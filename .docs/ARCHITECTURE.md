@@ -16,7 +16,8 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 
 - **Web app** para interação com Experts e gestão de conectores.
 - **API** dedicada para regras de negócio, ingestão e orquestração de agents.
-- **Supabase** para autenticação, banco PostgreSQL e storage.
+- **Supabase/Postgres** como banco PostgreSQL e storage; a **autenticação é própria da API**
+  (JWT emitido pela API; sem Supabase Auth).
 - **Conectores externos** para trazer dados de Notion, Google Drive, Jira, PDF etc.
 
 ---
@@ -173,6 +174,32 @@ Regras de dependência entre pacotes:
 - `packages/ui` não importa apps nem acessa API diretamente.
 - `packages/shared` não depende de React, Next.js ou NestJS.
 
+### 4.4 Modelo de dados de autenticação
+
+O schema de auth é criado em `supabase/migrations/` e é de uso **exclusivo da API**; o navegador
+não acessa essas tabelas (RLS habilitado, nenhuma policy para `anon`/`authenticated`). A API
+opera com a credencial de servidor (`service_role`).
+
+| Tabela        | Papel                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| `users`       | Conta da pessoa: nome, e-mail normalizado e único, hash de senha e confirmação de e-mail         |
+| `auth_tokens` | Tokens opacos de uso único para confirmação de e-mail e reset de senha, persistidos só como hash |
+| `sessions`    | Registro server-side das sessões emitidas pela API, com expiração e revogação                    |
+
+Regras centrais:
+
+- `users.email` é armazenado em minúsculas; o índice único em `lower(email)` garante unicidade
+  case-insensitive.
+- `users.password_hash` armazena apenas o hash; a senha em claro nunca é persistida.
+- `auth_tokens` usa `purpose` (`email_confirmation` ou `password_reset`), `expires_at` e
+  `used_at`; apenas `token_hash` é persistido.
+- `sessions` usa `origin` (`sign_up_confirmation` ou `sign_in`), `expires_at` e `revoked_at`;
+  sessão ativa é a que tem `revoked_at` nulo e `expires_at` no futuro.
+- `users`, `auth_tokens` e `sessions` usam UUID e `ON DELETE CASCADE` a partir do usuário.
+
+O detalhamento de campos e constraints está em `.specs/001-auth-schema.md`; o JWT, o cookie
+`HttpOnly` e os endpoints de auth entram nas specs 002 a 008.
+
 ---
 
 ## 5. Fluxo de dados alvo
@@ -185,7 +212,7 @@ apps/web (Next.js)
   │  HTTP
   ▼
 apps/api (NestJS)
-  ├── AuthN/AuthZ ──────────────► Supabase Auth
+  ├── AuthN/AuthZ ──────────────► Postgres (auth própria: users, auth_tokens, sessions)
   ├── Casos de uso
   │     ├── Conectores ─────────► Notion / Google / Jira / ...
   │     ├── Ingestão ───────────► Postgres + Storage (documentos e chunks)
@@ -202,7 +229,9 @@ Fluxo resumido:
 5. Logs, métricas e traces são emitidos desde o dia 0.
 
 > O fluxo acima é o alvo do produto. Na fundação, apenas o caminho web → API (`GET /`) e a
-> telemetria estão implementados.
+> telemetria estão implementados. A fatia 001 adiciona o **schema de auth** (`users`,
+> `auth_tokens`, `sessions`), mas ainda **sem endpoints, JWT ou cookie** — eles entram nas
+> fatias 002 a 008.
 
 ---
 
@@ -218,6 +247,7 @@ tomadas.
 | Next.js App Router no front-end            | Server Components, streaming e SEO                                             | ✅           |
 | API separada em NestJS                     | Isolar domínio, ingestão e orquestração do front                               | ✅           |
 | Supabase local via CLI                     | Ambiente reproduzível sem instalação global                                    | ✅           |
+| Auth própria na API (sem Supabase Auth)    | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação        | ✅ (schema)  |
 | Arquitetura em camadas + vertical slices   | Baixo acoplamento e evolução por domínio                                       | ✅ (`hello`) |
 | Light theme único                          | Direção visual definida em `DESIGN.md`                                         | ✅           |
 | Tailwind CSS + shadcn/ui em `packages/ui`  | Base visual compartilhada e tokens únicos                                      | ✅           |
@@ -235,7 +265,7 @@ tomadas.
 | Tema                 | Pergunta                                                                                       |
 | -------------------- | ---------------------------------------------------------------------------------------------- |
 | Deploy da API        | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render). |
-| Hash de senha        | Se o Supabase Auth gerencia credenciais, bcrypt é necessário apenas para auth própria.         |
+| Hash de senha        | Qual algoritmo usar no hash próprio (bcrypt/argon2) e qual custo; decidir na fatia 002.        |
 | `apps/docs`          | Será o site público de documentação ou deve ser removido?                                      |
 | OXLint/OXFmt         | Migrar do ESLint/Prettier atual ou manter?                                                     |
 | Multi-tenancy        | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                     |

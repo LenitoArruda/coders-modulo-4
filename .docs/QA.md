@@ -40,6 +40,11 @@ Execute na raiz do monorepo:
 | `bun run infra:up`    | Sobe LGTM (Compose) e Supabase local                         |
 | `bun run infra:down`  | Para Supabase e LGTM (idempotente)                           |
 | `bun run db:migrate`  | Aplica migrações pendentes no Supabase local                 |
+| `bun run db:test`     | Executa os testes pgTAP de `supabase/tests/` no banco local  |
+
+> `bun run db:test` exige o Supabase local ativo (`bun run infra:up`) e as migrações aplicadas
+> (`bun run db:migrate`). Ele usa `supabase test db`, que roda cada arquivo de `supabase/tests/`
+> com pgTAP em uma transação com `rollback`.
 
 > Use sempre `bun run <script>`. `bun build` e `bun test` são comandos nativos do Bun e **não**
 > executam os scripts do `package.json`.
@@ -114,6 +119,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] RLS/isolamento por tenant quando aplicável.
 - [ ] Nenhuma perda de dados.
 - [ ] Seed/dados de teste documentados.
+- [ ] `bun run db:migrate` aplica a migração e `bun run db:test` passa com os testes pgTAP.
 
 ### 5.4 Conectores e integrações
 
@@ -234,17 +240,17 @@ Requisitos:
 
 ## 10. Lacunas conhecidas
 
-| Lacuna                                      | Impacto                                                                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Nenhum CI                                   | Verificação depende do ambiente local                                                                              |
-| Commitlint apenas local                     | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                  |
-| Produto não implementado                    | Apenas a rota de hello world e a fundação existem                                                                  |
-| `apps/docs` ainda é o starter               | Conteúdo público de documentação não definido                                                                      |
-| Componentes legados em `packages/ui`        | `button`, `card` e `code` são mantidos por uso em `apps/docs`                                                      |
-| Sem Vitest/Testing Library no pacote `ui`   | Componentes compartilhados não têm testes unitários                                                                |
-| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                |
-| PostgreSQL local em `15`                    | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                |
-| OXLint/OXFmt não adotados                   | ESLint + Prettier seguem como padrão nesta entrega                                                                 |
-| Skills locais em `.agents/` não versionadas | A edição de `implement-me`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
+| Lacuna                                      | Impacto                                                                                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Nenhum CI                                   | Verificação depende do ambiente local                                                                                                |
+| Commitlint apenas local                     | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
+| Produto não implementado                    | Apenas a rota de hello world e a fundação existem                                                                                    |
+| `apps/docs` ainda é o starter               | Conteúdo público de documentação não definido                                                                                        |
+| Componentes legados em `packages/ui`        | `button`, `card` e `code` são mantidos por uso em `apps/docs`                                                                        |
+| Sem Vitest/Testing Library no pacote `ui`   | Componentes compartilhados não têm testes unitários                                                                                  |
+| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                                  |
+| PostgreSQL local em `15`                    | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                                  |
+| OXLint/OXFmt não adotados                   | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
+| Skills locais em `.agents/` não versionadas | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
 
 Ao resolver uma lacuna, atualize esta tabela e o documento relacionado.

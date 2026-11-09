@@ -15,6 +15,7 @@
     "infra:up": "node scripts/infra.mjs up",
     "infra:down": "node scripts/infra.mjs down",
     "db:migrate": "bun x supabase migration up --local",
+    "db:test": "bun x supabase test db",
     "prepare": "lefthook install"
   },
   "lint-staged": {
