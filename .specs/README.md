@@ -12,6 +12,9 @@ Esta pasta guarda as **specs de feature** do projeto.
   `.plans/<numero>-<slug>-plan.md` (ex.: `.plans/000-foundation-plan.md`).
 - A spec descreve **o quê** e **por quê**; o plano descreve **como**.
 - Crie specs com a skill `create-spec`, refine com `refine-spec` e execute com `implement-me`.
+- Para um épico ou prompt com várias features, use `breakdown-specs` antes de `create-spec`:
+  ele gera o mapa em `.plans/<numero>-<epic-slug>-breakdown.md` e as specs em ordem de
+  dependência.
 - Use `feature-concept` quando a ideia ainda estiver vaga e precisar de uma entrevista de
   requisitos antes de escrever ou refinar a spec.
 

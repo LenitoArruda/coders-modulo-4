@@ -29,7 +29,9 @@ Antes de iniciar qualquer desenvolvimento:
    `001-expert-onboarding.md`) e seguem o template
    [`.specs/_template.md`](../.specs/_template.md). Crie com `create-spec`, refine com
    `refine-spec` e execute com `implement-me`. Use `feature-concept` quando a ideia ainda estiver
-   vaga ou for necessário descobrir requisitos.
+   vaga ou for necessário descobrir requisitos. Quando o pedido descrever um épico ou várias
+   features, use `breakdown-specs` antes de `create-spec` para gerar o mapa em `.plans/` e as
+   specs em ordem de dependência.
 
 ---
 

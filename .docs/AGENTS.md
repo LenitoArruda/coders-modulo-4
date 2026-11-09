@@ -55,6 +55,8 @@ o documento afetado na mesma tarefa.
    - Se faltar contexto de produto, consulte `BUSINESS.md`.
    - Se faltar contexto técnico, consulte `ARCHITECTURE.md`.
    - Se a tarefa vier de uma spec (`.specs/<numero>-<slug>.md`), leia-a por completo.
+   - Se o pedido descrever um épico ou várias features, use a skill `breakdown-specs` para gerar
+     o mapa e as specs em ordem de dependência.
    - Se a spec ainda não existir, use a skill `create-spec`.
    - Se a spec existir mas estiver incompleta, use a skill `refine-spec`.
    - Se a ideia ou a spec estiver vaga, use a skill `feature-concept`.
@@ -80,6 +82,8 @@ o documento afetado na mesma tarefa.
 Antes de começar, verifique se existe uma skill adequada ao domínio da tarefa:
 
 - **Descoberta e requisitos:** `feature-concept` — obrigatória quando a ideia/spec estiver vaga.
+- **Decomposição de escopo:** `breakdown-specs` — quebra um épico em várias specs pequenas,
+  registra o mapa em `.plans` e cria as specs com `create-spec`.
 - **Criação de spec:** `create-spec` — transforma um prompt ou ideia em spec refinada em
   `.specs`, seguindo o template canônico.
 - **Refinamento de spec:** `refine-spec` — audita uma spec existente e fecha lacunas,
