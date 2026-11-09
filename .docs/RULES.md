@@ -89,7 +89,7 @@ Antes de iniciar qualquer desenvolvimento:
 - Ao final de cada spec, a skill `implement-me` executa o comando `commit-and-push`
   (`.opencode/commands/commit-and-push.md`): analisa o diff, commita e faz push.
 - Commits criados por esse fluxo incluem o trailer
-  `Co-authored-by: opencode <noreply@opencode.ai>`.
+  `Co-authored-by: OpenCode Agent <noreply@opencode.ai>`.
 - Fora da execução de spec, não commite nem faça push sem pedido explícito do usuário.
 - Não commite `.env`, credenciais ou artefatos de build.
 - Não reescreva histórico compartilhado nem use `push --force` em branches de outras pessoas.

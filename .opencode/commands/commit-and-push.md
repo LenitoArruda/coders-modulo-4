@@ -50,7 +50,7 @@ Siga Conventional Commits:
 - O rodapé é obrigatório e separado do corpo por uma linha em branco:
 
 ```text
-Co-authored-by: opencode <noreply@opencode.ai>
+Co-authored-by: OpenCode Agent <noreply@opencode.ai>
 ```
 
 Não liste caminhos de arquivos no resumo. Descreva o comportamento entregue.
@@ -62,7 +62,7 @@ Não liste caminhos de arquivos no resumo. Descreva o comportamento entregue.
 3. Crie o commit com subject, corpo (quando houver) e o trailer:
 
 ```sh
-git commit -m "<subject>" -m "<corpo>" -m "Co-authored-by: opencode <noreply@opencode.ai>"
+git commit -m "<subject>" -m "<corpo>" -m "Co-authored-by: OpenCode Agent <noreply@opencode.ai>"
 ```
 
 O hook `commit-msg` valida a mensagem com o commitlint. Se ele falhar, **corrija a mensagem** e

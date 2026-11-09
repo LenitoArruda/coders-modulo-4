@@ -137,7 +137,7 @@ O comando está em `.opencode/commands/commit-and-push.md`, segue Conventional C
 o trailer:
 
 ```text
-Co-authored-by: opencode <noreply@opencode.ai>
+Co-authored-by: OpenCode Agent <noreply@opencode.ai>
 ```
 
 Fora da execução de uma spec, use o comando apenas com pedido explícito.

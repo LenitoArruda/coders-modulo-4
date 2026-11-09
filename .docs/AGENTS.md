@@ -71,7 +71,7 @@ o documento afetado na mesma tarefa.
 6. **Publicar**
    - Ao final de cada spec, execute o comando `commit-and-push`
      (`.opencode/commands/commit-and-push.md`): analise o diff, crie o commit Conventional
-     Commits com o trailer `Co-authored-by: opencode <noreply@opencode.ai>` e faça o push.
+     Commits com o trailer `Co-authored-by: OpenCode Agent <noreply@opencode.ai>` e faça o push.
 
 ---
 

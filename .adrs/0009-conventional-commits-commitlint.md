@@ -21,7 +21,7 @@ Adotar **Conventional Commits** em inglês, no imperativo:
 A validação usa **commitlint 21.2.4** com `@commitlint/config-conventional`, executado pelo
 hook `commit-msg` do Lefthook. O hook `pre-commit` roda `lint-staged` (ADR 0011). Commits
 criados pelo fluxo de agentes incluem o trailer
-`Co-authored-by: opencode <noreply@opencode.ai>`. O commit inicial do starter permanece fora do
+`Co-authored-by: OpenCode Agent <noreply@opencode.ai>`. O commit inicial do starter permanece fora do
 padrão como exceção histórica e não deve ser reescrito.
 
 ## Consequências

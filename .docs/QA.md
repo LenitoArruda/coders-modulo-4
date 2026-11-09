@@ -46,9 +46,9 @@ Execute na raiz do monorepo:
 
 ### 2.1 Comando do OpenCode
 
-| Comando            | O que faz                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `/commit-and-push` | Analisa o diff, cria um commit Conventional Commits com `Co-authored-by: opencode <noreply@opencode.ai>` e faz push |
+| Comando            | O que faz                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `/commit-and-push` | Analisa o diff, cria um commit Conventional Commits com `Co-authored-by: OpenCode Agent <noreply@opencode.ai>` e faz push |
 
 > O fluxo está em `.opencode/commands/commit-and-push.md`. Ele é obrigatório ao final de cada
 > spec (skill `implement-me`). Fora disso, só execute com pedido explícito do usuário.
