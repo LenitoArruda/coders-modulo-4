@@ -5,11 +5,35 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
+    "lint:commit": "commitlint --edit",
+    "code:fix": "turbo run lint -- --fix && prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,css,yml,yaml}\"",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "types:check": "turbo run types:check",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "test:e2e": "turbo run test:e2e",
+    "infra:up": "node scripts/infra.mjs up",
+    "infra:down": "node scripts/infra.mjs down",
+    "db:migrate": "bun x supabase migration up --local",
+    "prepare": "lefthook install"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --no-config-lookup --config eslint.config.mjs --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "eslint": "10.9.1",
+    "lefthook": "2.2.2",
+    "lint-staged": "17.6.0",
     "prettier": "3.9.6",
+    "supabase": "3.0.0",
     "turbo": "^2.11.10",
     "typescript": "7.0.2"
   },

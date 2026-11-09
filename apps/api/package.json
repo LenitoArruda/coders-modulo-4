@@ -1,0 +1,43 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun --env-file=../../.env --watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "bun --env-file=../../.env dist/main.js",
+    "lint": "eslint . --max-warnings 0",
+    "types:check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.3.3",
+    "@nestjs/core": "12.3.3",
+    "@nestjs/platform-express": "12.3.3",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "0.301.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "0.301.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.301.0",
+    "@opentelemetry/instrumentation-http": "0.301.0",
+    "@opentelemetry/resources": "3.1.0",
+    "@opentelemetry/sdk-logs": "3.1.0",
+    "@opentelemetry/sdk-metrics": "3.1.0",
+    "@opentelemetry/sdk-node": "0.301.0",
+    "@opentelemetry/semantic-conventions": "1.44.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "12.3.3",
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/express": "5.0.6",
+    "@types/node": "26.4.1",
+    "@types/supertest": "7.2.1",
+    "eslint": "10.9.1",
+    "supertest": "7.3.1",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}
