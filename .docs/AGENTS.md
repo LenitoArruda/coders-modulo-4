@@ -130,6 +130,7 @@ Regras:
 | [QA.md](./QA.md)                                | Comandos reais, verificações, QA manual, DoD e lacunas conhecidas            |
 | [`.specs/README.md`](../.specs/README.md)       | Convenções, status e Definition of Ready das specs                           |
 | [`.specs/_template.md`](../.specs/_template.md) | Template canônico para criar e refinar specs                                 |
+| [`.adrs/README.md`](../.adrs/README.md)         | Architecture Decision Records: contexto, decisão e consequências             |
 
 ---
 

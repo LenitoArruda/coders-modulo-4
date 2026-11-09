@@ -42,6 +42,7 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 ├── .plans/                      # Planos de tarefas (<numero>-<slug>-plan.md)
 ├── .specs/                      # Specs de feature (<numero>-<slug>.md)
 ├── .docs/                       # Documentação do projeto
+├── .adrs/                       # Architecture Decision Records (ADRs)
 ├── turbo.json
 ├── package.json
 └── bun.lock
@@ -207,6 +208,10 @@ Fluxo resumido:
 
 ## 6. Decisões arquiteturais
 
+Cada decisão abaixo possui um registro correspondente em [`.adrs/`](../.adrs/README.md), com
+contexto, alternativas e consequências. Decisões ainda em aberto permanecem na §7 até serem
+tomadas.
+
 | Decisão                                    | Motivo                                                                         | Estado       |
 | ------------------------------------------ | ------------------------------------------------------------------------------ | ------------ |
 | Monorepo com Turborepo + Bun               | Compartilhar código, cache e execução paralela                                 | ✅           |
@@ -247,6 +252,7 @@ Atualize `ARCHITECTURE.md` na mesma mudança que:
 - adicionar/remover app ou pacote;
 - instalar/remover tecnologia da stack;
 - alterar a direção de dependência entre camadas;
-- mudar o fluxo de dados ou o modelo de deploy.
+- mudar o fluxo de dados ou o modelo de deploy;
+- tomar ou revisar uma decisão arquitetural (crie/atualize um ADR em [`.adrs/`](../.adrs/README.md)).
 
 Mantenha a legenda de status e as versões sincronizadas com os `package.json`.

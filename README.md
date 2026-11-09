@@ -183,6 +183,7 @@ Consulte `service_name="coders-modulo-4-api"` em Loki, Tempo ou Prometheus.
 ├── supabase/                    # config.toml e migrações
 ├── docker-compose.yml           # LGTM: Grafana + OTel Collector + Loki/Tempo/Prometheus
 ├── .docs/                       # Documentação do projeto (fonte de verdade)
+├── .adrs/                       # Architecture Decision Records (ADRs)
 ├── .specs/                      # Specs de feature
 ├── .plans/                      # Planos de execução
 ├── .opencode/commands/          # Comandos do OpenCode (ex.: commit-and-push)
@@ -256,3 +257,4 @@ Detalhes e decisões: [`.docs/ARCHITECTURE.md`](./.docs/ARCHITECTURE.md) e
 | [`.docs/DESIGN.md`](./.docs/DESIGN.md)               | Direção visual                       |
 | [`.docs/DESIGN_SYSTEM.md`](./.docs/DESIGN_SYSTEM.md) | Tailwind, shadcn e tokens            |
 | [`.docs/BUSINESS.md`](./.docs/BUSINESS.md)           | Produto, Experts e conectores        |
+| [`.adrs/README.md`](./.adrs/README.md)               | Decisões arquiteturais (ADRs)        |
