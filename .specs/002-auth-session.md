@@ -1,11 +1,11 @@
 # Auth session — Spec
 
-> **Status:** approved
+> **Status:** done
 > **Atualizado em:** 2026-11-09
 > **Autor:** Time de engenharia
 > **Mapa:** `.plans/001-auth-breakdown.md`
 > **Depende de:** `.specs/001-auth-schema.md`
-> **Plano:** `.plans/002-auth-session-plan.md` (a criar pelo `implement-me`)
+> **Plano:** `.plans/002-auth-session-plan.md`
 
 ## 1. Contexto e problema
 
@@ -204,25 +204,28 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um usuário válido, quando uma sessão é criada, então a API assina um JWT com `sub`, `sid`, `iat` e `exp` e persiste a sessão com `origin` e expiração.
-- [ ] Dado um JWT válido com sessão ativa, quando `GET /api/v1/auth/me` é chamado, então a API responde `200` com os dados básicos da pessoa.
-- [ ] Dado um JWT ausente, inválido, expirado ou com sessão revogada, quando `GET /api/v1/auth/me` é chamado, então a API responde `401` sem detalhes internos.
-- [ ] Dada uma sessão ativa anterior, quando uma nova sessão é criada, então a anterior é revogada e apenas a nova é aceita.
-- [ ] Dada a criação de uma sessão, quando o fluxo termina, então o e-mail de nova sessão en-US é disparado com data/hora e sem link de recuperação nesta fatia.
-- [ ] Dado o cookie de sessão, quando ele é inspecionado no navegador, então é `HttpOnly`, `SameSite=Lax`, `Secure` em produção, `Path=/` e inacessível ao JavaScript.
-- [ ] Dada a API, quando os endpoints são chamados, então o hello está em `GET /api/v1/hello`, `GET /` não existe, o contrato de erro é estável e nenhum token, JWT ou PII aparece em logs.
+- [x] Dado um usuário válido, quando uma sessão é criada, então a API assina um JWT com `sub`, `sid`, `iat` e `exp` e persiste a sessão com `origin` e expiração.
+- [x] Dado um JWT válido com sessão ativa, quando `GET /api/v1/auth/me` é chamado, então a API responde `200` com os dados básicos da pessoa.
+- [x] Dado um JWT ausente, inválido, expirado ou com sessão revogada, quando `GET /api/v1/auth/me` é chamado, então a API responde `401` sem detalhes internos.
+- [x] Dada uma sessão ativa anterior, quando uma nova sessão é criada, então a anterior é revogada e apenas a nova é aceita.
+- [x] Dada a criação de uma sessão, quando o fluxo termina, então o e-mail de nova sessão en-US é disparado com data/hora e sem link de recuperação nesta fatia.
+- [x] Dado o cookie de sessão, quando ele é inspecionado no navegador, então é `HttpOnly`, `SameSite=Lax`, `Secure` em produção, `Path=/` e inacessível ao JavaScript.
+- [x] Dada a API, quando os endpoints são chamados, então o hello está em `GET /api/v1/hello`, `GET /` não existe, o contrato de erro é estável e nenhum token, JWT ou PII aparece em logs.
+
+> A inspeção do cookie no navegador depende de um fluxo público que grave o cookie (fatias 005/006);
+> nesta fatia as opções são garantidas por teste unitário e a limitação está registrada em `QA.md`.
 
 ## 15. Decisões e questões abertas
 
-| Tema                           | Decisão ou pergunta                                                 | Impacto                                                      | Dono               | Status                  |
-| ------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------ | ----------------------- |
-| Emissor do JWT                 | API NestJS própria                                                  | Mantém sessão única, revogação e e-mails sob controle da API | Engenharia         | fechada (2026-11-09)    |
-| Transporte no web              | Cookie `HttpOnly` no web + `Authorization: Bearer` na API           | Protege o token contra XSS e permite proteção SSR            | Engenharia         | fechada (2026-11-09)    |
-| Sessão única                   | Toda nova sessão revoga as anteriores e envia e-mail                | Atende ao requisito de “última sessão vence”                 | Produto/Engenharia | fechada (2026-11-09)    |
-| Namespace da API               | `/api/v1` nasce nesta fatia com `/api/v1/auth/me` e `/api/v1/hello` | Evita dependência circular com a fatia de rotas              | Engenharia         | fechada (2026-11-09)    |
-| TTL da sessão                  | 7 dias, configurável                                                | Define expiração e frequência de novo login                  | Engenharia         | aberta (não bloqueante) |
-| Refresh token                  | Fora do épico; ao expirar, novo sign-in                             | Evita complexidade de rotação nesta entrega                  | Produto/Engenharia | aberta (não bloqueante) |
-| Sign-out                       | Fora do épico                                                       | Sessão termina por expiração ou nova sessão                  | Produto            | aberta (não bloqueante) |
-| Falha no e-mail de nova sessão | Sessão permanece válida; falha é registrada                         | Evita bloquear o acesso por falha de e-mail                  | Engenharia         | fechada (default)       |
-| Link de recuperação no e-mail  | Adicionado na fatia 007                                             | Evita link quebrado antes da página existir                  | Produto/Engenharia | fechada (2026-11-09)    |
-| Banco de testes                | Postgres descartável ou repositório fake                            | Afeta testes de integração e E2E                             | Engenharia         | aberta (não bloqueante) |
+| Tema                           | Decisão ou pergunta                                                       | Impacto                                                      | Dono               | Status                  |
+| ------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------ | ----------------------- |
+| Emissor do JWT                 | API NestJS própria                                                        | Mantém sessão única, revogação e e-mails sob controle da API | Engenharia         | fechada (2026-11-09)    |
+| Transporte no web              | Cookie `HttpOnly` no web + `Authorization: Bearer` na API                 | Protege o token contra XSS e permite proteção SSR            | Engenharia         | fechada (2026-11-09)    |
+| Sessão única                   | Toda nova sessão revoga as anteriores e envia e-mail                      | Atende ao requisito de “última sessão vence”                 | Produto/Engenharia | fechada (2026-11-09)    |
+| Namespace da API               | `/api/v1` nasce nesta fatia com `/api/v1/auth/me` e `/api/v1/hello`       | Evita dependência circular com a fatia de rotas              | Engenharia         | fechada (2026-11-09)    |
+| TTL da sessão                  | 7 dias, configurável                                                      | Define expiração e frequência de novo login                  | Engenharia         | fechada (2026-11-09)    |
+| Refresh token                  | Fora do épico; ao expirar, novo sign-in                                   | Evita complexidade de rotação nesta entrega                  | Produto/Engenharia | aberta (não bloqueante) |
+| Sign-out                       | Fora do épico                                                             | Sessão termina por expiração ou nova sessão                  | Produto            | aberta (não bloqueante) |
+| Falha no e-mail de nova sessão | Sessão permanece válida; falha é registrada                               | Evita bloquear o acesso por falha de e-mail                  | Engenharia         | fechada (default)       |
+| Link de recuperação no e-mail  | Adicionado na fatia 007                                                   | Evita link quebrado antes da página existir                  | Produto/Engenharia | fechada (2026-11-09)    |
+| Banco de testes                | Repositórios fake na integração; banco real coberto por QA manual + pgTAP | Evita infra de banco descartável nesta fatia                 | Engenharia         | fechada (2026-11-09)    |

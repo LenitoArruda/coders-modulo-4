@@ -8,7 +8,10 @@ test("home exibe o hello world acessível", async ({ page }) => {
   await expect(page.locator("h1")).toHaveCount(1);
 
   const apiLink = page.getByRole("link", { name: "Abrir a API" });
-  await expect(apiLink).toHaveAttribute("href", "http://localhost:3333/");
+  await expect(apiLink).toHaveAttribute(
+    "href",
+    "http://localhost:3333/api/v1/hello",
+  );
 });
 
 for (const width of [360, 768, 1280]) {

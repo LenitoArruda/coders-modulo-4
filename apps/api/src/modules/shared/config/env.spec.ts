@@ -9,6 +9,7 @@ const validEnv: EnvSource = {
   SUPABASE_ANON_KEY: "anon-key",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4317",
+  JWT_SECRET: "test-jwt-secret-with-at-least-32-characters",
 };
 
 describe("loadEnv", () => {
@@ -17,6 +18,67 @@ describe("loadEnv", () => {
       port: 3333,
       webOrigin: "http://localhost:3000",
       serviceName: "coders-modulo-4-api",
+      jwtSecret: "test-jwt-secret-with-at-least-32-characters",
+      sessionTtlSeconds: 604_800,
+      smtpHost: "127.0.0.1",
+      smtpPort: 54_325,
+      smtpFrom: "no-reply@localhost",
+    });
+  });
+
+  it("deve falhar quando o segredo do JWT está ausente", () => {
+    const source = { ...validEnv, JWT_SECRET: undefined };
+
+    expect(() => loadEnv(source)).toThrow(ConfigurationError);
+
+    try {
+      loadEnv(source);
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigurationError);
+      expect((error as ConfigurationError).missing).toContain("JWT_SECRET");
+    }
+  });
+
+  it("deve falhar quando o segredo do JWT é curto demais", () => {
+    expect(() => loadEnv({ ...validEnv, JWT_SECRET: "short-secret" })).toThrow(
+      /JWT_SECRET/,
+    );
+  });
+
+  it("deve aplicar o TTL de sessão configurado", () => {
+    expect(
+      loadEnv({ ...validEnv, SESSION_TTL_SECONDS: "3600" }).sessionTtlSeconds,
+    ).toBe(3600);
+  });
+
+  it("deve falhar quando o TTL de sessão é inválido", () => {
+    expect(() => loadEnv({ ...validEnv, SESSION_TTL_SECONDS: "abc" })).toThrow(
+      /SESSION_TTL_SECONDS/,
+    );
+
+    expect(() => loadEnv({ ...validEnv, SESSION_TTL_SECONDS: "0" })).toThrow(
+      /SESSION_TTL_SECONDS/,
+    );
+  });
+
+  it("deve falhar quando a porta do SMTP é inválida", () => {
+    expect(() => loadEnv({ ...validEnv, SMTP_PORT: "not-a-port" })).toThrow(
+      /SMTP_PORT/,
+    );
+  });
+
+  it("deve aplicar os overrides de SMTP quando informados", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        SMTP_HOST: "smtp.example.com",
+        SMTP_PORT: "587",
+        SMTP_FROM: "no-reply@example.com",
+      }),
+    ).toMatchObject({
+      smtpHost: "smtp.example.com",
+      smtpPort: 587,
+      smtpFrom: "no-reply@example.com",
     });
   });
 

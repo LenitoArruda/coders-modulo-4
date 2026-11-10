@@ -1,8 +1,8 @@
 # Coders Módulo 4 — Fundação
 
 Monorepo da plataforma de **Experts**: agentes de IA especializados por área/posição da empresa.
-Esta entrega é a **fundação** do projeto — web, API, banco local, testes e observabilidade — e
-**não** implementa ainda funcionalidades de produto.
+Esta entrega é a **fundação** do projeto — web, API, banco local, testes, observabilidade e
+infraestrutura de sessão de auth — e **não** implementa ainda funcionalidades de produto.
 
 > A fonte de verdade sobre produto, arquitetura, padrões e QA está em [`.docs/`](./.docs).
 > Comece por [`.docs/AGENTS.md`](./.docs/AGENTS.md).
@@ -17,8 +17,9 @@ Esta entrega é a **fundação** do projeto — web, API, banco local, testes e 
 | Web / Docs             | Next.js 16 (App Router) + React 19                     |
 | UI                     | Tailwind CSS 4 + shadcn/ui (`packages/ui`)             |
 | API                    | NestJS 12 + TypeScript (CommonJS)                      |
-| Banco / Auth / Storage | Supabase local via CLI 3                               |
-| Testes                 | Vitest + Supertest (API) e Playwright (web)            |
+| Sessão / e-mail        | jose (JWT HS256) + nodemailer (SMTP local)             |
+| Banco / Auth / Storage | Supabase local via CLI 3 (`@supabase/supabase-js`)     |
+| Testes                 | Vitest + Supertest (API), Vitest (web) e Playwright    |
 | Observabilidade        | OpenTelemetry → Grafana LGTM (métricas, logs e traces) |
 | Lint / formato         | ESLint + Prettier + Lefthook/lint-staged               |
 
@@ -65,6 +66,15 @@ quando alguma chave está ausente ou inválida.
 | `SUPABASE_SERVICE_ROLE_KEY`   | Chave de serviço local (nunca use em produção)       |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP gRPC do LGTM (`http://localhost:4317`) |
 | `OTEL_SERVICE_NAME`           | Nome do serviço na telemetria                        |
+| `JWT_SECRET`                  | Segredo HS256 do JWT (obrigatório, ≥ 32 caracteres)  |
+| `SESSION_TTL_SECONDS`         | Duração da sessão em segundos (padrão `604800`)      |
+| `SMTP_HOST`                   | Host SMTP local (padrão `127.0.0.1`)                 |
+| `SMTP_PORT`                   | Porta SMTP do Mailpit (padrão `54325`)               |
+| `SMTP_FROM`                   | Remetente do e-mail de nova sessão                   |
+| `API_BASE_URL`                | URL da API usada pelo servidor do web                |
+
+> Gere um `JWT_SECRET` local com `openssl rand -base64 48` (ou equivalente). O valor vazio no
+> `.env.example` é intencional: a API falha no boot se o segredo estiver ausente ou curto.
 
 ---
 
@@ -81,12 +91,13 @@ Execute na raiz do monorepo:
 | `bun run code:fix`    | ESLint `--fix` + Prettier em código, JSON, CSS e YAML        |
 | `bun run format`      | Prettier em `**/*.{ts,tsx,md}`                               |
 | `bun run types:check` | Checagem de tipos em todos os apps/pacotes                   |
-| `bun run test`        | Testes unitários e de integração da API (Vitest)             |
-| `bun run test:watch`  | Vitest em modo watch                                         |
+| `bun run test`        | Testes unitários e de integração da API e do web (Vitest)    |
+| `bun run test:watch`  | Vitest em modo watch (API e web)                             |
 | `bun run test:e2e`    | Smoke E2E do web (Playwright)                                |
 | `bun run infra:up`    | Sobe LGTM (Compose) e Supabase local                         |
 | `bun run infra:down`  | Para Supabase e LGTM (idempotente)                           |
 | `bun run db:migrate`  | Aplica migrações pendentes no Supabase local                 |
+| `bun run db:test`     | Executa os testes pgTAP de `supabase/tests/`                 |
 
 > Use sempre `bun run <script>`. `bun test` e `bun build` são comandos nativos do Bun e **não**
 > executam os scripts do monorepo.
@@ -160,7 +171,8 @@ o padrão; não reescreva o histórico por causa disso.
 | Supabase API    | <http://localhost:54321> |
 | Supabase DB     | `localhost:54322`        |
 | Supabase Studio | <http://localhost:54323> |
-| Mailpit         | <http://localhost:54324> |
+| Mailpit (inbox) | <http://localhost:54324> |
+| Mailpit (SMTP)  | `localhost:54325`        |
 
 O Grafana do LGTM sobe com acesso anônimo (Admin) e já recebe logs, métricas e traces da API.
 Consulte `service_name="coders-modulo-4-api"` em Loki, Tempo ou Prometheus.
@@ -197,12 +209,36 @@ A API segue arquitetura em camadas + vertical slices:
 ```text
 apps/api/src/
 ├── modules/
+│   ├── auth/{domain,application,infrastructure,interface}
 │   ├── hello/{domain,application,interface}
-│   └── shared/{config,logging,observability}
+│   └── shared/{config,logging,observability,interface}
+├── test/fakes/                  # repositórios, e-mail e token em memória
 ├── app.module.ts
 ├── app-setup.ts
 └── main.ts
 ```
+
+---
+
+## Auth e sessão
+
+A autenticação é própria da API (sem Supabase Auth) e a API é versionada em `/api/v1`:
+
+| Rota                          | Comportamento                                                |
+| ----------------------------- | ------------------------------------------------------------ |
+| `GET /api/v1/hello`           | Hello world (200)                                            |
+| `GET /api/v1/auth/me`         | Dados básicos da pessoa autenticada (200) ou 401 do contrato |
+| Qualquer rota fora do prefixo | 404 com o contrato de erro                                   |
+
+- Sessão = JWT HS256 (`sub`, `sid`, `iat`, `exp`) + registro em `sessions`; toda requisição
+  autenticada confere se a sessão está ativa. Sessão única: um novo login revoga os anteriores.
+- O web guarda o token no cookie `session_token` (`HttpOnly`, `SameSite=Lax`, `Secure` em
+  produção); o servidor do Next lê o cookie e envia `Authorization: Bearer` (`apps/web/lib/auth`).
+  O token nunca vai para o JavaScript do navegador.
+- O e-mail de nova sessão é enviado pelo SMTP local e fica visível no Mailpit
+  (<http://localhost:54324>). A fatia entrega a infraestrutura; páginas públicas de confirmação,
+  sign-in, sign-out e recuperação de senha entram nas fatias 004–008.
+- Erros seguem `{ code, message, fieldErrors? }`, sem stack, SQL ou detalhes internos.
 
 ---
 
@@ -223,10 +259,12 @@ apps/api/src/
 - ✅ Fundação implementada: web, docs, API, Supabase local, migrações, testes, lint/tipos/build e
   observabilidade.
 - ✅ Scripts `code:fix`, `types:check`, `test`, `test:watch`, `test:e2e`, `infra:up`,
-  `infra:down` e `db:migrate`.
-- 🧭 Produto, autenticação de usuário final, multi-tenancy/RLS, deploy e CI ainda não
-  implementados.
-- 🧭 `packages/shared`, OXLint/OXFmt, date-fns, TanStack e bcrypt fora desta entrega.
+  `infra:down`, `db:migrate` e `db:test`.
+- ✅ Infraestrutura de sessão (spec 002): JWT HS256 + sessão server-side, `GET /api/v1/auth/me`,
+  ponte de cookie `HttpOnly` no web, contrato de erro, hello em `/api/v1` e e-mail de nova sessão.
+- 🧭 Fluxos públicos de auth (confirmação, sign-in, sign-out e recuperação de senha), produto,
+  multi-tenancy/RLS, deploy e CI ainda não implementados.
+- 🧭 `packages/shared`, OXLint/OXFmt, date-fns, TanStack e hash de senha fora desta entrega.
 
 Detalhes e decisões: [`.docs/ARCHITECTURE.md`](./.docs/ARCHITECTURE.md) e
 [`.specs/000-foundation.md`](./.specs/000-foundation.md).

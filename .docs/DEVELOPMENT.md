@@ -69,8 +69,25 @@ apps/api/src/modules/<domain>/
 └── interface/
 ```
 
-O slice `hello` é o exemplo de referência. `modules/shared` contém `config`, `logging` e
-`observability`. Novos domínios seguem a mesma estrutura.
+O slice `auth` é a referência de slice completo (quatro camadas); `hello` permanece como exemplo
+mínimo. `modules/shared` contém `config`, `logging`, `observability` e `interface` (contrato de
+erro). Fakes de teste vivem em `apps/api/src/test/fakes/`. Novos domínios seguem a mesma estrutura.
+
+### 3.1 Módulo auth — convenções
+
+- Portas são **classes abstratas**; os tokens de DI ficam em `modules/auth/auth.tokens.ts` e a
+  montagem concreta em `auth.module.ts`. Não importe adaptadores de dentro de `application`.
+- Casos de uso não conhecem Nest nem HTTP. `CreateSessionUseCase` é **interno**: a rota pública de
+  criação de sessão entra nas fatias 005/006. `ValidateSessionUseCase` é usado pelo guard.
+- Rotas protegidas usam `@UseGuards(SessionGuard)` e `@CurrentUser()`; a API **não** lê cookie —
+  ela só aceita `Authorization: Bearer`.
+- `InvalidSessionError` é traduzido pelo guard em `401` com o contrato único da sessão; ausência,
+  expiração, revogação e assinatura inválida são indistinguíveis na resposta.
+- Adaptadores convertem erros externos (jose, PostgREST, SMTP) sem vazar detalhes; falha de e-mail
+  não derruba a sessão já criada.
+- Toda rota vive sob `/api/v1`; caminhos fora do prefixo respondem 404 com o mesmo contrato.
+- Testes de integração usam os fakes de repositório/e-mail e o adaptador `jose` **real** para
+  tokens; não há banco de teste nesta fatia (o banco local é coberto por QA manual + pgTAP).
 
 ---
 
@@ -86,6 +103,11 @@ O slice `hello` é o exemplo de referência. `modules/shared` contém `config`, 
 - Defina `metadata` por rota sempre que a página for pública.
 - Implemente `loading.tsx`, `error.tsx` e `not-found.tsx` quando a rota precisar.
 - Componentes de UI reutilizáveis vivem em `packages/ui`; composições de tela vivem no app.
+- **Sessão:** o cookie `session_token` é `HttpOnly`; o JavaScript do navegador nunca lê o token.
+  Chamadas autenticadas feitas no servidor usam `apps/web/lib/auth` (`getBearerToken` /
+  `fetchApiWithSession`), nunca `document.cookie`.
+- `API_BASE_URL` é lida apenas no servidor (default `http://localhost:3333`); não exponha segredo
+  nem token em variáveis `NEXT_PUBLIC_*`.
 
 ---
 
@@ -129,7 +151,9 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 - Não exponha stack trace, SQL ou detalhes internos ao usuário.
 - Não engula exceções com `catch` vazio.
 - Logs de erro devem conter contexto (operação, ids), sem PII/segredos.
-- Respostas de API devem ter formato de erro consistente.
+- Respostas de API seguem o contrato global `{ code, message, fieldErrors? }` via
+  `ErrorContractFilter` (`APP_FILTER`); nunca devolva stack, SQL ou mensagem interna.
+- O `401` de sessão tem mensagem única e fixa; não detalhe qual verificação falhou.
 
 ---
 
@@ -144,8 +168,10 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 - Nomeie no formato `deve <comportamento> quando <condição>`.
 - Todo bug corrigido ganha teste de regressão.
 - Evite snapshots como única cobertura.
-- A infraestrutura existe: **Vitest + Supertest** na API e **Playwright** no web. Comandos em
-  [QA.md](./QA.md).
+- A infraestrutura existe: **Vitest + Supertest** na API, **Vitest** para `apps/web/lib/**` e
+  **Playwright** no E2E. Comandos em [QA.md](./QA.md).
+- Integração de API: prefira fakes de repositório/e-mail (`apps/api/src/test/fakes/`) para
+  comportamento e use o adaptador real apenas quando o contrato externo importa (ex.: `jose`).
 
 ---
 
@@ -153,7 +179,8 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 
 - Logs estruturados em JSON, com nível (`debug`, `info`, `warn`, `error`).
 - Inclua `requestId`/`correlationId` para rastrear fluxos.
-- **Nunca** logue tokens, senhas, PII ou payloads sensíveis.
+- **Nunca** logue tokens (JWT, cookie, `auth_tokens`), senhas, e-mails completos ou payloads
+  sensíveis; use `userId`/`sessionId` como contexto.
 - Métricas para ingestão, latência, erros e custo de LLM.
 - Traces para chamadas externas e processamento assíncrono.
 - Stack atual: **Grafana LGTM** (imagem `grafana/otel-lgtm`, com Loki, Grafana, Tempo e

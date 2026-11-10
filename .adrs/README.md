@@ -42,6 +42,7 @@ escolha ao longo do tempo.
 | [0010](./0010-typescript-strict.md)                  | TypeScript `strict` no monorepo                    | `aceito` | 2026-11-05 |
 | [0011](./0011-eslint-prettier-e-config-raiz.md)      | ESLint + Prettier com config raiz para lint-staged | `aceito` | 2026-11-09 |
 | [0012](./0012-auth-propria-na-api.md)                | Autenticação própria na API, sem Supabase Auth     | `aceito` | 2026-11-09 |
+| [0013](./0013-auth-session-jwt-cookie.md)            | Sessão com JWT, registro server-side e cookie      | `aceito` | 2026-11-09 |
 
 ## Decisões em aberto
 

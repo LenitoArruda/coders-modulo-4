@@ -5,3 +5,5 @@ process.env.SUPABASE_ANON_KEY = "test-anon-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4317";
 process.env.OTEL_SDK_DISABLED = "true";
+process.env.JWT_SECRET = "test-jwt-secret-with-at-least-32-characters";
+process.env.SESSION_TTL_SECONDS = "3600";

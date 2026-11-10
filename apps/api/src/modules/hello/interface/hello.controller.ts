@@ -5,7 +5,7 @@ import {
   type HelloResponse,
 } from "../application/get-hello.use-case";
 
-@Controller()
+@Controller("hello")
 export class HelloController {
   constructor(
     @Inject(GetHelloUseCase)
