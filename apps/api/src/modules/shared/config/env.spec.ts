@@ -182,6 +182,34 @@ describe("loadEnv", () => {
     ).toThrow(/FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS/);
   });
 
+  it("deve aplicar o rate limit do reset de senha e usar 5/60 s por padrão", () => {
+    expect(loadEnv(validEnv)).toMatchObject({
+      resetPasswordRateLimitMax: 5,
+      resetPasswordRateLimitWindowSeconds: 60,
+    });
+
+    expect(
+      loadEnv({
+        ...validEnv,
+        RESET_PASSWORD_RATE_LIMIT_MAX: "9",
+        RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS: "90",
+      }),
+    ).toMatchObject({
+      resetPasswordRateLimitMax: 9,
+      resetPasswordRateLimitWindowSeconds: 90,
+    });
+  });
+
+  it("deve falhar quando o rate limit do reset de senha é inválido", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, RESET_PASSWORD_RATE_LIMIT_MAX: "0" }),
+    ).toThrow(/RESET_PASSWORD_RATE_LIMIT_MAX/);
+
+    expect(() =>
+      loadEnv({ ...validEnv, RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS: "abc" }),
+    ).toThrow(/RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS/);
+  });
+
   it("deve falhar quando a porta do SMTP é inválida", () => {
     expect(() => loadEnv({ ...validEnv, SMTP_PORT: "not-a-port" })).toThrow(
       /SMTP_PORT/,

@@ -49,6 +49,20 @@ export class InMemorySessionsRepository extends SessionsRepositoryPort {
     }
   }
 
+  async revokeAllActive(userId: string): Promise<void> {
+    const now = new Date();
+
+    for (const session of this.sessions) {
+      if (
+        session.userId === userId &&
+        session.revokedAt === null &&
+        session.expiresAt.getTime() > now.getTime()
+      ) {
+        session.revokedAt = now;
+      }
+    }
+  }
+
   async findActiveById(sessionId: string): Promise<Session | null> {
     const session = this.sessions.find(
       (candidate) => candidate.id === sessionId,

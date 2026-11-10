@@ -20,6 +20,12 @@ export abstract class SessionsRepositoryPort {
   ): Promise<void>;
 
   /**
+   * Revokes every active session of the user, with no exception. Used after a
+   * password reset: no previous session may survive it. Never revives one.
+   */
+  abstract revokeAllActive(userId: string): Promise<void>;
+
+  /**
    * Returns the session only when it is active: not revoked and not expired.
    * A valid JWT signature is not enough to consider a session valid.
    */

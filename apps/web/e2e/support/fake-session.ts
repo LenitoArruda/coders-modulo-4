@@ -22,3 +22,15 @@ export const E2E_CONFIRM_RATE_LIMITED_TOKEN = "rate-limited-confirmation-token";
  */
 export const E2E_SIGN_IN_DOMAIN = "signin.example.com";
 export const E2E_SIGN_IN_PASSWORD = "correct-password";
+
+/**
+ * Reset-password tokens: `reset-token:<local>:<unique>` is valid exactly once
+ * and, when used, changes the password of `<local>@signin.example.com` and
+ * revokes its sessions. Any other value is invalid, except the rate-limited one.
+ */
+export const E2E_RESET_TOKEN_PREFIX = "reset-token:";
+export const E2E_RESET_RATE_LIMITED_TOKEN = "rate-limited-reset-token";
+
+export function e2eResetToken(local: string, unique: string): string {
+  return `${E2E_RESET_TOKEN_PREFIX}${local}:${unique}`;
+}

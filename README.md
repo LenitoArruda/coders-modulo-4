@@ -244,15 +244,15 @@ A autenticação é própria da API (sem Supabase Auth) e a API é versionada em
 
 O web separa o fluxo público da área privada em dois grupos de rota:
 
-| Rota                    | Acesso  | Comportamento                                        |
-| ----------------------- | ------- | ---------------------------------------------------- |
-| `/`                     | Público | Sessão válida → `/app`; sem sessão → `/auth/sign-up` |
-| `/auth/sign-up`         | Público | Placeholder; com sessão → `/app`                     |
-| `/auth/sign-in`         | Público | Placeholder; com sessão → `/app`                     |
-| `/auth/confirm`         | Público | Placeholder; com sessão → `/app`                     |
-| `/auth/forgot-password` | Público | Placeholder; acessível com ou sem sessão             |
-| `/auth/reset-password`  | Público | Placeholder; acessível com ou sem sessão             |
-| `/app` e `/app/*`       | Privado | Shell privado; sem sessão válida → `/auth/sign-up`   |
+| Rota                    | Acesso  | Comportamento                                         |
+| ----------------------- | ------- | ----------------------------------------------------- |
+| `/`                     | Público | Sessão válida → `/app`; sem sessão → `/auth/sign-up`  |
+| `/auth/sign-up`         | Público | Placeholder; com sessão → `/app`                      |
+| `/auth/sign-in`         | Público | Placeholder; com sessão → `/app`                      |
+| `/auth/confirm`         | Público | Placeholder; com sessão → `/app`                      |
+| `/auth/forgot-password` | Público | Placeholder; acessível com ou sem sessão              |
+| `/auth/reset-password`  | Público | Troca de senha com token; acessível com ou sem sessão |
+| `/app` e `/app/*`       | Privado | Shell privado; sem sessão válida → `/auth/sign-up`    |
 
 - O guard de `/app/*` é server-side: lê o cookie e confirma a sessão em `GET /api/v1/auth/me`;
   erro, `401` ou ausência de cookie contam como sem sessão. A API continua validando toda chamada.

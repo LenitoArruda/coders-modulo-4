@@ -14,6 +14,7 @@ import { SessionTokenPort } from "./application/ports/session-token.port";
 import { SessionsRepositoryPort } from "./application/ports/sessions-repository.port";
 import { UsersRepositoryPort } from "./application/ports/users-repository.port";
 import { RequestPasswordResetUseCase } from "./application/request-password-reset.use-case";
+import { ResetPasswordUseCase } from "./application/reset-password.use-case";
 import { SignInUseCase } from "./application/sign-in.use-case";
 import { SignUpUseCase } from "./application/sign-up.use-case";
 import { ValidateSessionUseCase } from "./application/validate-session.use-case";
@@ -24,6 +25,8 @@ import {
   FORGOT_PASSWORD_RATE_LIMIT_MAX,
   FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
   JWT_SECRET,
+  RESET_PASSWORD_RATE_LIMIT_MAX,
+  RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
   RESET_TOKEN_TTL_SECONDS,
   SESSION_TTL_SECONDS,
   SIGN_IN_RATE_LIMIT_MAX,
@@ -45,6 +48,7 @@ import { SupabaseUsersRepository } from "./infrastructure/supabase-users.reposit
 import { AuthController } from "./interface/auth.controller";
 import { ConfirmationRateLimiter } from "./interface/confirmation-rate-limiter";
 import { ForgotPasswordRateLimiter } from "./interface/forgot-password-rate-limiter";
+import { ResetPasswordRateLimiter } from "./interface/reset-password-rate-limiter";
 import { SessionGuard } from "./interface/session.guard";
 import { SignInRateLimiter } from "./interface/sign-in-rate-limiter";
 import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
@@ -102,6 +106,14 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
       provide: SIGN_IN_RATE_LIMIT_WINDOW_SECONDS,
       useFactory: () => loadEnv().signInRateLimitWindowSeconds,
     },
+    {
+      provide: RESET_PASSWORD_RATE_LIMIT_MAX,
+      useFactory: () => loadEnv().resetPasswordRateLimitMax,
+    },
+    {
+      provide: RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
+      useFactory: () => loadEnv().resetPasswordRateLimitWindowSeconds,
+    },
     { provide: WEB_ORIGIN, useFactory: () => loadEnv().webOrigin },
     {
       provide: SUPABASE_CLIENT,
@@ -142,6 +154,8 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     ConfirmAccountUseCase,
     ConfirmationRateLimiter,
     ForgotPasswordRateLimiter,
+    ResetPasswordUseCase,
+    ResetPasswordRateLimiter,
     SignInUseCase,
     SignInRateLimiter,
     ValidateSessionUseCase,

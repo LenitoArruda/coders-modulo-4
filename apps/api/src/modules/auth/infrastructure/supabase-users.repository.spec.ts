@@ -247,4 +247,31 @@ describe("SupabaseUsersRepository", () => {
       "Could not confirm user email",
     );
   });
+
+  it("deve atualizar somente o hash da senha da pessoa", async () => {
+    const mock = createSupabaseClientMock();
+    const repository = new SupabaseUsersRepository(mock.client);
+
+    await repository.updatePassword(userId, "new-password-hash-value-123");
+
+    expect(mock.calls.map((call) => call.method)).toEqual([
+      "from",
+      "update",
+      "eq",
+    ]);
+    expect(mock.calls[0]?.args).toEqual(["users"]);
+    expect(mock.calls[1]?.args).toEqual([
+      { password_hash: "new-password-hash-value-123" },
+    ]);
+    expect(mock.calls[2]?.args).toEqual(["id", userId]);
+  });
+
+  it("deve falhar quando a atualização da senha retorna erro", async () => {
+    const mock = createSupabaseClientMock({ error: { code: "42501" } });
+    const repository = new SupabaseUsersRepository(mock.client);
+
+    await expect(
+      repository.updatePassword(userId, "new-password-hash-value-123"),
+    ).rejects.toThrow("Could not update user password");
+  });
 });

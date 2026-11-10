@@ -116,6 +116,17 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
     return data !== null;
   }
 
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    const { error } = await this.client
+      .from("users")
+      .update({ password_hash: passwordHash })
+      .eq("id", id);
+
+    if (error !== null) {
+      throw databaseFailure("update user password", error);
+    }
+  }
+
   async create(record: CreateUserRecord): Promise<UserAccount> {
     const { data, error } = await this.client
       .from("users")

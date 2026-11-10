@@ -1,11 +1,11 @@
 # Auth reset password — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-09
+> **Status:** done
+> **Atualizado em:** 2026-11-10
 > **Autor:** Time de engenharia
 > **Mapa:** `.plans/001-auth-breakdown.md`
 > **Depende de:** `.specs/001-auth-schema.md`, `.specs/002-auth-session.md`, `.specs/003-auth-routes.md`, `.specs/006-auth-sign-in.md`, `.specs/007-auth-forgot-password.md`
-> **Plano:** `.plans/008-auth-reset-password-plan.md` (a criar pelo `implement-me`)
+> **Plano:** `.plans/008-auth-reset-password-plan.md`
 
 ## 1. Contexto e problema
 
@@ -49,7 +49,7 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 - Redirecionamento para `/auth/sign-in?reset=success` após o sucesso.
 - Atualização da página de sign-in para exibir a mensagem de sucesso quando recebe `reset=success`.
 - Remoção do token da URL após o uso, com `replace` no histórico, e ausência de recursos externos que possam vazar o valor por `Referer`.
-- Rate limiting básico no endpoint.
+- Rate limiting básico no endpoint (por IP, 5/60 s por padrão).
 - Atualização de testes, E2E e documentação afetada.
 
 ### Fora
@@ -74,19 +74,19 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 2. Informa nova senha e confirmação e envia o formulário.
 3. O web chama `POST /api/v1/auth/reset-password` com token, senha e confirmação.
 4. A API valida o token, a política de senha e a confirmação.
-5. A API atualiza o hash, marca o token como usado, invalida outros tokens de reset e revoga todas as sessões ativas.
-6. A API confirma o e-mail se ainda não estava confirmado.
+5. A API valida a senha e a confirmação **antes** de consumir o token; um erro de senha não queima o token.
+6. A API executa, nesta ordem: consome o token (uso único), atualiza o hash de senha, confirma o e-mail se ainda não estava confirmado, invalida os outros tokens de reset não usados e revoga **todas** as sessões ativas.
 7. A API envia o e-mail de sucesso.
 8. O web mostra a confirmação e redireciona para `/auth/sign-in?reset=success`.
 9. O sign-in exibe a mensagem de sucesso e a pessoa entra com a nova senha.
 
 ### Fluxos alternativos e de exceção
 
-- Token inválido, expirado ou já usado: a API responde `400` com `code` específico, o web mostra “This password reset link is invalid or has expired.” e oferece link para `/auth/forgot-password`.
+- Token inválido, expirado ou já usado: a API responde `400` com `code` `INVALID_RESET_TOKEN`, o web mostra “This password reset link is invalid or has expired.” e oferece link para `/auth/forgot-password`.
 - Senha fora da política ou confirmação diferente: a API responde `400` com erros por campo e não altera a senha.
 - Falha no envio do e-mail de sucesso: a senha continua alterada, a falha é registrada e a pessoa vê a confirmação na tela.
 - Muitas tentativas: a API responde `429` e o web orienta a aguardar.
-- Pessoa com sessão ativa abre o link de reset: o fluxo funciona; após o sucesso, a sessão antiga deixa de valer.
+- Pessoa com sessão ativa abre o link de reset: o fluxo funciona; após o sucesso, a sessão antiga deixa de valer e o cookie obsoleto é tratado como ausente pelo guard (a API responde `401`).
 - Token válido para conta não confirmada: a senha é atualizada e o e-mail é confirmado no mesmo fluxo.
 - Segundo uso do mesmo token: a API rejeita e a senha não muda novamente.
 
@@ -94,7 +94,7 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 - O token de reset é opaco, de alta entropia, de uso único, com hash em repouso e expiração de 1 hora.
 - O token é enviado no corpo da requisição para a API; o link do e-mail aponta para a página do web.
-- O token é removido da URL após o uso, com `replace` no histórico, e a página não carrega recursos externos que possam vazar o valor por `Referer`.
+- O token é lido no servidor, removido da barra de endereços com `history.replaceState` assim que a página carrega e mantido no estado do formulário até o envio; a rota responde com `Referrer-Policy: no-referrer` e não carrega recursos externos. Um token ausente na URL mostra o estado de link inválido.
 - A nova senha segue a mesma política do sign-up: mínimo de 8 e máximo de 128 caracteres, sem exigência de composição; a confirmação precisa ser idêntica.
 - A senha é persistida apenas como hash forte e nunca aparece em logs, respostas ou mensagens de erro.
 - O reset bem-sucedido marca o e-mail como confirmado se ele ainda não estava confirmado, porque o token de reset prova a posse do endereço.
@@ -121,14 +121,21 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 Respostas previstas:
 
 - `200` — `{ "message": "Your password has been updated. Sign in with your new password." }`
-- `400` — token inválido/expirado/já usado ou erro de validação de senha, com `code` e `fieldErrors` quando aplicável.
-- `429` — excesso de tentativas.
+- `400` — `INVALID_RESET_TOKEN` (token inválido/expirado/já usado) ou `VALIDATION_ERROR` com `fieldErrors.password`/`fieldErrors.passwordConfirmation`. Se o token e a senha forem inválidos ao mesmo tempo, vale `VALIDATION_ERROR` e o token não é consumido.
+- Mensagens de senha e confirmação reutilizam as do sign-up (ex.: “Passwords do not match.”). Como no sign-up, uma senha que falha na própria política também reporta “Passwords do not match.” na confirmação.
+- `429` — excesso de tentativas, com header `Retry-After`.
 - `500` — falha interna sem detalhes.
+
+### Rate limiting
+
+- Chave: IP. Padrão: 5 tentativas por janela de 60 s; a 6ª tentativa recebe `429`.
+- Variáveis: `RESET_PASSWORD_RATE_LIMIT_MAX` e `RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS`, no padrão dos demais limitadores.
+- O store é em memória por processo; um store compartilhado fica como evolução futura.
 
 ### E-mail de sucesso
 
 - Assunto: “Your password has been changed”.
-- Corpo en-US informando a alteração e orientando a solicitar novo reset se não foi a pessoa.
+- Corpo en-US informando a alteração e orientando a solicitar novo reset se não foi a pessoa, com link para `/auth/forgot-password`.
 - Em desenvolvimento, o e-mail é inspecionável na caixa de e-mail do Supabase local.
 
 ### Persistência
@@ -136,7 +143,8 @@ Respostas previstas:
 - `auth_tokens`: o token usado recebe `used_at`; outros tokens de reset ainda não usados do mesmo usuário são invalidados.
 - `users`: `password_hash` é atualizado e `email_confirmed_at` é preenchido se ainda estiver vazio.
 - `sessions`: todas as sessões ativas do usuário são revogadas.
-- A atualização de senha, o consumo do token e a revogação de sessões são atômicos do ponto de vista da pessoa.
+- Não há transação de banco: a consistência vem da **ordem** das escritas (token → hash/confirmação → invalidar tokens → revogar sessões). Se uma etapa falhar após o consumo do token, a pessoa precisa solicitar um novo link; o fluxo nunca deixa sessão antiga válida após a resposta `200`. A atomicidade estrita em banco segue como evolução (ADR 0013).
+- Os ports ganham `updatePassword` (usuários) e `revokeAllActive` (sessões); esses métodos são entregáveis desta fatia.
 
 ### Navegação
 
@@ -163,7 +171,7 @@ Respostas previstas:
 - A UI é light-only e usa os tokens e componentes do design system.
 - Textos de UI e e-mails são en-US.
 - Logs, métricas e traces continuam chegando ao LGTM sem PII, tokens ou senhas.
-- A revogação de sessões e a invalidação de tokens são consistentes sob concorrência: dois resets simultâneos não podem deixar tokens ou sessões válidos indevidamente.
+- Dois resets simultâneos com o mesmo token: apenas um consome o token (consumo condicional por `used_at is null`); o outro recebe `INVALID_RESET_TOKEN`.
 
 ## 11. Dependências e riscos
 
@@ -181,7 +189,7 @@ Respostas previstas:
 
 ## 12. Rollout e migração
 
-- Não há nova tabela; a tabela de tokens da fatia 001 já aceita `password_reset` desde a fatia 007.
+- Não há nova tabela; a tabela de tokens da fatia 001 já aceita `password_reset` desde a própria fatia 001.
 - O placeholder de `/auth/reset-password` é substituído pela página real.
 - A página de sign-in passa a exibir a mensagem de sucesso quando recebe `reset=success`.
 - Não há feature flag nesta entrega.
@@ -198,24 +206,25 @@ Respostas previstas:
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um token válido, quando a pessoa informa nova senha e confirmação iguais e dentro da política, então a senha é atualizada, o token é consumido, todas as sessões ativas são revogadas, o e-mail de sucesso é enviado e ela é redirecionada para `/auth/sign-in?reset=success`.
-- [ ] Dado um token inválido, expirado ou já usado, quando a pessoa tenta redefinir, então a senha não é alterada, nenhuma sessão é criada e a página oferece caminho para solicitar um novo link.
-- [ ] Dados senha fora da política ou confirmação diferente, quando o formulário é enviado, então a senha não é alterada, os erros aparecem junto aos campos e a interface continua acessível.
-- [ ] Dada uma conta não confirmada, quando o reset é concluído, então o e-mail é confirmado e a pessoa consegue entrar com a nova senha.
-- [ ] Dado um reset bem-sucedido, quando a pessoa tenta acessar `/app` com uma sessão antiga, então a sessão é rejeitada; ao entrar com a senha antiga, o acesso falha; com a nova senha, o acesso funciona.
-- [ ] Dado o e-mail de sucesso, quando ele é inspecionado, então é en-US, informa a alteração e orienta a solicitar novo reset se não foi a pessoa; falha no envio não reverte a senha.
-- [ ] Dado o fluxo de reset, quando a segurança é verificada, então há rate limiting, token de uso único com hash, remoção do token da URL, nenhum token/senha/PII em logs e o sign-in exibe a mensagem de sucesso.
+- [x] Dado um token válido, quando a pessoa informa nova senha e confirmação iguais e dentro da política, então a senha é atualizada, o token é consumido, todas as sessões ativas são revogadas, o e-mail de sucesso é enviado e ela é redirecionada para `/auth/sign-in?reset=success`.
+- [x] Dado um token inválido, expirado ou já usado, quando a pessoa tenta redefinir, então a senha não é alterada, nenhuma sessão é criada e a página oferece caminho para solicitar um novo link.
+- [x] Dados senha fora da política ou confirmação diferente, quando o formulário é enviado, então a senha não é alterada, os erros aparecem junto aos campos e a interface continua acessível.
+- [x] Dada uma conta não confirmada, quando o reset é concluído, então o e-mail é confirmado e a pessoa consegue entrar com a nova senha.
+- [x] Dado um reset bem-sucedido, quando a pessoa tenta acessar `/app` com uma sessão antiga, então a sessão é rejeitada; ao entrar com a senha antiga, o acesso falha; com a nova senha, o acesso funciona.
+- [x] Dado o e-mail de sucesso, quando ele é inspecionado, então é en-US, informa a alteração e orienta a solicitar novo reset se não foi a pessoa; falha no envio não reverte a senha.
+- [x] Dado o fluxo de reset, quando a segurança é verificada, então há rate limiting, token de uso único com hash, remoção do token da URL, nenhum token/senha/PII em logs e o sign-in exibe a mensagem de sucesso.
 
 ## 15. Decisões e questões abertas
 
-| Tema                         | Decisão ou pergunta                                | Impacto                                     | Dono               | Status                  |
-| ---------------------------- | -------------------------------------------------- | ------------------------------------------- | ------------------ | ----------------------- |
-| Token de reset               | Uso único, 1 hora, hash em repouso                 | Define expiração e reutilização             | Engenharia         | fechada (default)       |
-| Conta não confirmada         | O reset bem-sucedido também confirma o e-mail      | Evita pessoa sem acesso após trocar a senha | Produto/Engenharia | fechada (default)       |
-| Revogação de sessões         | Todas as sessões ativas são revogadas após o reset | Protege a conta após troca de senha         | Produto/Engenharia | fechada (2026-11-09)    |
-| Falha no e-mail de sucesso   | Senha permanece alterada; falha é registrada       | Evita reverter uma troca válida             | Engenharia         | fechada (default)       |
-| Mensagem no sign-in          | `/auth/sign-in?reset=success` exibe confirmação    | Fecha a jornada com feedback claro          | Produto/Engenharia | fechada (2026-11-09)    |
-| Política de senha            | Mínimo 8, máximo 128, sem composição obrigatória   | Alinha reset e sign-up                      | Produto/Segurança  | aberta (não bloqueante) |
-| Reutilização da senha antiga | Não há bloqueio nesta entrega                      | Reduz escopo; pode ser evoluído depois      | Produto/Segurança  | aberta (não bloqueante) |
-| Rate limiting                | Limites configuráveis por e-mail/IP                | Reduz abuso                                 | Engenharia         | aberta (não bloqueante) |
-| Banco de testes              | Postgres descartável ou repositório fake           | Afeta testes de integração e E2E            | Engenharia         | aberta (não bloqueante) |
+| Tema                         | Decisão ou pergunta                                 | Impacto                                        | Dono               | Status                  |
+| ---------------------------- | --------------------------------------------------- | ---------------------------------------------- | ------------------ | ----------------------- |
+| Token de reset               | Uso único, 1 hora, hash em repouso                  | Define expiração e reutilização                | Engenharia         | fechada (default)       |
+| Conta não confirmada         | O reset bem-sucedido também confirma o e-mail       | Evita pessoa sem acesso após trocar a senha    | Produto/Engenharia | fechada (default)       |
+| Revogação de sessões         | Todas as sessões ativas são revogadas após o reset  | Protege a conta após troca de senha            | Produto/Engenharia | fechada (2026-11-09)    |
+| Falha no e-mail de sucesso   | Senha permanece alterada; falha é registrada        | Evita reverter uma troca válida                | Engenharia         | fechada (default)       |
+| Mensagem no sign-in          | `/auth/sign-in?reset=success` exibe confirmação     | Fecha a jornada com feedback claro             | Produto/Engenharia | fechada (2026-11-09)    |
+| Política de senha            | Mínimo 8, máximo 128, sem composição obrigatória    | Alinha reset e sign-up                         | Produto/Segurança  | fechada (2026-11-10)    |
+| Reutilização da senha antiga | Não há bloqueio nesta entrega                       | Reduz escopo; pode ser evoluído depois         | Produto/Segurança  | aberta (não bloqueante) |
+| Rate limiting                | Por IP, 5 tentativas por 60 s, configurável         | Reduz abuso                                    | Engenharia         | fechada (2026-11-10)    |
+| Atomicidade                  | Consistência por ordem das escritas, sem transação  | Evita nova migração/RPC                        | Engenharia         | fechada (2026-11-10)    |
+| Banco de testes              | Repositórios fake em memória (API) e API fake (E2E) | Testes determinísticos sem banco compartilhado | Engenharia         | fechada (2026-11-10)    |

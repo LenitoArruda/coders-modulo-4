@@ -119,6 +119,12 @@ erro). Fakes de teste vivem em `apps/api/src/test/fakes/`. Novos domínios segue
   header `x-return-to`. Páginas de `/auth/sign-up` e `/auth/sign-in` redirecionam pessoa
   autenticada para `/app`; `/auth/confirm` sem token vai para `/app` (com sessão) ou
   `/auth/sign-in` (sem sessão); forgot/reset permanecem acessíveis.
+- **Token na URL:** `/auth/reset-password` lê o `token` no servidor, o remove da barra de endereços
+  com `history.replaceState`, responde `Referrer-Policy: no-referrer` (`next.config.js`) e não
+  carrega recursos externos; rotas com token de uso único ficam fora do log de requisições do
+  `next dev` (`logging.incomingRequests.ignore`).
+- **Política de senha:** vive em `apps/api/src/modules/auth/domain/password-policy.ts` e é
+  reutilizada pelo sign-up e pelo reset; não duplique limites ou mensagens.
 - **Idioma:** todo texto visível (UI, metadados, `lang`) é **en-US**; a documentação interna é
   PT-BR. Rotas, arquivos, componentes e endpoints também usam en-US.
 

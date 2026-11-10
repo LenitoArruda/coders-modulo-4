@@ -36,6 +36,12 @@ export const DEFAULT_SIGN_IN_RATE_LIMIT_MAX = 5;
 /** Default sign-in rate limit window (60 seconds). */
 export const DEFAULT_SIGN_IN_RATE_LIMIT_WINDOW_SECONDS = 60;
 
+/** Default reset-password rate limit: attempts allowed per IP inside the window. */
+export const DEFAULT_RESET_PASSWORD_RATE_LIMIT_MAX = 5;
+
+/** Default reset-password rate limit window (60 seconds). */
+export const DEFAULT_RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = 60;
+
 export type Env = {
   port: number;
   webOrigin: string;
@@ -56,6 +62,8 @@ export type Env = {
   forgotPasswordRateLimitWindowSeconds: number;
   signInRateLimitMax: number;
   signInRateLimitWindowSeconds: number;
+  resetPasswordRateLimitMax: number;
+  resetPasswordRateLimitWindowSeconds: number;
   smtpHost: string;
   smtpPort: number;
   smtpFrom: string;
@@ -275,6 +283,34 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("SIGN_IN_RATE_LIMIT_WINDOW_SECONDS");
   }
 
+  const resetPasswordRateLimitMaxValue =
+    readString(source.RESET_PASSWORD_RATE_LIMIT_MAX) ||
+    String(DEFAULT_RESET_PASSWORD_RATE_LIMIT_MAX);
+  const resetPasswordRateLimitMax = Number(resetPasswordRateLimitMaxValue);
+
+  if (
+    !Number.isInteger(resetPasswordRateLimitMax) ||
+    resetPasswordRateLimitMax < 1 ||
+    resetPasswordRateLimitMax > 10_000
+  ) {
+    invalid.push("RESET_PASSWORD_RATE_LIMIT_MAX");
+  }
+
+  const resetPasswordRateLimitWindowValue =
+    readString(source.RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS) ||
+    String(DEFAULT_RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS);
+  const resetPasswordRateLimitWindowSeconds = Number(
+    resetPasswordRateLimitWindowValue,
+  );
+
+  if (
+    !Number.isInteger(resetPasswordRateLimitWindowSeconds) ||
+    resetPasswordRateLimitWindowSeconds < 1 ||
+    resetPasswordRateLimitWindowSeconds > 86_400
+  ) {
+    invalid.push("RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS");
+  }
+
   const smtpHost = readString(source.SMTP_HOST) || "127.0.0.1";
   const smtpPortValue = readString(source.SMTP_PORT) || "54325";
   const smtpPort = Number(smtpPortValue);
@@ -315,6 +351,8 @@ export function loadEnv(source: EnvSource = process.env): Env {
     forgotPasswordRateLimitWindowSeconds,
     signInRateLimitMax,
     signInRateLimitWindowSeconds,
+    resetPasswordRateLimitMax,
+    resetPasswordRateLimitWindowSeconds,
     smtpHost,
     smtpPort,
     smtpFrom,

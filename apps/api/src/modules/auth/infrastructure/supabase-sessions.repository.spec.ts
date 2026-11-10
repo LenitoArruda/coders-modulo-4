@@ -128,4 +128,29 @@ describe("SupabaseSessionsRepository", () => {
       "Could not load session",
     );
   });
+
+  it("deve revogar todas as sessões ativas da pessoa sem exceção", async () => {
+    const mock = createSupabaseClientMock();
+    const repository = new SupabaseSessionsRepository(mock.client);
+
+    await repository.revokeAllActive(userId);
+
+    expect(methods(mock.calls)).toEqual(["from", "update", "eq", "is", "gt"]);
+    expect(mock.calls[0]?.args).toEqual(["sessions"]);
+    expect(mock.calls[1]?.args[0]).toMatchObject({
+      revoked_at: expect.any(String),
+    });
+    expect(mock.calls[2]?.args).toEqual(["user_id", userId]);
+    expect(mock.calls[3]?.args).toEqual(["revoked_at", null]);
+    expect(mock.calls[4]?.args[0]).toBe("expires_at");
+  });
+
+  it("deve falhar quando a revogação total retorna erro", async () => {
+    const mock = createSupabaseClientMock({ error: { code: "42501" } });
+    const repository = new SupabaseSessionsRepository(mock.client);
+
+    await expect(repository.revokeAllActive(userId)).rejects.toThrow(
+      "Could not revoke sessions",
+    );
+  });
 });

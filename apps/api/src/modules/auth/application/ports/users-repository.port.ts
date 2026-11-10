@@ -31,6 +31,12 @@ export abstract class UsersRepositoryPort {
   abstract confirmEmail(id: string): Promise<boolean>;
 
   /**
+   * Replaces the stored password hash. Only the hash is ever written; the
+   * clear password never reaches a repository.
+   */
+  abstract updatePassword(id: string, passwordHash: string): Promise<void>;
+
+  /**
    * Persists a new account. `email_confirmed_at` stays null: confirmation is
    * handled by the next slice.
    */
