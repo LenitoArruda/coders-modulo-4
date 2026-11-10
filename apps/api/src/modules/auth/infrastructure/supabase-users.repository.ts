@@ -9,6 +9,7 @@ import {
 import { SUPABASE_CLIENT } from "../auth.tokens";
 import type { AuthUser } from "../domain/auth-user";
 import { DuplicateEmailError } from "../domain/sign-up.errors";
+import { withDbSpan } from "../../shared/observability/db-span";
 
 import { databaseFailure } from "./supabase-error";
 
@@ -55,11 +56,14 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
   }
 
   async findById(id: string): Promise<AuthUser | null> {
-    const { data, error } = await this.client
-      .from("users")
-      .select(USER_COLUMNS)
-      .eq("id", id)
-      .maybeSingle<UserRow>();
+    const { data, error } = await withDbSpan(
+      { table: "users", operation: "SELECT" },
+      this.client
+        .from("users")
+        .select(USER_COLUMNS)
+        .eq("id", id)
+        .maybeSingle<UserRow>(),
+    );
 
     if (error !== null) {
       throw databaseFailure("load user", error);
@@ -73,11 +77,14 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
   }
 
   async findByEmail(email: string): Promise<UserAccount | null> {
-    const { data, error } = await this.client
-      .from("users")
-      .select(USER_ACCOUNT_COLUMNS)
-      .eq("email", email)
-      .maybeSingle<UserAccountRow>();
+    const { data, error } = await withDbSpan(
+      { table: "users", operation: "SELECT" },
+      this.client
+        .from("users")
+        .select(USER_ACCOUNT_COLUMNS)
+        .eq("email", email)
+        .maybeSingle<UserAccountRow>(),
+    );
 
     if (error !== null) {
       throw databaseFailure("load user by email", error);
@@ -87,11 +94,14 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
   }
 
   async findAccountById(id: string): Promise<UserAccount | null> {
-    const { data, error } = await this.client
-      .from("users")
-      .select(USER_ACCOUNT_COLUMNS)
-      .eq("id", id)
-      .maybeSingle<UserAccountRow>();
+    const { data, error } = await withDbSpan(
+      { table: "users", operation: "SELECT" },
+      this.client
+        .from("users")
+        .select(USER_ACCOUNT_COLUMNS)
+        .eq("id", id)
+        .maybeSingle<UserAccountRow>(),
+    );
 
     if (error !== null) {
       throw databaseFailure("load user account", error);
@@ -101,13 +111,16 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
   }
 
   async confirmEmail(id: string): Promise<boolean> {
-    const { data, error } = await this.client
-      .from("users")
-      .update({ email_confirmed_at: new Date().toISOString() })
-      .eq("id", id)
-      .is("email_confirmed_at", null)
-      .select("id")
-      .maybeSingle<{ id: string }>();
+    const { data, error } = await withDbSpan(
+      { table: "users", operation: "UPDATE" },
+      this.client
+        .from("users")
+        .update({ email_confirmed_at: new Date().toISOString() })
+        .eq("id", id)
+        .is("email_confirmed_at", null)
+        .select("id")
+        .maybeSingle<{ id: string }>(),
+    );
 
     if (error !== null) {
       throw databaseFailure("confirm user email", error);
@@ -117,10 +130,13 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
   }
 
   async updatePassword(id: string, passwordHash: string): Promise<void> {
-    const { error } = await this.client
-      .from("users")
-      .update({ password_hash: passwordHash })
-      .eq("id", id);
+    const { error } = await withDbSpan(
+      { table: "users", operation: "UPDATE" },
+      this.client
+        .from("users")
+        .update({ password_hash: passwordHash })
+        .eq("id", id),
+    );
 
     if (error !== null) {
       throw databaseFailure("update user password", error);
@@ -128,16 +144,19 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
   }
 
   async create(record: CreateUserRecord): Promise<UserAccount> {
-    const { data, error } = await this.client
-      .from("users")
-      .insert({
-        first_name: record.firstName,
-        last_name: record.lastName,
-        email: record.email,
-        password_hash: record.passwordHash,
-      })
-      .select(USER_ACCOUNT_COLUMNS)
-      .single<UserAccountRow>();
+    const { data, error } = await withDbSpan(
+      { table: "users", operation: "INSERT" },
+      this.client
+        .from("users")
+        .insert({
+          first_name: record.firstName,
+          last_name: record.lastName,
+          email: record.email,
+          password_hash: record.passwordHash,
+        })
+        .select(USER_ACCOUNT_COLUMNS)
+        .single<UserAccountRow>(),
+    );
 
     if (error !== null) {
       // Unique index violation: another request created the same email first.

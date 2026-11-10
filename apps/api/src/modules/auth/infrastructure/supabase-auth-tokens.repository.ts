@@ -7,6 +7,7 @@ import {
   type AuthTokenRecord,
 } from "../application/ports/auth-tokens-repository.port";
 import { SUPABASE_CLIENT } from "../auth.tokens";
+import { withDbSpan } from "../../shared/observability/db-span";
 
 import { databaseFailure } from "./supabase-error";
 
@@ -50,12 +51,15 @@ export class SupabaseAuthTokensRepository extends AuthTokensRepositoryPort {
   async create(
     creation: Parameters<AuthTokensRepositoryPort["create"]>[0],
   ): Promise<void> {
-    const { error } = await this.client.from("auth_tokens").insert({
-      user_id: creation.userId,
-      purpose: creation.purpose,
-      token_hash: creation.tokenHash,
-      expires_at: creation.expiresAt.toISOString(),
-    });
+    const { error } = await withDbSpan(
+      { table: "auth_tokens", operation: "INSERT" },
+      this.client.from("auth_tokens").insert({
+        user_id: creation.userId,
+        purpose: creation.purpose,
+        token_hash: creation.tokenHash,
+        expires_at: creation.expiresAt.toISOString(),
+      }),
+    );
 
     if (error !== null) {
       throw databaseFailure("create auth token", error);
@@ -63,11 +67,14 @@ export class SupabaseAuthTokensRepository extends AuthTokensRepositoryPort {
   }
 
   async findByHash(tokenHash: string): Promise<AuthTokenRecord | null> {
-    const { data, error } = await this.client
-      .from("auth_tokens")
-      .select(AUTH_TOKEN_COLUMNS)
-      .eq("token_hash", tokenHash)
-      .maybeSingle<AuthTokenRow>();
+    const { data, error } = await withDbSpan(
+      { table: "auth_tokens", operation: "SELECT" },
+      this.client
+        .from("auth_tokens")
+        .select(AUTH_TOKEN_COLUMNS)
+        .eq("token_hash", tokenHash)
+        .maybeSingle<AuthTokenRow>(),
+    );
 
     if (error !== null) {
       throw databaseFailure("load auth token", error);
@@ -77,13 +84,16 @@ export class SupabaseAuthTokensRepository extends AuthTokensRepositoryPort {
   }
 
   async consume(tokenId: string): Promise<boolean> {
-    const { data, error } = await this.client
-      .from("auth_tokens")
-      .update({ used_at: new Date().toISOString() })
-      .eq("id", tokenId)
-      .is("used_at", null)
-      .select("id")
-      .maybeSingle<{ id: string }>();
+    const { data, error } = await withDbSpan(
+      { table: "auth_tokens", operation: "UPDATE" },
+      this.client
+        .from("auth_tokens")
+        .update({ used_at: new Date().toISOString() })
+        .eq("id", tokenId)
+        .is("used_at", null)
+        .select("id")
+        .maybeSingle<{ id: string }>(),
+    );
 
     if (error !== null) {
       throw databaseFailure("consume auth token", error);
@@ -96,12 +106,15 @@ export class SupabaseAuthTokensRepository extends AuthTokensRepositoryPort {
     userId: string,
     purpose: Parameters<AuthTokensRepositoryPort["invalidateUnused"]>[1],
   ): Promise<void> {
-    const { error } = await this.client
-      .from("auth_tokens")
-      .update({ used_at: new Date().toISOString() })
-      .eq("user_id", userId)
-      .eq("purpose", purpose)
-      .is("used_at", null);
+    const { error } = await withDbSpan(
+      { table: "auth_tokens", operation: "UPDATE" },
+      this.client
+        .from("auth_tokens")
+        .update({ used_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .eq("purpose", purpose)
+        .is("used_at", null),
+    );
 
     if (error !== null) {
       throw databaseFailure("invalidate auth tokens", error);
@@ -113,13 +126,16 @@ export class SupabaseAuthTokensRepository extends AuthTokensRepositoryPort {
     purpose: Parameters<AuthTokensRepositoryPort["invalidateUnusedExcept"]>[1],
     keepTokenHash: string,
   ): Promise<void> {
-    const { error } = await this.client
-      .from("auth_tokens")
-      .update({ used_at: new Date().toISOString() })
-      .eq("user_id", userId)
-      .eq("purpose", purpose)
-      .is("used_at", null)
-      .neq("token_hash", keepTokenHash);
+    const { error } = await withDbSpan(
+      { table: "auth_tokens", operation: "UPDATE" },
+      this.client
+        .from("auth_tokens")
+        .update({ used_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .eq("purpose", purpose)
+        .is("used_at", null)
+        .neq("token_hash", keepTokenHash),
+    );
 
     if (error !== null) {
       throw databaseFailure("invalidate previous auth tokens", error);
