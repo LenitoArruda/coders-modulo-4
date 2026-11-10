@@ -144,7 +144,7 @@ Ao final de cada spec, o fluxo `commit-and-push` analisa o diff, cria o commit e
 /commit-and-push
 ```
 
-O comando está em `.opencode/commands/commit-and-push.md`, segue Conventional Commits e inclui
+O comando está em `.agents/commands/commit-and-push.md`, segue Conventional Commits e inclui
 o trailer:
 
 ```text
@@ -194,7 +194,7 @@ Consulte `service_name="coders-modulo-4-api"` em Loki, Tempo ou Prometheus.
 ├── .adrs/                       # Architecture Decision Records (ADRs)
 ├── .specs/                      # Specs de feature
 ├── .plans/                      # Planos de execução
-├── .opencode/commands/          # Comandos do OpenCode (ex.: commit-and-push)
+├── .agents/                     # Skills e comandos dos agentes (ex.: commit-and-push)
 ├── turbo.json
 ├── package.json
 └── bun.lock
