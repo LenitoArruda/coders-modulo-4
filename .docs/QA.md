@@ -52,16 +52,19 @@ Execute na raiz do monorepo:
 > A API exige `JWT_SECRET` com no mínimo 32 caracteres no boot (veja `.env.example`); sem ele, a
 > API não inicia. Os testes não dependem do `.env`: `apps/api/src/test/setup-env.ts` define as
 > variáveis mínimas (incluindo `JWT_SECRET`, `SESSION_TTL_SECONDS`,
-> `CONFIRMATION_TOKEN_TTL_SECONDS`, `RESET_TOKEN_TTL_SECONDS` e as dos rate limits de sign-up e
-> forgot-password).
+> `CONFIRMATION_TOKEN_TTL_SECONDS`, `RESET_TOKEN_TTL_SECONDS` e as dos rate limits de sign-up,
+> sign-in e forgot-password).
 >
 > O E2E do web (`bun run test:e2e`) sobe uma **API fake** local em `127.0.0.1:3434`
 > (`apps/web/e2e/support/fake-api-server.ts`) e aponta `API_BASE_URL` do web para ela. Assim os
-> cenários de sessão, sign-up e forgot-password (sucesso, `400`, `409`, `429` e `503`) são
+> cenários de sessão, sign-up, sign-in e forgot-password (sucesso, `400`, `401`, `403`, `409`, `429` e `503`) são
 > determinísticos e não dependem do banco compartilhado, de credenciais ou de `JWT_SECRET`.
 > E-mails especiais da fake no sign-up: `taken@example.com` (`409`),
 > `mail-failure@example.com` (`503`) e `resend@example.com` (`200`); no forgot-password,
-> `rate-limited@example.com` (`429`) e qualquer e-mail válido recebe `200` genérico. Não deixe um
+> `rate-limited@example.com` (`429`) e qualquer e-mail válido recebe `200` genérico. No sign-in,
+> `<nome>@signin.example.com` com a senha `correct-password` entra (cada token novo invalida o
+> anterior do mesmo e-mail), `unconfirmed@example.com` (`403` só com a senha correta),
+> `rate-limited@example.com` (`429`) e `server-error@example.com` (`500`); o resto é `401`. Não deixe um
 > `bun run dev` antigo ocupando a porta 3000 antes do E2E, pois o Playwright reutiliza o servidor
 > existente em modo local.
 
@@ -199,11 +202,12 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 
 ### 5.10 Navegação e rotas do web
 
-- [ ] `/` sem sessão → `/auth/sign-up`; com sessão válida → `/app`.
-- [ ] `/app` e `/app/*` sem cookie, com token inválido ou API indisponível → `/auth/sign-up`.
+- [ ] `/` sem sessão → `/auth/sign-in`; com sessão válida → `/app`.
+- [ ] `/app` e `/app/*` sem cookie, com token inválido ou API indisponível → `/auth/sign-in` (com `returnTo=<caminho>` para `/app/*`).
 - [ ] `/app` e `/app/*` com sessão válida carregam o shell e a página inicial com o primeiro nome.
 - [ ] `/auth/sign-up` e `/auth/sign-in` com sessão válida → `/app`; `/auth/confirm` processa um
-      token presente mesmo com sessão ativa e, sem token, envia pessoa autenticada para `/app`.
+      token presente mesmo com sessão ativa e, sem token, envia pessoa autenticada para `/app` e
+      visitante para `/auth/sign-in`.
 - [ ] `/auth/forgot-password` e `/auth/reset-password` permanecem acessíveis com sessão.
 - [ ] `/auth/*` inexistente → 404 no layout público; `/app/*` inexistente com sessão → 404 no shell.
 - [ ] `lang="en-US"`, textos en-US, light-only, foco visível e sem rolagem horizontal em
@@ -246,7 +250,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
       no QA manual, com data/hora e alerta de senha no segundo.
 - [ ] `CONFIRMATION_TOKEN_TTL_SECONDS` controla a expiração (padrão 86400) e os limites de rate
       limit vêm do env; logs incluem operação/`userId`, sem e-mail, senha ou token.
-- [ ] `/app` continua redirecionando para `/auth/sign-up` sem sessão após um sign-up bem-sucedido.
+- [ ] `/app` continua redirecionando para `/auth/sign-in` sem sessão após um sign-up bem-sucedido.
 - [ ] E2E cobre erros por campo, sucesso, `409`, `429`, `503`, foco visível, light-only e
       360/768/1280 px sem rolagem horizontal; Mailpit local (`http://127.0.0.1:54324`) validado no
       QA manual.
@@ -274,6 +278,19 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] E2E cobre validação, sucesso genérico, `429`, foco visível, light-only e 360/768/1280 px sem
       rolagem horizontal; Mailpit local (`http://127.0.0.1:54324`) e o link real validados no QA
       manual.
+
+### 5.13 Sign-in (fatia 006)
+
+- [ ] `/auth/sign-in` substitui o placeholder, usa en-US, light-only, labels, `aria-describedby`
+      e link "Forgot password?" para `/auth/forgot-password`.
+- [ ] Credenciais válidas → sessão `sign_in`, cookie `HttpOnly`/`SameSite=Lax`, redirect para `/app`
+      ou para o `returnTo` seguro e e-mail "New session on your account" no Mailpit.
+- [ ] Senha errada, e-mail inexistente ou e-mail malformado → `401` com a mesma mensagem; corpo
+      vazio/malformado → `400`; conta não confirmada com a senha certa → `403`.
+- [ ] Segundo dispositivo revoga o primeiro (JWT antigo → `401`, `/app` redireciona para sign-in).
+- [ ] `returnTo` externo, `//`, barra invertida, `..` ou fora de `/app` cai em `/app`.
+- [ ] 6ª tentativa do mesmo IP + e-mail em `SIGN_IN_RATE_LIMIT_WINDOW_SECONDS` (padrão 60 s) →
+      `429` com `Retry-After`; sem e-mail, senha ou token nos logs.
 
 ---
 

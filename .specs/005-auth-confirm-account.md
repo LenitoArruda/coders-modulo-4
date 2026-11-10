@@ -46,7 +46,7 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 - E-mail en-US de nova sessão enviado após a criação da sessão.
 - Gravação do JWT em cookie `HttpOnly` pelo web, com o contrato da fatia 002.
 - Shell privado `/app` exibindo a página inicial com o primeiro nome da pessoa.
-- Redirecionamento de `/app/*` sem sessão para `/auth/sign-up` nesta fatia, até a fatia 006 introduzir o sign-in.
+- Redirecionamento de `/app/*` sem sessão (destino `/auth/sign-in`, definido pela fatia 006).
 - Remoção do token da URL após o uso, com `replace` no histórico do navegador.
 - Atualização de testes, E2E e documentação afetada.
 
@@ -75,13 +75,13 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 ### Fluxos alternativos e de exceção
 
-- Token inexistente, expirado ou já usado: a API responde `400` com `code` específico, o web mostra “This confirmation link is invalid or has expired.” e oferece um link para `/auth/sign-up`.
-- Conta já confirmada: a API responde `409`, não cria nova sessão nem reenvia confirmação; o web mostra erro acionável e orienta a fazer sign-in quando a fatia 006 estiver disponível.
+- Token inexistente, expirado ou já usado: a API responde `400` com `code` específico, o web mostra “This confirmation link is invalid or has expired.” e oferece o CTA principal “Sign in” para `/auth/sign-in` (com um link secundário para `/auth/sign-up`).
+- Conta já confirmada: a API responde `409`, não cria nova sessão nem reenvia confirmação; o web mostra erro acionável e orienta a fazer sign-in em `/auth/sign-in`.
 - Falha ao enviar o e-mail de nova sessão: a sessão continua válida, a falha é registrada sem PII e a pessoa segue para `/app`; o reenvio automático fica fora desta entrega.
 - Falha ao criar a sessão no servidor: nenhum cookie é gravado e o web mostra erro genérico com opção de tentar novamente.
-- Sessão revogada, expirada ou com assinatura inválida: `/app/*` redireciona para `/auth/sign-up` nesta fatia e a API responde `401` nos endpoints protegidos.
+- Sessão revogada, expirada ou com assinatura inválida: `/app/*` redireciona para `/auth/sign-in` e a API responde `401` nos endpoints protegidos.
 - Pessoa já autenticada abre um link de confirmação válido: o token é consumido, as sessões anteriores são revogadas e a nova sessão passa a ser a única válida.
-- Pessoa autenticada abre `/auth/confirm` sem token: o web redireciona para `/app`.
+- `/auth/confirm` sem token: com sessão o web redireciona para `/app`; sem sessão redireciona para `/auth/sign-in`. Token presente é sempre processado.
 
 ## 7. Regras e casos de borda
 
@@ -94,7 +94,7 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 - Requisições de mudança de estado feitas pelo web exigem proteção de mesma origem/CSRF.
 - Sessões revogadas ou expiradas não podem ser reativadas; é necessário novo sign-in.
 - O e-mail de nova sessão é en-US, informa a data/hora e alerta para alterar a senha se a pessoa não reconhecer o acesso. O link para recuperação é adicionado na fatia 007.
-- `/app/*` é privado; nesta fatia, sem sessão, redireciona para `/auth/sign-up`.
+- `/app/*` é privado; sem sessão, redireciona para `/auth/sign-in`.
 - A UI de confirmação e a página inicial de `/app` são light-only, acessíveis e responsivas em 360 px, 768 px e 1280 px.
 - Nenhum token, JWT, senha ou PII é registrado em logs, traces ou métricas.
 
@@ -178,7 +178,7 @@ Respostas previstas:
 - Não há nova migração de schema; usa as tabelas da fatia 001.
 - O placeholder de `/auth/confirm` é substituído pela página real.
 - A página inicial de `/app` passa a exibir o primeiro nome da pessoa autenticada.
-- `/app/*` continua redirecionando para `/auth/sign-up` até a fatia 006.
+- `/app/*` sem sessão redireciona para `/auth/sign-in` (fatia 006).
 - Não há feature flag nesta entrega.
 - Rollback: reverter o commit; sessões e tokens são descartáveis no ambiente local.
 - Comunicação: atualizar `.docs` e testes na mesma mudança.
@@ -194,22 +194,22 @@ Respostas previstas:
 ## 14. Critérios de aceite
 
 - [x] Dado um token de confirmação válido, quando a pessoa abre `/auth/confirm?token=...`, então a conta é confirmada, o token é consumido, uma sessão JWT é criada, o e-mail de nova sessão é enviado e ela é redirecionada para `/app`.
-- [x] Dado um token inválido, expirado ou já usado, quando a pessoa abre o link, então nenhuma sessão é criada, a conta não é confirmada e a página mostra um erro acionável com caminho para recomeçar.
-- [x] Dada uma conta já confirmada, quando o link é usado novamente, então a API responde `409`, nenhuma sessão nova é criada e a pessoa recebe orientação para fazer sign-in quando a fatia 006 estiver disponível.
+- [x] Dado um token inválido, expirado ou já usado, quando a pessoa abre o link, então nenhuma sessão é criada, a conta não é confirmada e a página mostra um erro acionável com o CTA “Sign in” (e link secundário para criar conta).
+- [x] Dada uma conta já confirmada, quando o link é usado novamente, então a API responde `409`, nenhuma sessão nova é criada e a pessoa recebe orientação para fazer sign-in em `/auth/sign-in`.
 - [x] Dada uma sessão válida, quando a pessoa acessa `/app`, então vê a página inicial em en-US com seu primeiro nome e `GET /api/v1/auth/me` devolve seus dados básicos.
 - [x] Dada uma nova sessão criada, quando outra sessão anterior existia, então a anterior é revogada, apenas a nova acessa `/app` e o e-mail de nova sessão é enviado.
-- [x] Dada uma sessão ausente, revogada ou expirada, quando a pessoa acessa `/app/*`, então é redirecionada para `/auth/sign-up` e chamadas protegidas à API respondem `401`.
+- [x] Dada uma sessão ausente, revogada ou expirada, quando a pessoa acessa `/app/*`, então é redirecionada para `/auth/sign-in` e chamadas protegidas à API respondem `401`.
 - [x] Dado o JWT e o cookie, quando eles são inspecionados, então o JWT contém apenas `sub`, `sid`, `iat` e `exp`, o cookie é `HttpOnly`, `SameSite=Lax` e `Secure` em produção, e nenhum token ou PII aparece em logs.
 
 ## 15. Decisões e questões abertas
 
-| Tema                           | Decisão ou pergunta                                                                      | Impacto                                             | Dono               | Status                  |
-| ------------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------ | ----------------------- |
-| Emissor do JWT                 | API NestJS própria, conforme a fatia 002                                                 | Mantém sessão única e revogação sob controle da API | Engenharia         | fechada (2026-11-09)    |
-| Sessão única                   | A confirmação também cria sessão e revoga as anteriores                                  | Atende ao requisito de “última sessão vence”        | Produto/Engenharia | fechada (2026-11-09)    |
-| Destino do guard               | `/app/*` sem sessão → `/auth/sign-up` nesta fatia; a fatia 006 muda para `/auth/sign-in` | Permite entregar confirmação antes do sign-in       | Engenharia         | fechada (2026-11-09)    |
-| Conta já confirmada            | `409` sem nova sessão                                                                    | Evita sessão duplicada e reenvio desnecessário      | Produto/Engenharia | fechada (2026-11-09)    |
-| Falha no e-mail de nova sessão | Sessão permanece válida; falha é registrada                                              | Evita bloquear o acesso por falha de e-mail         | Engenharia         | fechada (default)       |
-| Link de recuperação no e-mail  | Adicionado na fatia 007                                                                  | Evita link quebrado antes da página existir         | Produto/Engenharia | fechada (2026-11-09)    |
-| TTL da sessão                  | 7 dias, configurável                                                                     | Define expiração e frequência de novo login         | Engenharia         | aberta (não bloqueante) |
-| Banco de testes                | Postgres descartável ou repositório fake                                                 | Afeta testes de integração e E2E                    | Engenharia         | aberta (não bloqueante) |
+| Tema                           | Decisão ou pergunta                                                                            | Impacto                                             | Dono               | Status                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------ | ----------------------- |
+| Emissor do JWT                 | API NestJS própria, conforme a fatia 002                                                       | Mantém sessão única e revogação sob controle da API | Engenharia         | fechada (2026-11-09)    |
+| Sessão única                   | A confirmação também cria sessão e revoga as anteriores                                        | Atende ao requisito de “última sessão vence”        | Produto/Engenharia | fechada (2026-11-09)    |
+| Destino do guard               | `/app/*` sem sessão → `/auth/sign-in` (originalmente `/auth/sign-up`, alterado pela fatia 006) | Permite entregar confirmação antes do sign-in       | Engenharia         | fechada (2026-11-09)    |
+| Conta já confirmada            | `409` sem nova sessão                                                                          | Evita sessão duplicada e reenvio desnecessário      | Produto/Engenharia | fechada (2026-11-09)    |
+| Falha no e-mail de nova sessão | Sessão permanece válida; falha é registrada                                                    | Evita bloquear o acesso por falha de e-mail         | Engenharia         | fechada (default)       |
+| Link de recuperação no e-mail  | Adicionado na fatia 007                                                                        | Evita link quebrado antes da página existir         | Produto/Engenharia | fechada (2026-11-09)    |
+| TTL da sessão                  | 7 dias, configurável                                                                           | Define expiração e frequência de novo login         | Engenharia         | aberta (não bloqueante) |
+| Banco de testes                | Postgres descartável ou repositório fake                                                       | Afeta testes de integração e E2E                    | Engenharia         | aberta (não bloqueante) |
