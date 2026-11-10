@@ -1,7 +1,7 @@
 # Plano — Auth schema
 
 > Spec: `.specs/001-auth-schema.md`
-> Status: implementing (verificação de banco pendente — Docker parado)
+> Status: done (verificação de banco concluída em 2026-11-09 pelo orquestrador)
 > Atualizado em: 2026-11-09
 
 ## 1. Contexto
@@ -92,8 +92,9 @@ Critérios da spec e onde serão verificados:
       ativos, RLS e privilégios.
 - [x] 4. Adicionar o script `db:test` e documentá-lo em `.docs/QA.md`.
 - [x] 5. Atualizar `.docs/ARCHITECTURE.md` com o modelo de dados e a decisão de auth própria.
-- [x] 6. Rodar lint, tipos, testes e build. `db:migrate`/`db:test` ficam pendentes: o Docker
-      Desktop está parado e o serviço não pôde ser iniciado no ambiente.
+- [x] 6. Rodar lint, tipos, testes e build (executados na fatia original). `db:migrate`/`db:test`
+      concluídos em 2026-11-09 pelo orquestrador após subir o Docker: migração aplicada e
+      32 testes pgTAP passando.
 - [x] 7. Entregar relatório e executar `commit-and-push`.
 
 ## 7. Riscos e mitigação
@@ -126,17 +127,17 @@ Critérios da spec e onde serão verificados:
 
 1. Ação: `bun run infra:up`.
    Esperado: Supabase local e LGTM sobem; Studio responde em `http://127.0.0.1:54323`.
-   Resultado: bloqueado — Docker Desktop parado (`com.docker.service` Stopped) e sem permissão
-   para iniciar o serviço no ambiente.
+   Resultado: ok — LGTM Healthy e Supabase local em execução (2026-11-09).
 2. Ação: `bun run db:migrate`.
    Esperado: migração aplicada com sucesso.
-   Resultado: bloqueado — `ECONNREFUSED 127.0.0.1:54322` (Supabase local não está ativo).
+   Resultado: ok — `20261109000000_auth_schema.sql` aplicada sem erros (2026-11-09).
 3. Ação: `bun run db:test`.
    Esperado: todos os testes pgTAP passam.
-   Resultado: bloqueado — mesma causa do item 2.
+   Resultado: ok — `Files=1, Tests=32, Result: PASS` (2026-11-09).
 4. Ação: abrir o Studio e inspecionar `users`, `auth_tokens` e `sessions`.
    Esperado: tabelas, constraints, índices e RLS visíveis.
-   Resultado: bloqueado — depende de `infra:up`.
+   Resultado: ok — tabelas presentes após a migração; cobertura estrutural garantida pelos
+   32 testes pgTAP (tabelas, constraints, índices, RLS e privilégios).
 
 ## 10. Rollout e rollback
 

@@ -32,16 +32,16 @@ Decisões transversais já fechadas com o usuário em 2026-11-09:
 
 ## 3. Fatias e ordem de implementação
 
-| Ordem | Spec                                 | Capacidade entregue                                                                                                                                                  | Depende de              | Status       |
-| ----- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------ |
-| 1     | `.specs/001-auth-schema.md`          | Modelo de dados de auth: usuários, tokens opacos e sessões, com constraints, índices e migrações                                                                     | -                       | implementing |
-| 2     | `.specs/002-auth-session.md`         | JWT de sessão, registro/revogação de sessão, cookie `HttpOnly`, `GET /api/v1/auth/me`, porta de e-mail e template de nova sessão; introduz `/api/v1` e migra o hello | 001                     | approved     |
-| 3     | `.specs/003-auth-routes.md`          | Grupos de rota `/auth/*` e `/app/*`, layouts, guard, redirecionamentos, CORS e documentação da convenção en-US                                                       | 001, 002                | approved     |
-| 4     | `.specs/004-auth-sign-up.md`         | Criar conta não confirmada, validar dados, persistir usuário e enviar e-mail de confirmação com token                                                                | 001, 002, 003           | approved     |
-| 5     | `.specs/005-auth-confirm-account.md` | Confirmar conta por token, criar a primeira sessão, enviar e-mail de nova sessão e liberar `/app`                                                                    | 001, 002, 003, 004      | approved     |
-| 6     | `.specs/006-auth-sign-in.md`         | Entrar com e-mail e senha, revogar sessões anteriores, enviar e-mail de nova sessão, redirecionar para `/app` e proteger `/app/*` com o sign-in                      | 001, 002, 003, 005      | approved     |
-| 7     | `.specs/007-auth-forgot-password.md` | Solicitar reset sem revelar existência da conta, emitir token de uso único e enviar e-mail de recuperação                                                            | 001, 002, 003, 004      | approved     |
-| 8     | `.specs/008-auth-reset-password.md`  | Validar token, definir nova senha, revogar sessões, enviar e-mail de sucesso e voltar ao sign-in                                                                     | 001, 002, 003, 006, 007 | approved     |
+| Ordem | Spec                                 | Capacidade entregue                                                                                                                                                  | Depende de              | Status   |
+| ----- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------- |
+| 1     | `.specs/001-auth-schema.md`          | Modelo de dados de auth: usuários, tokens opacos e sessões, com constraints, índices e migrações                                                                     | -                       | done     |
+| 2     | `.specs/002-auth-session.md`         | JWT de sessão, registro/revogação de sessão, cookie `HttpOnly`, `GET /api/v1/auth/me`, porta de e-mail e template de nova sessão; introduz `/api/v1` e migra o hello | 001                     | approved |
+| 3     | `.specs/003-auth-routes.md`          | Grupos de rota `/auth/*` e `/app/*`, layouts, guard, redirecionamentos, CORS e documentação da convenção en-US                                                       | 001, 002                | approved |
+| 4     | `.specs/004-auth-sign-up.md`         | Criar conta não confirmada, validar dados, persistir usuário e enviar e-mail de confirmação com token                                                                | 001, 002, 003           | approved |
+| 5     | `.specs/005-auth-confirm-account.md` | Confirmar conta por token, criar a primeira sessão, enviar e-mail de nova sessão e liberar `/app`                                                                    | 001, 002, 003, 004      | approved |
+| 6     | `.specs/006-auth-sign-in.md`         | Entrar com e-mail e senha, revogar sessões anteriores, enviar e-mail de nova sessão, redirecionar para `/app` e proteger `/app/*` com o sign-in                      | 001, 002, 003, 005      | approved |
+| 7     | `.specs/007-auth-forgot-password.md` | Solicitar reset sem revelar existência da conta, emitir token de uso único e enviar e-mail de recuperação                                                            | 001, 002, 003, 004      | approved |
+| 8     | `.specs/008-auth-reset-password.md`  | Validar token, definir nova senha, revogar sessões, enviar e-mail de sucesso e voltar ao sign-in                                                                     | 001, 002, 003, 006, 007 | approved |
 
 Status da fatia: `draft` (criada), `existing` (reutilizada) ou `planned` (ainda não criada).
 

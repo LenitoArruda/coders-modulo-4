@@ -1,6 +1,6 @@
 # Auth schema — Spec
 
-> **Status:** implementing
+> **Status:** done
 > **Atualizado em:** 2026-11-09
 > **Autor:** Time de engenharia
 > **Mapa:** `.plans/001-auth-breakdown.md`
@@ -182,12 +182,12 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um banco local limpo, quando `bun run db:migrate` é executado, então `users`, `auth_tokens` e `sessions` existem com constraints, índices e relacionamentos.
-- [ ] Dado um e-mail já cadastrado, quando outra conta tenta usar o mesmo e-mail com variação de maiúsculas/minúsculas, então o banco rejeita a duplicata.
-- [ ] Dado um token de confirmação ou reset, quando ele é persistido, então apenas o hash é armazenado e o valor em claro não aparece no banco.
-- [ ] Dado um token usado ou expirado, quando a API tenta validá-lo, então ele não é considerado válido para uma nova operação.
-- [ ] Dada uma sessão revogada ou expirada, quando a API consulta sessões ativas, então ela é excluída do resultado.
-- [ ] Dado o navegador ou a chave anônima, quando tenta acessar as tabelas de auth diretamente, então o acesso é negado e somente a API com credencial de servidor consegue operar.
+- [x] Dado um banco local limpo, quando `bun run db:migrate` é executado, então `users`, `auth_tokens` e `sessions` existem com constraints, índices e relacionamentos.
+- [x] Dado um e-mail já cadastrado, quando outra conta tenta usar o mesmo e-mail com variação de maiúsculas/minúsculas, então o banco rejeita a duplicata.
+- [x] Dado um token de confirmação ou reset, quando ele é persistido, então apenas o hash é armazenado e o valor em claro não aparece no banco.
+- [x] Dado um token usado ou expirado, quando a API tenta validá-lo, então ele não é considerado válido para uma nova operação.
+- [x] Dada uma sessão revogada ou expirada, quando a API consulta sessões ativas, então ela é excluída do resultado.
+- [x] Dado o navegador ou a chave anônima, quando tenta acessar as tabelas de auth diretamente, então o acesso é negado e somente a API com credencial de servidor consegue operar.
 
 ## 15. Decisões e questões abertas
 
