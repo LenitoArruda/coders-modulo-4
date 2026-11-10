@@ -188,7 +188,7 @@ describe("buildNewSessionEmail (usado pelo caso de uso)", () => {
     );
     expect(message.text).toContain(`Reset your password: ${passwordResetUrl}`);
     expect(message.html).toContain("change your password");
-    expect(message.html).toContain(`<a href="${passwordResetUrl}">`);
+    expect(message.html).toContain(`href="${passwordResetUrl}"`);
   });
 
   it("deve escapar HTML no primeiro nome e na URL", () => {

@@ -33,9 +33,8 @@ describe("buildResetPasswordEmail", () => {
     expect(message.text).toContain(
       "If you did not request a password reset, you can safely ignore this message.",
     );
-    expect(message.html).toContain(
-      `<a href="${resetUrl}">Reset your password</a>`,
-    );
+    expect(message.html).toContain(`href="${resetUrl}"`);
+    expect(message.html).toContain(">Reset your password</a>");
   });
 
   it("deve renderizar a duração em minutos quando não é múltipla de hora", () => {

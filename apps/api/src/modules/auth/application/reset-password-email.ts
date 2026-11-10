@@ -1,5 +1,6 @@
 import type { AuthUser } from "../domain/auth-user";
 
+import { renderEmailLayout } from "./email-layout";
 import type { EmailMessage } from "./ports/email-sender.port";
 
 export const RESET_PASSWORD_EMAIL_SUBJECT = "Reset your password";
@@ -12,15 +13,6 @@ export type ResetPasswordEmailInput = {
   /** Token lifetime, used only to render the human-readable expiry notice. */
   ttlSeconds: number;
 };
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 function formatDateTimeUtc(date: Date): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -62,11 +54,27 @@ export function buildResetPasswordEmail(
     "",
     "If you did not request a password reset, you can safely ignore this message. Your password will not change.",
   ].join("\n");
-  const html = `<p>Hi ${escapeHtml(input.user.firstName)},</p>
-<p>We received a request to reset the password for your Experts account.</p>
-<p><a href="${escapeHtml(input.resetUrl)}">Reset your password</a></p>
-<p>This link expires in ${duration} (on ${when}) and can be used only once.</p>
-<p>If you did not request a password reset, you can safely ignore this message. Your password will not change.</p>`;
+  const html = renderEmailLayout({
+    title: "Reset your password",
+    preheader:
+      "Use this link to choose a new password for your Experts account.",
+    greeting: `Hi ${input.user.firstName},`,
+    blocks: [
+      {
+        type: "paragraph",
+        text: "We received a request to reset the password for your Experts account.",
+      },
+      { type: "action", label: "Reset your password", url: input.resetUrl },
+      {
+        type: "note",
+        text: `This link expires in ${duration} (on ${when}) and can be used only once.`,
+      },
+      {
+        type: "note",
+        text: "If you did not request a password reset, you can safely ignore this message. Your password will not change.",
+      },
+    ],
+  });
 
   return {
     to: input.user.email,

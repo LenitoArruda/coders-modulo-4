@@ -267,16 +267,17 @@ pessoa. Juntas, as duas rotas fecham a jornada iniciada em `/auth/sign-up`.
                                                    └─ API Mailtrap
 ```
 
-| Peça                                  | Responsabilidade                                                          |
-| ------------------------------------- | ------------------------------------------------------------------------- |
-| `SignUpInput`                         | Valida/normaliza os cinco campos e devolve mensagens en-US por campo      |
-| `SignUpUseCase`                       | Cria conta não confirmada, reenvia confirmação ou sinaliza conflito       |
-| `PasswordHasherPort` / scrypt         | Hash forte da senha, sem dependência nativa (ADR 0014)                    |
-| `OpaqueTokenPort` / `node:crypto`     | 32 bytes aleatórios no link; SHA-256 em hex persistido em `token_hash`    |
-| `AuthTokensRepositoryPort` / Supabase | Cria o token e invalida os pendentes do mesmo usuário/purpose             |
-| `UsersRepositoryPort` / Supabase      | Busca por e-mail normalizado e cria a conta com `email_confirmed_at` nulo |
-| `confirmation-email`                  | Template en-US "Confirm your account" com expiração de 24 h               |
-| `SignUpRateLimiter`                   | Janela deslizante em memória por IP, limites configuráveis por env        |
+| Peça                                  | Responsabilidade                                                                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SignUpInput`                         | Valida/normaliza os cinco campos e devolve mensagens en-US por campo                                                                        |
+| `SignUpUseCase`                       | Cria conta não confirmada, reenvia confirmação ou sinaliza conflito                                                                         |
+| `PasswordHasherPort` / scrypt         | Hash forte da senha, sem dependência nativa (ADR 0014)                                                                                      |
+| `OpaqueTokenPort` / `node:crypto`     | 32 bytes aleatórios no link; SHA-256 em hex persistido em `token_hash`                                                                      |
+| `AuthTokensRepositoryPort` / Supabase | Cria o token e invalida os pendentes do mesmo usuário/purpose                                                                               |
+| `UsersRepositoryPort` / Supabase      | Busca por e-mail normalizado e cria a conta com `email_confirmed_at` nulo                                                                   |
+| `email-layout`                        | Layout HTML compartilhado dos e-mails: light-only, paleta e tokens de `DESIGN.md`, tabelas + estilos inline, botão único e link de fallback |
+| `confirmation-email`                  | Template en-US "Confirm your account" com expiração de 24 h                                                                                 |
+| `SignUpRateLimiter`                   | Janela deslizante em memória por IP, limites configuráveis por env                                                                          |
 
 Regras:
 

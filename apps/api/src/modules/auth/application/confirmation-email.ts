@@ -1,5 +1,6 @@
 import type { AuthUser } from "../domain/auth-user";
 
+import { renderEmailLayout } from "./email-layout";
 import type { EmailMessage } from "./ports/email-sender.port";
 
 export const CONFIRMATION_EMAIL_SUBJECT = "Confirm your account";
@@ -12,15 +13,6 @@ export type ConfirmationEmailInput = {
   /** Token lifetime, used only to render the human-readable expiry notice. */
   ttlSeconds: number;
 };
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 function formatDateTimeUtc(date: Date): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -62,11 +54,28 @@ export function buildConfirmationEmail(
     "",
     "If you did not create an account, you can safely ignore this message.",
   ].join("\n");
-  const html = `<p>Hi ${escapeHtml(input.user.firstName)},</p>
-<p>Confirm your email address to finish creating your Experts account.</p>
-<p><a href="${escapeHtml(input.confirmationUrl)}">Confirm your email</a></p>
-<p>This link expires in ${duration} (on ${when}).</p>
-<p>If you did not create an account, you can safely ignore this message.</p>`;
+  const html = renderEmailLayout({
+    title: "Confirm your email",
+    preheader:
+      "Confirm your email address to finish creating your Experts account.",
+    greeting: `Hi ${input.user.firstName},`,
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Confirm your email address to finish creating your Experts account.",
+      },
+      {
+        type: "action",
+        label: "Confirm your email",
+        url: input.confirmationUrl,
+      },
+      { type: "note", text: `This link expires in ${duration} (on ${when}).` },
+      {
+        type: "note",
+        text: "If you did not create an account, you can safely ignore this message.",
+      },
+    ],
+  });
 
   return {
     to: input.user.email,
