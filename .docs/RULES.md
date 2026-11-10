@@ -91,7 +91,7 @@ Antes de iniciar qualquer desenvolvimento:
 - O hook `commit-msg` do Lefthook valida a mensagem com **commitlint**; commits fora do padrão
   são bloqueados. Para validar manualmente a mensagem preparada: `bun run lint:commit`.
 - Ao final de cada spec, a skill `implement-me` executa o comando `commit-and-push`
-  (`.opencode/commands/commit-and-push.md`): analisa o diff, commita e faz push. No modo
+  (`.agents/commands/commit-and-push.md`): analisa o diff, commita e faz push. No modo
   orquestrado (`orchestrate-me`), cada subagente commita na branch `spec/<numero>` do seu
   worktree e o orquestrador integra por onda: merge, QA completo e `commit-and-push` antes de
   lançar a onda seguinte.

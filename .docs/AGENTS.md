@@ -15,7 +15,7 @@ o fluxo obrigatório de trabalho e o que nunca pode ser feito.
 - **Como funciona:** Experts consomem dados de **conectores externos** (Notion, Google Drive,
   Jira, PDF etc.) para responder perguntas e produzir análises.
 - **Repositório:** monorepo **Turborepo** gerenciado com **Bun**.
-- **Estado atual:** **fundação implementada** — `apps/web`, `apps/docs`, `apps/api`,
+- **Estado atual:** **fundação implementada** — `apps/web`, `apps/api`,
   `packages/ui` com Tailwind/shadcn, Supabase local, migrações, testes e observabilidade
   (LGTM). O produto e as features de negócio ainda **não estão implementados**. Veja
   [ARCHITECTURE.md](./ARCHITECTURE.md#2-estrutura-atual).
@@ -25,7 +25,7 @@ o fluxo obrigatório de trabalho e o que nunca pode ser feito.
 
 > **Fonte de verdade:** o `README.md` da raiz descreve o setup da fundação; esta pasta contém as
 > regras e a documentação técnica. `BUSINESS.md` é o documento de produto e ainda tem hipóteses.
-> Os READMEs de `apps/web` e `apps/docs` continuam sendo os do starter; não os use como fonte.
+> O README de `apps/web` continua sendo o do starter; não o use como fonte.
 
 ---
 
@@ -74,7 +74,7 @@ o documento afetado na mesma tarefa.
    - Entregue o relatório final no formato de [RULES.md](./RULES.md#8-relatório-final-obrigatório).
 6. **Publicar**
    - Ao final de cada spec, execute o comando `commit-and-push`
-     (`.opencode/commands/commit-and-push.md`): analise o diff, crie o commit Conventional
+     (`.agents/commands/commit-and-push.md`): analise o diff, crie o commit Conventional
      Commits com o trailer `Co-authored-by: OpenCode Agent <noreply@opencode.ai>` e faça o push.
 
 ---

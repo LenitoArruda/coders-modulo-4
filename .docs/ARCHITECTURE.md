@@ -28,7 +28,6 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 .
 ├── apps/
 │   ├── web/                     # Next.js — porta 3000
-│   ├── docs/                    # Next.js — porta 3001 (starter, ainda não customizado)
 │   └── api/                     # NestJS — porta 3333
 ├── packages/
 │   ├── ui/                      # Tailwind/shadcn, tokens e componentes compartilhados
@@ -52,9 +51,8 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 | App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                              |
 | ---------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação e troca de senha na porta 3000 |
-| `apps/docs`                  | Site de documentação                    | ✅ starter rodando na porta 3001; ainda não customizado                                                                                             |
 | `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, contrato de erro, env, CORS, logs e OTel na porta 3333     |
-| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`; legados `button`, `card`, `code` mantidos para `apps/docs`                                            |
+| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                        |
 | `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                      |
 | `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                |
 | `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                |
@@ -77,7 +75,7 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 | API                         | NestJS                                   | 12.3.3           |
 | JWT de sessão               | jose (HS256)                             | 6.2.17           |
 | Acesso ao banco (servidor)  | `@supabase/supabase-js` (PostgREST)      | 2.119.0          |
-| E-mail transacional (local) | nodemailer (SMTP do Mailpit)             | 10.4.0           |
+| E-mail transacional         | SDK `mailtrap` (API de envio)            | 6.2.0            |
 | Hash de senha               | `node:crypto` scrypt (ADR 0014)          | —                |
 | Banco local                 | Supabase CLI (PostgreSQL 15)             | 3.0.0            |
 | Testes unitários/integração | Vitest + Supertest                       | 5.1.0 / 7.3.1    |
@@ -140,7 +138,7 @@ apps/api/src/
 │   ├── auth/
 │   │   ├── domain/              # Session, SessionOrigin, AuthUser, SignUpInput, erros de auth
 │   │   ├── application/         # Casos de uso (sessão, sign-up, confirmação, reset), templates, portas
-│   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios Supabase, SMTP
+│   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios Supabase, Mailtrap
 │   │   └── interface/           # guard, controller, rate limiter, testes de integração
 │   ├── hello/
 │   │   ├── domain/
@@ -233,7 +231,7 @@ web (server)                         api
 | `SessionTokenPort` / `jose`          | Assina e valida HS256 com `JWT_SECRET`; claims `sub`, `sid`, `iat`, `exp`           |
 | `SessionsRepositoryPort` / Supabase  | Persiste, consulta e revoga sessões via PostgREST com `service_role`                |
 | `UsersRepositoryPort` / Supabase     | Carrega os dados básicos da pessoa autenticada                                      |
-| `EmailSenderPort` / nodemailer       | Envia o template en-US de nova sessão pelo SMTP local (Mailpit)                     |
+| `EmailSenderPort` / Mailtrap         | Envia o template en-US de nova sessão pela API do Mailtrap                          |
 | `SessionGuard` + `@CurrentUser()`    | Extrai o Bearer, aplica o contrato de 401 e injeta a pessoa na rota                 |
 | `ErrorContractFilter` (`APP_FILTER`) | Serializa `{ code, message, fieldErrors? }` sem stack/SQL/detalhes internos         |
 
@@ -266,7 +264,7 @@ pessoa. Juntas, as duas rotas fecham a jornada iniciada em `/auth/sign-up`.
                                                    ├─ users (Postgres, service_role)
                                                    ├─ auth_tokens (apenas token_hash)
                                                    ├─ scrypt (password_hash)
-                                                   └─ SMTP local (Mailpit)
+                                                   └─ API Mailtrap
 ```
 
 | Peça                                  | Responsabilidade                                                          |
@@ -277,7 +275,7 @@ pessoa. Juntas, as duas rotas fecham a jornada iniciada em `/auth/sign-up`.
 | `OpaqueTokenPort` / `node:crypto`     | 32 bytes aleatórios no link; SHA-256 em hex persistido em `token_hash`    |
 | `AuthTokensRepositoryPort` / Supabase | Cria o token e invalida os pendentes do mesmo usuário/purpose             |
 | `UsersRepositoryPort` / Supabase      | Busca por e-mail normalizado e cria a conta com `email_confirmed_at` nulo |
-| `confirmation-email` / nodemailer     | Template en-US "Confirm your account" com expiração de 24 h               |
+| `confirmation-email`                  | Template en-US "Confirm your account" com expiração de 24 h               |
 | `SignUpRateLimiter`                   | Janela deslizante em memória por IP, limites configuráveis por env        |
 
 Regras:
@@ -305,7 +303,7 @@ Regras:
                                                              └─ CreateSessionUseCase (sign_up_confirmation)
                                                                   ├─ sessions (revoga as anteriores)
                                                                   ├─ JWT HS256
-                                                                  └─ SMTP local (e-mail de nova sessão)
+                                                                  └─ API Mailtrap (e-mail de nova sessão)
 ```
 
 | Peça                                  | Responsabilidade                                                                  |
@@ -363,7 +361,7 @@ dummy real quando a conta não existe. Só depois de senha correta checa a confi
                                                └─ CreateSessionUseCase (sign_in)
                                                     ├─ sessions (nova + revoga as anteriores)
                                                     ├─ JWT HS256
-                                                    └─ SMTP local (e-mail de nova sessão)
+                                                    └─ API Mailtrap (e-mail de nova sessão)
 ◄── { accessToken, tokenType, expiresIn, user } ── Server Action grava cookie HttpOnly
     e redireciona para o returnTo sanitizado (ou /app)
 ```
@@ -393,16 +391,16 @@ com o link `/auth/reset-password?token=...` (a troca de senha é descrita na se�
                                                            ├─ users (busca por e-mail normalizado)
                                                            ├─ auth_tokens (purpose password_reset, apenas token_hash)
                                                            ├─ create-then-revoke (invalidateUnusedExcept)
-                                                           └─ SMTP local (Mailpit)
+                                                           └─ API Mailtrap
 ```
 
-| Peça                                | Responsabilidade                                                              |
-| ----------------------------------- | ----------------------------------------------------------------------------- |
-| `ForgotPasswordInput`               | Valida/normaliza o e-mail e devolve mensagem en-US por campo                  |
-| `RequestPasswordResetUseCase`       | Emite o token para conta existente e mantém a resposta genérica               |
-| `reset-password-email` / nodemailer | Template en-US "Reset your password" com link, expiração e aviso para ignorar |
-| `ForgotPasswordRateLimiter`         | Janela deslizante em memória por `ip:` e `email:`, limites via env            |
-| `auth_tokens`                       | `purpose = password_reset`, `expires_at`, `used_at`; só o hash é persistido   |
+| Peça                          | Responsabilidade                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| `ForgotPasswordInput`         | Valida/normaliza o e-mail e devolve mensagem en-US por campo                  |
+| `RequestPasswordResetUseCase` | Emite o token para conta existente e mantém a resposta genérica               |
+| `reset-password-email`        | Template en-US "Reset your password" com link, expiração e aviso para ignorar |
+| `ForgotPasswordRateLimiter`   | Janela deslizante em memória por `ip:` e `email:`, limites via env            |
+| `auth_tokens`                 | `purpose = password_reset`, `expires_at`, `used_at`; só o hash é persistido   |
 
 Regras:
 
@@ -413,7 +411,7 @@ Regras:
 - Um novo pedido cria o token e invalida os pendentes do mesmo usuário/purpose exceto o recém-criado
   (`invalidateUnusedExcept`), preservando um único token válido sob concorrência.
 - O token expira em `RESET_TOKEN_TTL_SECONDS` (padrão 1 hora), é de uso único e nunca aparece em
-  logs, métricas ou respostas. Falha de SMTP é registrada sem PII e não muda a resposta.
+  logs, métricas ou respostas. Falha de envio de e-mail é registrada sem PII e não muda a resposta.
 - O formulário usa `useActionState`, label visível, `aria-describedby`, resumo `role="alert"` e
   estado de sucesso `role="status"` que substitui o formulário. A UI é en-US e light-only.
 - O rate limit é local ao processo; um store compartilhado fica como follow-up.
@@ -517,7 +515,7 @@ apps/web (Next.js)
   ▼
 apps/api (NestJS)
   ├── AuthN/AuthZ ──────────────► Postgres (auth própria: users, auth_tokens, sessions)
-  │                               └─► SMTP local (e-mail de nova sessão / Mailpit)
+  │                               └─► SMTP Mailtrap (e-mail de nova sessão)
   ├── Casos de uso
   │     ├── Conectores ─────────► Notion / Google / Jira / ...
   │     ├── Ingestão ───────────► Postgres + Storage (documentos e chunks)
@@ -584,7 +582,6 @@ tomadas.
 | Tema                 | Pergunta                                                                                       |
 | -------------------- | ---------------------------------------------------------------------------------------------- |
 | Deploy da API        | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render). |
-| `apps/docs`          | Será o site público de documentação ou deve ser removido?                                      |
 | OXLint/OXFmt         | Migrar do ESLint/Prettier atual ou manter?                                                     |
 | Multi-tenancy        | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                     |
 | `packages/shared`    | Quais contratos realmente serão compartilhados entre web e api?                                |

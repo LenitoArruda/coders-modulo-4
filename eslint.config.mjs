@@ -38,10 +38,7 @@ export default [
   ...scopeConfigs(reactInternalConfig, [
     "packages/ui/**/*.{js,mjs,cjs,ts,tsx}",
   ]),
-  ...scopeConfigs(nextJsConfig, [
-    "apps/web/**/*.{js,mjs,cjs,ts,tsx}",
-    "apps/docs/**/*.{js,mjs,cjs,ts,tsx}",
-  ]),
+  ...scopeConfigs(nextJsConfig, ["apps/web/**/*.{js,mjs,cjs,ts,tsx}"]),
   ...scopeConfigs(baseConfig, [
     "*.{js,mjs,cjs,ts,tsx}",
     "scripts/**/*.{js,mjs,cjs,ts,tsx}",

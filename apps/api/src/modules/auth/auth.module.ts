@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { createClient } from "@supabase/supabase-js";
-import { createTransport } from "nodemailer";
+import { MailtrapClient } from "mailtrap";
 
 import { loadEnv } from "../shared/config/env";
 
@@ -33,15 +33,15 @@ import {
   SIGN_IN_RATE_LIMIT_WINDOW_SECONDS,
   SIGN_UP_RATE_LIMIT_MAX,
   SIGN_UP_RATE_LIMIT_WINDOW_SECONDS,
-  SMTP_FROM,
-  SMTP_TRANSPORT,
+  MAIL_FROM,
+  MAILTRAP_CLIENT,
   SUPABASE_CLIENT,
   WEB_ORIGIN,
 } from "./auth.tokens";
 import { CryptoOpaqueTokenAdapter } from "./infrastructure/crypto-opaque-token.adapter";
 import { JoseSessionTokenAdapter } from "./infrastructure/jose-session-token.adapter";
 import { ScryptPasswordHasherAdapter } from "./infrastructure/scrypt-password-hasher.adapter";
-import { SmtpEmailSender } from "./infrastructure/smtp-email.sender";
+import { MailtrapEmailSender } from "./infrastructure/mailtrap-email.sender";
 import { SupabaseAuthTokensRepository } from "./infrastructure/supabase-auth-tokens.repository";
 import { SupabaseSessionsRepository } from "./infrastructure/supabase-sessions.repository";
 import { SupabaseUsersRepository } from "./infrastructure/supabase-users.repository";
@@ -126,14 +126,18 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
       },
     },
     {
-      provide: SMTP_TRANSPORT,
+      provide: MAILTRAP_CLIENT,
+      useFactory: () =>
+        new MailtrapClient({ token: loadEnv().mailtrapApiToken }),
+    },
+    {
+      provide: MAIL_FROM,
       useFactory: () => {
         const env = loadEnv();
 
-        return createTransport({ host: env.smtpHost, port: env.smtpPort });
+        return { email: env.mailFromEmail, name: env.mailFromName };
       },
     },
-    { provide: SMTP_FROM, useFactory: () => loadEnv().smtpFrom },
     JoseSessionTokenAdapter,
     { provide: SessionTokenPort, useExisting: JoseSessionTokenAdapter },
     { provide: SessionsRepositoryPort, useClass: SupabaseSessionsRepository },
@@ -146,7 +150,7 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     { provide: PasswordHasherPort, useExisting: ScryptPasswordHasherAdapter },
     CryptoOpaqueTokenAdapter,
     { provide: OpaqueTokenPort, useExisting: CryptoOpaqueTokenAdapter },
-    { provide: EmailSenderPort, useClass: SmtpEmailSender },
+    { provide: EmailSenderPort, useClass: MailtrapEmailSender },
     CreateSessionUseCase,
     RequestPasswordResetUseCase,
     SignUpUseCase,

@@ -7,22 +7,21 @@ Este documento define **como** a UI é construída. O `DESIGN.md` define **como 
 
 > ✅ **Estado atual:** Tailwind CSS 4, shadcn/ui (`packages/ui/components.json`), `cn`, `cva` e
 > `@radix-ui/react-slot` estão instalados. O primitivo `Button` e os tokens light-only estão em
-> `packages/ui`. Os componentes legados `button`, `card` e `code` continuam no pacote apenas
-> porque `apps/docs` ainda os usa.
+> `packages/ui`.
 
 ---
 
 ## 1. Base e status
 
-| Item                               | Estado                                                                             |
-| ---------------------------------- | ---------------------------------------------------------------------------------- |
-| shadcn/ui                          | ✅ configurado em `packages/ui/components.json`                                    |
-| Tailwind CSS                       | ✅ 4.3.4                                                                           |
-| `clsx` + `tailwind-merge` (`cn`)   | ✅ `packages/ui/src/lib/cn.ts`                                                     |
-| `class-variance-authority` (`cva`) | ✅ 0.7.1                                                                           |
-| Primitivos Radix (via shadcn)      | ✅ `@radix-ui/react-slot` 1.5.0                                                    |
-| Ícones                             | 🧭 Lucide definido no `components.json`; pacote ainda não instalado                |
-| Componentes atuais                 | ✅ `Button` em `components/ui`; `button`, `card` e `code` legados para `apps/docs` |
+| Item                               | Estado                                                              |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| shadcn/ui                          | ✅ configurado em `packages/ui/components.json`                     |
+| Tailwind CSS                       | ✅ 4.3.4                                                            |
+| `clsx` + `tailwind-merge` (`cn`)   | ✅ `packages/ui/src/lib/cn.ts`                                      |
+| `class-variance-authority` (`cva`) | ✅ 0.7.1                                                            |
+| Primitivos Radix (via shadcn)      | ✅ `@radix-ui/react-slot` 1.5.0                                     |
+| Ícones                             | 🧭 Lucide definido no `components.json`; pacote ainda não instalado |
+| Componentes atuais                 | ✅ `Button` em `components/ui`                                      |
 
 ---
 
@@ -37,9 +36,6 @@ packages/ui/src/
 │   └── cn.ts                    # clsx + tailwind-merge
 ├── styles/
 │   └── globals.css              # Tailwind, tokens e base styles
-├── button.tsx                   # legado (usado por apps/docs)
-├── card.tsx                     # legado (usado por apps/docs)
-└── code.tsx                     # legado (usado por apps/docs)
 ```
 
 Regras:
@@ -49,8 +45,6 @@ Regras:
 - Não duplique um primitivo do shadcn para "customizar"; use variantes.
 - O pacote `ui` **não** contém regra de negócio, chamada de API ou acesso a dados.
 - Importe sempre via `@repo/ui/...`. Ao mover arquivos, atualize o `exports` do pacote.
-- Os componentes legados na raiz de `src/` não devem receber novas features; migre ou remova
-  quando `apps/docs` deixar de usá-los.
 
 ---
 
@@ -214,9 +208,7 @@ Quando forem adicionados:
 
 ## 12. Próximos passos (ordem sugerida)
 
-1. Migrar ou remover os componentes legados `button`, `card` e `code` quando `apps/docs`
-   deixar de usá-los.
-2. Definir tokens semânticos de sucesso/alerta/erro.
-3. Instalar `lucide-react` quando o primeiro ícone real for necessário.
-4. Configurar Vitest + Testing Library para o pacote `ui`.
-5. Adicionar novos primitivos apenas com uso real, cobrindo estados e acessibilidade.
+1. Definir tokens semânticos de sucesso/alerta/erro.
+2. Instalar `lucide-react` quando o primeiro ícone real for necessário.
+3. Configurar Vitest + Testing Library para o pacote `ui`.
+4. Adicionar novos primitivos apenas com uso real, cobrindo estados e acessibilidade.

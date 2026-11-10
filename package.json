@@ -16,7 +16,9 @@
     "infra:down": "node scripts/infra.mjs down",
     "db:migrate": "bun x supabase migration up --local",
     "db:test": "bun x supabase test db",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "env:setup": "cp .env.example .env",
+    "local:setup": "bun i && bun env:setup && bun infra:up && bun db:migrate"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [

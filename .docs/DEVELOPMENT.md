@@ -83,7 +83,7 @@ erro). Fakes de teste vivem em `apps/api/src/test/fakes/`. Novos domínios segue
   ela só aceita `Authorization: Bearer`.
 - `InvalidSessionError` é traduzido pelo guard em `401` com o contrato único da sessão; ausência,
   expiração, revogação e assinatura inválida são indistinguíveis na resposta.
-- Adaptadores convertem erros externos (jose, PostgREST, SMTP) sem vazar detalhes; falha de e-mail
+- Adaptadores convertem erros externos (jose, PostgREST, Mailtrap) sem vazar detalhes; falha de e-mail
   não derruba a sessão já criada.
 - Toda rota vive sob `/api/v1`; caminhos fora do prefixo respondem 404 com o mesmo contrato.
 - Testes de integração usam os fakes de repositório/e-mail e o adaptador `jose` **real** para

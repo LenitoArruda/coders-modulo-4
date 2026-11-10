@@ -49,7 +49,7 @@ escolha ao longo do tempo.
 
 Temas ainda não decididos permanecem em
 [`.docs/ARCHITECTURE.md` §7](../.docs/ARCHITECTURE.md#7-decisões-em-aberto): deploy da API,
-multi-tenancy/RLS, futuro de `apps/docs`, OXLint/OXFmt, contratos de `packages/shared`, versão de
+multi-tenancy/RLS, OXLint/OXFmt, contratos de `packages/shared`, versão de
 PostgreSQL em produção e reativação do Supabase Analytics.
 
 Quando uma delas for fechada, crie o ADR correspondente e mova a linha para o índice acima.
