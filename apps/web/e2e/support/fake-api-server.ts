@@ -449,6 +449,26 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (pathname === "/api/v1/auth/sign-out" && request.method === "POST") {
+    const owner = signInTokenOwner(
+      (request.headers.authorization ?? "").replace(/^Bearer /, ""),
+    );
+
+    if (owner === null || latestSignInSession.get(owner.local) !== owner.n) {
+      sendJson(response, 401, {
+        code: "UNAUTHORIZED",
+        message: "Your session is invalid or has expired. Sign in again.",
+      });
+      return;
+    }
+
+    // Revoke the session: only a token newer than this one stays valid.
+    latestSignInSession.set(owner.local, owner.n + 1);
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
   if (pathname === "/api/v1/auth/me") {
     const authorization = request.headers.authorization;
 

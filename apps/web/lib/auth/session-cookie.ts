@@ -46,3 +46,10 @@ export async function setSessionCookie(
 
   store.set(SESSION_COOKIE_NAME, token, createSessionCookieOptions(ttlSeconds));
 }
+
+/** Removes the session cookie (sign-out). */
+export async function clearSessionCookie(): Promise<void> {
+  const store = await cookies();
+
+  store.delete(SESSION_COOKIE_NAME);
+}

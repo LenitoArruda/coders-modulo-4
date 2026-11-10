@@ -15,6 +15,7 @@ import { SessionsRepositoryPort } from "./application/ports/sessions-repository.
 import { UsersRepositoryPort } from "./application/ports/users-repository.port";
 import { RequestPasswordResetUseCase } from "./application/request-password-reset.use-case";
 import { ResetPasswordUseCase } from "./application/reset-password.use-case";
+import { SignOutUseCase } from "./application/sign-out.use-case";
 import { SignInUseCase } from "./application/sign-in.use-case";
 import { SignUpUseCase } from "./application/sign-up.use-case";
 import { ValidateSessionUseCase } from "./application/validate-session.use-case";
@@ -162,6 +163,7 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     ResetPasswordRateLimiter,
     SignInUseCase,
     SignInRateLimiter,
+    SignOutUseCase,
     ValidateSessionUseCase,
     SessionGuard,
   ],

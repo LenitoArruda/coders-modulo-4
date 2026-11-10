@@ -63,6 +63,19 @@ export class InMemorySessionsRepository extends SessionsRepositoryPort {
     }
   }
 
+  async revoke(userId: string, sessionId: string): Promise<void> {
+    const session = this.sessions.find(
+      (candidate) =>
+        candidate.id === sessionId &&
+        candidate.userId === userId &&
+        candidate.revokedAt === null,
+    );
+
+    if (session) {
+      session.revokedAt = new Date();
+    }
+  }
+
   async findActiveById(sessionId: string): Promise<Session | null> {
     const session = this.sessions.find(
       (candidate) => candidate.id === sessionId,

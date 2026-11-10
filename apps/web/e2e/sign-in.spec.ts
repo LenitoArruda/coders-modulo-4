@@ -360,3 +360,50 @@ test.describe("root and auth pages with a session", () => {
     await context.close();
   });
 });
+
+test.describe("signing out", () => {
+  test("botão Sign out encerra a sessão, apaga o cookie e volta ao sign-in", async ({
+    browser,
+  }) => {
+    const { context, page } = await newSignedInContext(
+      browser,
+      uniqueEmail("signout"),
+    );
+    const token = (await sessionCookie(context))?.value;
+
+    expect(token).toBeDefined();
+
+    await page.getByRole("button", { name: "Sign out" }).click();
+
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+    expect(await sessionCookie(context)).toBeUndefined();
+
+    await page.goto("/app");
+    await expect(page).toHaveURL(/\/auth\/sign-in/);
+
+    // The revoked token no longer works even if a copy of it survives.
+    await context.addCookies([
+      { name: "session_token", value: token ?? "", url: BASE_URL },
+    ]);
+    await page.goto("/app");
+    await expect(page).toHaveURL(/\/auth\/sign-in/);
+
+    await context.close();
+  });
+
+  test("é operável pelo teclado", async ({ browser }) => {
+    const { context, page } = await newSignedInContext(
+      browser,
+      uniqueEmail("signoutkb"),
+    );
+    const button = page.getByRole("button", { name: "Sign out" });
+
+    await button.focus();
+    await expect(button).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+
+    await context.close();
+  });
+});

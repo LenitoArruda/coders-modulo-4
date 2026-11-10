@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { signOutAction } from "./actions";
 import { requireSessionUser } from "../../lib/auth/guards";
 import { APP_HOME_PATH } from "../../lib/auth/route-rules";
 import { skipLinkClassName } from "../_components/shared-styles";
@@ -45,6 +46,14 @@ export default async function AppLayout({ children }: AppLayoutProps) {
               </li>
             </ul>
           </nav>
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              className="inline-flex h-11 items-center rounded-md px-3 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
       </header>
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-12">

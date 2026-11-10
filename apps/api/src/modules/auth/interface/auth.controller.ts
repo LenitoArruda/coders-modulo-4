@@ -24,6 +24,7 @@ import {
   type SignInResult,
   SignInUseCase,
 } from "../application/sign-in.use-case";
+import { SignOutUseCase } from "../application/sign-out.use-case";
 import { SignUpUseCase } from "../application/sign-up.use-case";
 import type { AuthUser } from "../domain/auth-user";
 import {
@@ -48,7 +49,7 @@ import { ConfirmationRateLimiter } from "./confirmation-rate-limiter";
 import { CurrentUser } from "./current-user.decorator";
 import { ForgotPasswordRateLimiter } from "./forgot-password-rate-limiter";
 import { ResetPasswordRateLimiter } from "./reset-password-rate-limiter";
-import { SessionGuard } from "./session.guard";
+import { SessionGuard, extractBearerToken } from "./session.guard";
 import { SignInRateLimiter } from "./sign-in-rate-limiter";
 import { SignUpRateLimiter } from "./sign-up-rate-limiter";
 
@@ -163,7 +164,21 @@ export class AuthController {
     @Inject(SignInUseCase) private readonly signInUseCase: SignInUseCase,
     @Inject(SignInRateLimiter)
     private readonly signInLimiter: SignInRateLimiter,
+    @Inject(SignOutUseCase) private readonly signOutUseCase: SignOutUseCase,
   ) {}
+
+  /** Revokes the caller's current session; the JWT stops working at once. */
+  @Post("sign-out")
+  @UseGuards(SessionGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async signOut(@Req() request: Request): Promise<void> {
+    const token = extractBearerToken(request.headers.authorization);
+
+    // The guard already rejected a missing token.
+    if (token !== null) {
+      await this.signOutUseCase.execute(token);
+    }
+  }
 
   @Post("sign-in")
   @HttpCode(HttpStatus.OK)
