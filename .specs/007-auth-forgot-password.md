@@ -186,13 +186,13 @@ Respostas previstas:
 
 ## 14. Critérios de aceite
 
-- [ ] Dado qualquer e-mail sintaticamente válido, quando a pessoa solicita recuperação em `/auth/forgot-password`, então a API responde `200` com a mesma mensagem genérica, exista ou não a conta, e nenhum dado de cadastro é revelado.
-- [ ] Dada uma conta existente, quando a recuperação é solicitada, então um e-mail en-US é enviado com link `/auth/reset-password?token=...`, token de uso único que expira em 1 hora e invalida tokens anteriores não usados.
-- [ ] Dado um e-mail inexistente, quando a recuperação é solicitada, então a API responde `200` com a mesma mensagem genérica e nenhum e-mail é enviado.
-- [ ] Dada uma conta não confirmada, quando a recuperação é solicitada, então a API responde `200` com a mesma mensagem genérica, o e-mail é enviado e o reset da fatia 008 poderá confirmar o endereço.
-- [ ] Dado um e-mail sintaticamente inválido, quando o formulário é enviado, então a API responde `400` com erro de campo, sem criar token e sem revelar existência de conta.
-- [ ] Dada falha no envio do e-mail, quando a recuperação é solicitada, então a resposta continua genérica, a falha é registrada sem PII e a pessoa pode tentar novamente.
-- [ ] Dado o fluxo e a documentação, quando a entrega é verificada, então há rate limiting, o e-mail de nova sessão contém o link de recuperação, a UI é en-US/light-only/acessível e nenhum token ou PII aparece em logs.
+- [x] Dado qualquer e-mail sintaticamente válido, quando a pessoa solicita recuperação em `/auth/forgot-password`, então a API responde `200` com a mesma mensagem genérica, exista ou não a conta, e nenhum dado de cadastro é revelado.
+- [x] Dada uma conta existente, quando a recuperação é solicitada, então um e-mail en-US é enviado com link `/auth/reset-password?token=...`, token de uso único que expira em 1 hora e invalida tokens anteriores não usados.
+- [x] Dado um e-mail inexistente, quando a recuperação é solicitada, então a API responde `200` com a mesma mensagem genérica e nenhum e-mail é enviado.
+- [x] Dada uma conta não confirmada, quando a recuperação é solicitada, então a API responde `200` com a mesma mensagem genérica, o e-mail é enviado e o reset da fatia 008 poderá confirmar o endereço.
+- [x] Dado um e-mail sintaticamente inválido, quando o formulário é enviado, então a API responde `400` com erro de campo, sem criar token e sem revelar existência de conta.
+- [x] Dada falha no envio do e-mail, quando a recuperação é solicitada, então a resposta continua genérica, a falha é registrada sem PII e a pessoa pode tentar novamente.
+- [x] Dado o fluxo e a documentação, quando a entrega é verificada, então há rate limiting, o e-mail de nova sessão contém o link de recuperação, a UI é en-US/light-only/acessível e nenhum token ou PII aparece em logs.
 
 ## 15. Decisões e questões abertas
 
