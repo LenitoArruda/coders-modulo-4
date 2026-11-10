@@ -26,6 +26,12 @@ export abstract class SessionsRepositoryPort {
   abstract revokeAllActive(userId: string): Promise<void>;
 
   /**
+   * Revokes one session of the user (sign-out). Idempotent: an unknown,
+   * already revoked or expired session is a no-op. Never revives a session.
+   */
+  abstract revoke(userId: string, sessionId: string): Promise<void>;
+
+  /**
    * Returns the session only when it is active: not revoked and not expired.
    * A valid JWT signature is not enough to consider a session valid.
    */

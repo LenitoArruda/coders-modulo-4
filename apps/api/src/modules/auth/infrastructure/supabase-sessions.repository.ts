@@ -95,6 +95,19 @@ export class SupabaseSessionsRepository extends SessionsRepositoryPort {
     }
   }
 
+  async revoke(userId: string, sessionId: string): Promise<void> {
+    const { error } = await this.client
+      .from("sessions")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", sessionId)
+      .eq("user_id", userId)
+      .is("revoked_at", null);
+
+    if (error !== null) {
+      throw databaseFailure("revoke session", error);
+    }
+  }
+
   async findActiveById(sessionId: string): Promise<Session | null> {
     const { data, error } = await this.client
       .from("sessions")
