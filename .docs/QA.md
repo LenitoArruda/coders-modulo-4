@@ -51,13 +51,16 @@ Execute na raiz do monorepo:
 
 > A API exige `JWT_SECRET` com no mínimo 32 caracteres no boot (veja `.env.example`); sem ele, a
 > API não inicia. Os testes não dependem do `.env`: `apps/api/src/test/setup-env.ts` define as
-> variáveis mínimas (incluindo `JWT_SECRET` e `SESSION_TTL_SECONDS`).
+> variáveis mínimas (incluindo `JWT_SECRET`, `SESSION_TTL_SECONDS`,
+> `CONFIRMATION_TOKEN_TTL_SECONDS` e as do rate limit de sign-up).
 >
 > O E2E do web (`bun run test:e2e`) sobe uma **API fake** local em `127.0.0.1:3434`
 > (`apps/web/e2e/support/fake-api-server.ts`) e aponta `API_BASE_URL` do web para ela. Assim os
-> cenários de sessão válida/inválida são determinísticos e não dependem do banco compartilhado,
-> de credenciais ou de `JWT_SECRET`. Não deixe um `bun run dev` antigo ocupando a porta 3000 antes
-> do E2E, pois o Playwright reutiliza o servidor existente em modo local.
+> cenários de sessão e sign-up (sucesso, `400`, `409`, `429` e `503`) são determinísticos e não
+> dependem do banco compartilhado, de credenciais ou de `JWT_SECRET`. E-mails especiais da fake:
+> `taken@example.com` (`409`), `rate-limited@example.com` (`429`), `mail-failure@example.com`
+> (`503`) e `resend@example.com` (`200`). Não deixe um `bun run dev` antigo ocupando a porta 3000
+> antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
 
 ### 2.1 Comando do OpenCode
 
@@ -204,6 +207,29 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] CORS aceita `WEB_ORIGIN` com `GET`, `HEAD`, `POST`, `OPTIONS` e headers `Authorization` e
       `Content-Type`; outras origens não recebem `Access-Control-Allow-Origin`.
 - [ ] HTML/JS não expõe token, JWT ou dados de sessão.
+
+### 5.11 Sign-up e confirmação de e-mail
+
+- [ ] `/auth/sign-up` substitui o placeholder, usa en-US, light-only e não cria sessão/JWT/cookie.
+- [ ] Campos first name, last name, email, password e confirm password têm labels visíveis e
+      `autocomplete` adequado; o formulário funciona por teclado.
+- [ ] Campos ausentes, e-mail inválido, senha fora de 8–128 ou confirmação diferente → `400`, erros
+      junto aos campos com `aria-describedby` e `role="alert"`, sem criar conta.
+- [ ] Sign-up válido → `201`, conta com `email_confirmed_at` nulo, hash scrypt em
+      `users.password_hash` e nenhum token/senha na resposta.
+- [ ] E-mail "Confirm your account" en-US com link `/auth/confirm?token=...`, aviso de 24 h e
+      orientação para ignorar; token só existe em claro na mensagem, nunca em log.
+- [ ] `auth_tokens` guarda apenas `token_hash`; o reenvio invalida o token pendente anterior.
+- [ ] E-mail confirmado → `409` sem duplicata; não confirmado → `200` com reenvio, sem duplicata.
+- [ ] Falha de SMTP → `503` acionável e a conta não confirmada pode ser reutilizada no retry.
+- [ ] Rate limit por IP: acima de `SIGN_UP_RATE_LIMIT_MAX` em `SIGN_UP_RATE_LIMIT_WINDOW_SECONDS`
+      → `429` com mensagem genérica, sem detalhes internos.
+- [ ] `CONFIRMATION_TOKEN_TTL_SECONDS` controla a expiração (padrão 86400) e os limites de rate
+      limit vêm do env; logs incluem operação/`userId`, sem e-mail, senha ou token.
+- [ ] `/app` continua redirecionando para `/auth/sign-up` sem sessão após um sign-up bem-sucedido.
+- [ ] E2E cobre erros por campo, sucesso, `409`, `429`, `503`, foco visível, light-only e
+      360/768/1280 px sem rolagem horizontal; Mailpit local (`http://127.0.0.1:54324`) validado no
+      QA manual.
 
 ---
 

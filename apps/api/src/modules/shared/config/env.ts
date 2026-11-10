@@ -6,6 +6,15 @@ export const JWT_SECRET_MIN_LENGTH = 32;
 /** Default session duration in seconds (7 days), configurable via SESSION_TTL_SECONDS. */
 export const DEFAULT_SESSION_TTL_SECONDS = 604_800;
 
+/** Default email confirmation token lifetime (24 hours). */
+export const DEFAULT_CONFIRMATION_TOKEN_TTL_SECONDS = 86_400;
+
+/** Default sign-up rate limit: requests allowed per IP inside the window. */
+export const DEFAULT_SIGN_UP_RATE_LIMIT_MAX = 5;
+
+/** Default sign-up rate limit window (60 seconds). */
+export const DEFAULT_SIGN_UP_RATE_LIMIT_WINDOW_SECONDS = 60;
+
 export type Env = {
   port: number;
   webOrigin: string;
@@ -16,6 +25,9 @@ export type Env = {
   serviceName: string;
   jwtSecret: string;
   sessionTtlSeconds: number;
+  confirmationTokenTtlSeconds: number;
+  signUpRateLimitMax: number;
+  signUpRateLimitWindowSeconds: number;
   smtpHost: string;
   smtpPort: number;
   smtpFrom: string;
@@ -101,6 +113,45 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("SESSION_TTL_SECONDS");
   }
 
+  const confirmationTokenTtlValue =
+    readString(source.CONFIRMATION_TOKEN_TTL_SECONDS) ||
+    String(DEFAULT_CONFIRMATION_TOKEN_TTL_SECONDS);
+  const confirmationTokenTtlSeconds = Number(confirmationTokenTtlValue);
+
+  if (
+    !Number.isInteger(confirmationTokenTtlSeconds) ||
+    confirmationTokenTtlSeconds < 1 ||
+    confirmationTokenTtlSeconds > 31_536_000
+  ) {
+    invalid.push("CONFIRMATION_TOKEN_TTL_SECONDS");
+  }
+
+  const signUpRateLimitMaxValue =
+    readString(source.SIGN_UP_RATE_LIMIT_MAX) ||
+    String(DEFAULT_SIGN_UP_RATE_LIMIT_MAX);
+  const signUpRateLimitMax = Number(signUpRateLimitMaxValue);
+
+  if (
+    !Number.isInteger(signUpRateLimitMax) ||
+    signUpRateLimitMax < 1 ||
+    signUpRateLimitMax > 10_000
+  ) {
+    invalid.push("SIGN_UP_RATE_LIMIT_MAX");
+  }
+
+  const signUpRateLimitWindowValue =
+    readString(source.SIGN_UP_RATE_LIMIT_WINDOW_SECONDS) ||
+    String(DEFAULT_SIGN_UP_RATE_LIMIT_WINDOW_SECONDS);
+  const signUpRateLimitWindowSeconds = Number(signUpRateLimitWindowValue);
+
+  if (
+    !Number.isInteger(signUpRateLimitWindowSeconds) ||
+    signUpRateLimitWindowSeconds < 1 ||
+    signUpRateLimitWindowSeconds > 86_400
+  ) {
+    invalid.push("SIGN_UP_RATE_LIMIT_WINDOW_SECONDS");
+  }
+
   const smtpHost = readString(source.SMTP_HOST) || "127.0.0.1";
   const smtpPortValue = readString(source.SMTP_PORT) || "54325";
   const smtpPort = Number(smtpPortValue);
@@ -131,6 +182,9 @@ export function loadEnv(source: EnvSource = process.env): Env {
     serviceName,
     jwtSecret,
     sessionTtlSeconds,
+    confirmationTokenTtlSeconds,
+    signUpRateLimitMax,
+    signUpRateLimitWindowSeconds,
     smtpHost,
     smtpPort,
     smtpFrom,

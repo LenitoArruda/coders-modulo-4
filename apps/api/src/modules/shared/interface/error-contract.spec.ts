@@ -30,7 +30,7 @@ describe("toErrorContract", () => {
     const exception = new BadRequestException({
       code: "VALIDATION_ERROR",
       message: "The request is invalid.",
-      fieldErrors: { email: ["Email is required."] },
+      fieldErrors: { email: "Email is required." },
     });
 
     expect(toErrorContract(exception)).toEqual({
@@ -38,7 +38,7 @@ describe("toErrorContract", () => {
       body: {
         code: "VALIDATION_ERROR",
         message: "The request is invalid.",
-        fieldErrors: { email: ["Email is required."] },
+        fieldErrors: { email: "Email is required." },
       },
     });
   });
@@ -80,6 +80,26 @@ describe("toErrorContract", () => {
       body: {
         code: "INTERNAL_ERROR",
         message: "An unexpected error occurred. Try again later.",
+      },
+    });
+  });
+
+  it("deve preservar o contrato explícito de um 503 acionável", () => {
+    const exception = new UnauthorizedException({
+      code: "CONFIRMATION_EMAIL_FAILED",
+      message:
+        "We could not send the confirmation email. Try again in a moment.",
+    });
+    const serverException = Object.assign(exception, {
+      getStatus: () => 503,
+    });
+
+    expect(toErrorContract(serverException)).toEqual({
+      status: 503,
+      body: {
+        code: "CONFIRMATION_EMAIL_FAILED",
+        message:
+          "We could not send the confirmation email. Try again in a moment.",
       },
     });
   });
