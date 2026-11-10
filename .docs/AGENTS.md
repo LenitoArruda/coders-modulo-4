@@ -64,6 +64,8 @@ o documento afetado na mesma tarefa.
    - Crie `.plans/<numero>-<slug>-plan.md` conforme [RULES.md](./RULES.md#1-planejamento-obrigatório).
    - Não implemente antes do plano, exceto nas mudanças triviais previstas em `RULES.md`.
    - Para executar uma spec existente de ponta a ponta, use a skill `implement-me`.
+   - Para executar um range de specs aprovadas em paralelo com subagentes, use a skill
+     `orchestrate-me`.
 3. **Implementar**
    - Faça a menor mudança possível, seguindo [DEVELOPMENT.md](./DEVELOPMENT.md).
 4. **Verificar**
@@ -89,6 +91,9 @@ Antes de começar, verifique se existe uma skill adequada ao domínio da tarefa:
 - **Refinamento de spec:** `refine-spec` — audita uma spec existente e fecha lacunas,
   contradições e critérios de aceite vagos.
 - **Execução de spec:** `implement-me` — orquestra spec, plano, implementação e QA.
+- **Execução paralela de specs:** `orchestrate-me` — orquestra um range de specs (ex.:
+  `001-010`) com subagentes em background, um worktree por spec, ondas de dependência e
+  integração por onda (merge + QA + push).
 - **UI/UX:** `frontend-design` e `web-design-guidelines` são obrigatórias **quando disponíveis**.
 - **Banco de dados:** skill de PostgreSQL/Supabase.
 - **Framework:** skill de Next.js, React ou NestJS, conforme o caso.

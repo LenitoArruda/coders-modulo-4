@@ -31,7 +31,8 @@ Antes de iniciar qualquer desenvolvimento:
    `refine-spec` e execute com `implement-me`. Use `feature-concept` quando a ideia ainda estiver
    vaga ou for necessário descobrir requisitos. Quando o pedido descrever um épico ou várias
    features, use `breakdown-specs` antes de `create-spec` para gerar o mapa em `.plans/` e as
-   specs em ordem de dependência.
+   specs em ordem de dependência. Para executar várias specs aprovadas de uma vez, use
+   `orchestrate-me`: um subagente por spec, em paralelo, com integração por onda.
 
 ---
 
@@ -89,7 +90,10 @@ Antes de iniciar qualquer desenvolvimento:
 - O hook `commit-msg` do Lefthook valida a mensagem com **commitlint**; commits fora do padrão
   são bloqueados. Para validar manualmente a mensagem preparada: `bun run lint:commit`.
 - Ao final de cada spec, a skill `implement-me` executa o comando `commit-and-push`
-  (`.opencode/commands/commit-and-push.md`): analisa o diff, commita e faz push.
+  (`.opencode/commands/commit-and-push.md`): analisa o diff, commita e faz push. No modo
+  orquestrado (`orchestrate-me`), cada subagente commita na branch `spec/<numero>` do seu
+  worktree e o orquestrador integra por onda: merge, QA completo e `commit-and-push` antes de
+  lançar a onda seguinte.
 - Commits criados por esse fluxo incluem o trailer
   `Co-authored-by: OpenCode Agent <noreply@opencode.ai>`.
 - Fora da execução de spec, não commite nem faça push sem pedido explícito do usuário.
