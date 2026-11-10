@@ -233,7 +233,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
       orientação para ignorar; token só existe em claro na mensagem, nunca em log.
 - [ ] `auth_tokens` guarda apenas `token_hash`; o reenvio invalida o token pendente anterior.
 - [ ] E-mail confirmado → `409` sem duplicata; não confirmado → `200` com reenvio, sem duplicata.
-- [ ] Falha de SMTP → `503` acionável e a conta não confirmada pode ser reutilizada no retry.
+- [ ] Falha de envio de e-mail → `503` acionável e a conta não confirmada pode ser reutilizada no retry.
 - [ ] Rate limit por IP: acima de `SIGN_UP_RATE_LIMIT_MAX` em `SIGN_UP_RATE_LIMIT_WINDOW_SECONDS`
       → `429` com mensagem genérica, sem detalhes internos.
 - [ ] `/auth/confirm?token=...` envia o token no corpo, auto-submete uma vez, grava o cookie
@@ -250,14 +250,13 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Com JavaScript desabilitado, o botão de fallback confirma a conta e o cookie abre `/app`.
 - [ ] E2E cobre sucesso/cookie/URL sem token, inválido, `409`, `429`, link sem token, sessão ativa,
       foco visível e 360/768/1280 px sem rolagem horizontal.
-- [ ] Mailpit local: e-mails "Confirm your account" e "New session on your account" inspecionados
+- [ ] Logs do Mailtrap (`https://mailtrap.io/sending/email_logs`): e-mails "Confirm your account" e "New session on your account" inspecionados
       no QA manual, com data/hora e alerta de senha no segundo.
 - [ ] `CONFIRMATION_TOKEN_TTL_SECONDS` controla a expiração (padrão 86400) e os limites de rate
       limit vêm do env; logs incluem operação/`userId`, sem e-mail, senha ou token.
 - [ ] `/app` continua redirecionando para `/auth/sign-in` sem sessão após um sign-up bem-sucedido.
 - [ ] E2E cobre erros por campo, sucesso, `409`, `429`, `503`, foco visível, light-only e
-      360/768/1280 px sem rolagem horizontal; Mailpit local (`http://127.0.0.1:54324`) validado no
-      QA manual.
+      360/768/1280 px sem rolagem horizontal; logs do Mailtrap validados no QA manual.
 
 ### 5.12 Recuperação de senha
 
@@ -275,20 +274,19 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
       aparece na resposta, no banco, em logs ou em métricas.
 - [ ] `RESET_TOKEN_TTL_SECONDS` controla a expiração (padrão 3600 s); um novo pedido invalida o
       token pendente anterior e dois pedidos simultâneos não deixam dois tokens válidos.
-- [ ] Falha de SMTP mantém o `200` genérico, registra a falha sem PII e permite nova tentativa.
+- [ ] Falha de envio de e-mail mantém o `200` genérico, registra a falha sem PII e permite nova tentativa.
 - [ ] Rate limit por IP e por e-mail: acima de `FORGOT_PASSWORD_RATE_LIMIT_MAX` em
       `FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS` → `429` com mensagem genérica e `Retry-After`.
 - [ ] E-mail de nova sessão contém o link de recuperação.
 - [ ] E2E cobre validação, sucesso genérico, `429`, foco visível, light-only e 360/768/1280 px sem
-      rolagem horizontal; Mailpit local (`http://127.0.0.1:54324`) e o link real validados no QA
-      manual.
+      rolagem horizontal; logs do Mailtrap e o link real validados no QA manual.
 
 ### 5.13 Sign-in (fatia 006)
 
 - [ ] `/auth/sign-in` substitui o placeholder, usa en-US, light-only, labels, `aria-describedby`
       e link "Forgot password?" para `/auth/forgot-password`.
 - [ ] Credenciais válidas → sessão `sign_in`, cookie `HttpOnly`/`SameSite=Lax`, redirect para `/app`
-      ou para o `returnTo` seguro e e-mail "New session on your account" no Mailpit.
+      ou para o `returnTo` seguro e e-mail "New session on your account" no Mailtrap.
 - [ ] Senha errada, e-mail inexistente ou e-mail malformado → `401` com a mesma mensagem; corpo
       vazio/malformado → `400`; conta não confirmada com a senha certa → `403`.
 - [ ] Segundo dispositivo revoga o primeiro (JWT antigo → `401`, `/app` redireciona para sign-in).
@@ -303,8 +301,8 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
       `autocomplete="new-password"`, foco visível e erros com `aria-describedby` e `role="alert"`.
 - [ ] Token válido + senha e confirmação válidas → `200`, hash atualizado (nunca a senha em
       claro), token consumido, outros tokens `password_reset` invalidados, **todas** as sessões
-      revogadas e e-mail "Your password has been changed" en-US no Mailpit
-      (`http://127.0.0.1:54324`) com orientação para solicitar novo reset.
+      revogadas e e-mail "Your password has been changed" en-US nos logs do Mailtrap
+      com orientação para solicitar novo reset.
 - [ ] Após o sucesso o web mostra a confirmação, redireciona para `/auth/sign-in?reset=success` e o
       sign-in exibe "Your password has been updated. Sign in with your new password."
 - [ ] Token ausente, desconhecido, expirado ou já usado → `400` `INVALID_RESET_TOKEN`, página mostra
@@ -315,7 +313,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Conta não confirmada: o reset confirma o e-mail e a pessoa entra com a nova senha.
 - [ ] JWT antigo → `/me` responde `401`; sign-in com a senha antiga falha e com a nova funciona.
 - [ ] Dois resets simultâneos com o mesmo token: apenas um responde `200`; o outro `INVALID_RESET_TOKEN`.
-- [ ] Falha de SMTP no e-mail de sucesso não reverte a senha nem muda o `200`.
+- [ ] Falha de envio de e-mail no e-mail de sucesso não reverte a senha nem muda o `200`.
 - [ ] Rate limit por IP: a 6ª tentativa em `RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS` (padrão 60 s,
       `RESET_PASSWORD_RATE_LIMIT_MAX` = 5) → `429` com `Retry-After`.
 - [ ] O token sai da barra de endereços (`history.replaceState`), a resposta da rota traz

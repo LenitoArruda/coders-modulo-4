@@ -17,7 +17,7 @@ infraestrutura de sessão de auth — e **não** implementa ainda funcionalidade
 | Web / Docs             | Next.js 16 (App Router) + React 19                     |
 | UI                     | Tailwind CSS 4 + shadcn/ui (`packages/ui`)             |
 | API                    | NestJS 12 + TypeScript (CommonJS)                      |
-| Sessão / e-mail        | jose (JWT HS256) + nodemailer (SMTP local)             |
+| Sessão / e-mail        | jose (JWT HS256) + SDK Mailtrap (API de envio)         |
 | Banco / Auth / Storage | Supabase local via CLI 3 (`@supabase/supabase-js`)     |
 | Testes                 | Vitest + Supertest (API), Vitest (web) e Playwright    |
 | Observabilidade        | OpenTelemetry → Grafana LGTM (métricas, logs e traces) |
@@ -57,21 +57,21 @@ quando alguma chave está ausente ou inválida.
 
 ### Chaves do `.env`
 
-| Variável                      | Uso                                                  |
-| ----------------------------- | ---------------------------------------------------- |
-| `PORT`                        | Porta da API (padrão `3333`)                         |
-| `WEB_ORIGIN`                  | Origem liberada no CORS (`http://localhost:3000`)    |
-| `SUPABASE_URL`                | URL da API local do Supabase                         |
-| `SUPABASE_ANON_KEY`           | Chave pública local                                  |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Chave de serviço local (nunca use em produção)       |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP gRPC do LGTM (`http://localhost:4317`) |
-| `OTEL_SERVICE_NAME`           | Nome do serviço na telemetria                        |
-| `JWT_SECRET`                  | Segredo HS256 do JWT (obrigatório, ≥ 32 caracteres)  |
-| `SESSION_TTL_SECONDS`         | Duração da sessão em segundos (padrão `604800`)      |
-| `SMTP_HOST`                   | Host SMTP local (padrão `127.0.0.1`)                 |
-| `SMTP_PORT`                   | Porta SMTP do Mailpit (padrão `54325`)               |
-| `SMTP_FROM`                   | Remetente do e-mail de nova sessão                   |
-| `API_BASE_URL`                | URL da API usada pelo servidor do web                |
+| Variável                      | Uso                                                                                |
+| ----------------------------- | ---------------------------------------------------------------------------------- |
+| `PORT`                        | Porta da API (padrão `3333`)                                                       |
+| `WEB_ORIGIN`                  | Origem liberada no CORS (`http://localhost:3000`)                                  |
+| `SUPABASE_URL`                | URL da API local do Supabase                                                       |
+| `SUPABASE_ANON_KEY`           | Chave pública local                                                                |
+| `SUPABASE_SERVICE_ROLE_KEY`   | Chave de serviço local (nunca use em produção)                                     |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP gRPC do LGTM (`http://localhost:4317`)                               |
+| `OTEL_SERVICE_NAME`           | Nome do serviço na telemetria                                                      |
+| `JWT_SECRET`                  | Segredo HS256 do JWT (obrigatório, ≥ 32 caracteres)                                |
+| `SESSION_TTL_SECONDS`         | Duração da sessão em segundos (padrão `604800`)                                    |
+| `MAILTRAP_API_TOKEN`          | Token da API do Mailtrap (obrigatório, segredo)                                    |
+| `MAIL_FROM_EMAIL`             | Remetente; domínio verificado no Mailtrap Sending (padrão `hello@demomailtrap.co`) |
+| `MAIL_FROM_NAME`              | Nome do remetente (padrão `Experts`)                                               |
+| `API_BASE_URL`                | URL da API usada pelo servidor do web                                              |
 
 > Gere um `JWT_SECRET` local com `openssl rand -base64 48` (ou equivalente). O valor vazio no
 > `.env.example` é intencional: a API falha no boot se o segredo estiver ausente ou curto.
@@ -171,8 +171,6 @@ o padrão; não reescreva o histórico por causa disso.
 | Supabase API    | <http://localhost:54321> |
 | Supabase DB     | `localhost:54322`        |
 | Supabase Studio | <http://localhost:54323> |
-| Mailpit (inbox) | <http://localhost:54324> |
-| Mailpit (SMTP)  | `localhost:54325`        |
 
 O Grafana do LGTM sobe com acesso anônimo (Admin) e já recebe logs, métricas e traces da API.
 Consulte `service_name="coders-modulo-4-api"` em Loki, Tempo ou Prometheus.
@@ -235,8 +233,8 @@ A autenticação é própria da API (sem Supabase Auth) e a API é versionada em
 - O web guarda o token no cookie `session_token` (`HttpOnly`, `SameSite=Lax`, `Secure` em
   produção); o servidor do Next lê o cookie e envia `Authorization: Bearer` (`apps/web/lib/auth`).
   O token nunca vai para o JavaScript do navegador.
-- O e-mail de nova sessão é enviado pelo SMTP local e fica visível no Mailpit
-  (<http://localhost:54324>). A fatia entrega a infraestrutura; páginas públicas de confirmação,
+- O e-mail de nova sessão é enviado pela API do Mailtrap; consulte os envios nos logs
+  (<https://mailtrap.io/sending/email_logs>). A fatia entrega a infraestrutura; páginas públicas de confirmação,
   sign-in, sign-out e recuperação de senha entram nas fatias 004–008.
 - Erros seguem `{ code, message, fieldErrors? }`, sem stack, SQL ou detalhes internos.
 

@@ -10,6 +10,7 @@ const validEnv: EnvSource = {
   SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4317",
   JWT_SECRET: "test-jwt-secret-with-at-least-32-characters",
+  MAILTRAP_API_TOKEN: "test-mailtrap-token",
 };
 
 describe("loadEnv", () => {
@@ -28,9 +29,9 @@ describe("loadEnv", () => {
       resetTokenTtlSeconds: 3_600,
       forgotPasswordRateLimitMax: 5,
       forgotPasswordRateLimitWindowSeconds: 60,
-      smtpHost: "127.0.0.1",
-      smtpPort: 54_325,
-      smtpFrom: "no-reply@localhost",
+      mailtrapApiToken: "test-mailtrap-token",
+      mailFromEmail: "hello@demomailtrap.co",
+      mailFromName: "Experts",
     });
   });
 
@@ -210,24 +211,28 @@ describe("loadEnv", () => {
     ).toThrow(/RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS/);
   });
 
-  it("deve falhar quando a porta do SMTP é inválida", () => {
-    expect(() => loadEnv({ ...validEnv, SMTP_PORT: "not-a-port" })).toThrow(
-      /SMTP_PORT/,
-    );
+  it("deve falhar quando o token do Mailtrap está ausente", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, MAILTRAP_API_TOKEN: undefined }),
+    ).toThrow(/MAILTRAP_API_TOKEN/);
   });
 
-  it("deve aplicar os overrides de SMTP quando informados", () => {
+  it("deve falhar quando o remetente do e-mail é inválido", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, MAIL_FROM_EMAIL: "not-an-email" }),
+    ).toThrow(/MAIL_FROM_EMAIL/);
+  });
+
+  it("deve aplicar os overrides do remetente quando informados", () => {
     expect(
       loadEnv({
         ...validEnv,
-        SMTP_HOST: "smtp.example.com",
-        SMTP_PORT: "587",
-        SMTP_FROM: "no-reply@example.com",
+        MAIL_FROM_EMAIL: "no-reply@example.com",
+        MAIL_FROM_NAME: "Acme",
       }),
     ).toMatchObject({
-      smtpHost: "smtp.example.com",
-      smtpPort: 587,
-      smtpFrom: "no-reply@example.com",
+      mailFromEmail: "no-reply@example.com",
+      mailFromName: "Acme",
     });
   });
 

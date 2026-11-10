@@ -64,9 +64,11 @@ export type Env = {
   signInRateLimitWindowSeconds: number;
   resetPasswordRateLimitMax: number;
   resetPasswordRateLimitWindowSeconds: number;
-  smtpHost: string;
-  smtpPort: number;
-  smtpFrom: string;
+  /** Mailtrap Email API token (secret). */
+  mailtrapApiToken: string;
+  /** Sender address; its domain must be verified in Mailtrap Sending. */
+  mailFromEmail: string;
+  mailFromName: string;
 };
 
 export class ConfigurationError extends Error {
@@ -311,15 +313,15 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS");
   }
 
-  const smtpHost = readString(source.SMTP_HOST) || "127.0.0.1";
-  const smtpPortValue = readString(source.SMTP_PORT) || "54325";
-  const smtpPort = Number(smtpPortValue);
+  const mailtrapApiToken = readString(source.MAILTRAP_API_TOKEN);
+  const mailFromEmail =
+    readString(source.MAIL_FROM_EMAIL) || "hello@demomailtrap.co";
+  const mailFromName = readString(source.MAIL_FROM_NAME) || "Experts";
 
-  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65_535) {
-    invalid.push("SMTP_PORT");
+  if (!mailtrapApiToken) missing.push("MAILTRAP_API_TOKEN");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailFromEmail)) {
+    invalid.push("MAIL_FROM_EMAIL");
   }
-
-  const smtpFrom = readString(source.SMTP_FROM) || "no-reply@localhost";
 
   if (webOrigin && !isValidHttpUrl(webOrigin)) invalid.push("WEB_ORIGIN");
   if (supabaseUrl && !isValidHttpUrl(supabaseUrl)) invalid.push("SUPABASE_URL");
@@ -353,8 +355,8 @@ export function loadEnv(source: EnvSource = process.env): Env {
     signInRateLimitWindowSeconds,
     resetPasswordRateLimitMax,
     resetPasswordRateLimitWindowSeconds,
-    smtpHost,
-    smtpPort,
-    smtpFrom,
+    mailtrapApiToken,
+    mailFromEmail,
+    mailFromName,
   };
 }

@@ -37,5 +37,5 @@ export const RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = Symbol(
 );
 export const WEB_ORIGIN = Symbol("WEB_ORIGIN");
 export const SUPABASE_CLIENT = Symbol("SUPABASE_CLIENT");
-export const SMTP_TRANSPORT = Symbol("SMTP_TRANSPORT");
-export const SMTP_FROM = Symbol("SMTP_FROM");
+export const MAILTRAP_CLIENT = Symbol("MAILTRAP_CLIENT");
+export const MAIL_FROM = Symbol("MAIL_FROM");
