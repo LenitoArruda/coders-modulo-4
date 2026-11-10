@@ -1,7 +1,16 @@
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { AppModule } from "../../../app.module";
 import { configureApp } from "../../../app-setup";
@@ -80,6 +89,10 @@ describe("POST /api/v1/auth/sign-up", () => {
     emails.messages.length = 0;
     emails.failure = null;
     limiter.reset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   afterAll(async () => {
@@ -287,5 +300,43 @@ describe("POST /api/v1/auth/sign-up", () => {
     expect(response.text).not.toContain("fake-hash");
     expect(response.text).not.toContain("token");
     expect(response.text).not.toMatch(/stack|postgres|scrypt/i);
+  });
+
+  it("não deve registrar e-mail, senha ou token nos logs", async () => {
+    const lines: string[] = [];
+    const capture = (...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    };
+
+    vi.spyOn(console, "log").mockImplementation(capture);
+    vi.spyOn(console, "warn").mockImplementation(capture);
+    vi.spyOn(console, "error").mockImplementation(capture);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/sign-up")
+      .send(validBody)
+      .expect(201);
+
+    const clearToken = extractToken(emails.messages[0]?.text ?? "");
+
+    emails.failure = new Error(`smtp down for ${validBody.email}`);
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/sign-up")
+      .send(validBody)
+      .expect(503);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/sign-up")
+      .send({ ...validBody, passwordConfirmation: "something else" })
+      .expect(400);
+
+    const output = lines.join("\n");
+
+    expect(output.length).toBeGreaterThan(0);
+    expect(output).not.toContain(validBody.email);
+    expect(output).not.toContain(validBody.password);
+    expect(output).not.toContain("something else");
+    expect(output).not.toContain(clearToken);
+    expect(output).not.toContain(authTokens.tokens[0]?.tokenHash ?? "");
   });
 });
