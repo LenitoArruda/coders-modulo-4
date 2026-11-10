@@ -18,12 +18,14 @@ import {
   type ConfirmAccountResult,
   ConfirmAccountUseCase,
 } from "../application/confirm-account.use-case";
+import { RequestPasswordResetUseCase } from "../application/request-password-reset.use-case";
 import { SignUpUseCase } from "../application/sign-up.use-case";
 import type { AuthUser } from "../domain/auth-user";
 import {
   AccountAlreadyConfirmedError,
   InvalidConfirmationTokenError,
 } from "../domain/confirmation.errors";
+import { validateForgotPasswordInput } from "../domain/forgot-password-input";
 import { validateSignUpInput } from "../domain/sign-up-input";
 import {
   ConfirmationEmailDeliveryError,
@@ -32,6 +34,7 @@ import {
 
 import { ConfirmationRateLimiter } from "./confirmation-rate-limiter";
 import { CurrentUser } from "./current-user.decorator";
+import { ForgotPasswordRateLimiter } from "./forgot-password-rate-limiter";
 import { SessionGuard } from "./session.guard";
 import { SignUpRateLimiter } from "./sign-up-rate-limiter";
 
@@ -65,6 +68,20 @@ const SIGN_UP_EMAIL_FAILURE_MESSAGE =
 const CONFIRM_RATE_LIMIT_MESSAGE =
   "Too many attempts. Wait a moment and try again.";
 
+export type ForgotPasswordResponse = { message: string };
+
+/**
+ * Same body and status for every syntactically valid email, whether or not an
+ * account exists, so the endpoint cannot be used to enumerate accounts.
+ */
+export const FORGOT_PASSWORD_SUCCESS_MESSAGE =
+  "If an account exists for this email, we sent a password reset link.";
+
+const FORGOT_PASSWORD_VALIDATION_MESSAGE =
+  "Check the highlighted fields and try again.";
+const FORGOT_PASSWORD_RATE_LIMIT_MESSAGE =
+  "Too many attempts. Wait a moment and try again.";
+
 function clientIp(request: Request): string {
   return request.ip ?? request.socket.remoteAddress ?? "unknown";
 }
@@ -95,6 +112,10 @@ export class AuthController {
     private readonly confirmAccountUseCase: ConfirmAccountUseCase,
     @Inject(ConfirmationRateLimiter)
     private readonly confirmationLimiter: ConfirmationRateLimiter,
+    @Inject(RequestPasswordResetUseCase)
+    private readonly requestPasswordReset: RequestPasswordResetUseCase,
+    @Inject(ForgotPasswordRateLimiter)
+    private readonly forgotPasswordRateLimiter: ForgotPasswordRateLimiter,
   ) {}
 
   @Post("sign-up")
@@ -158,6 +179,63 @@ export class AuthController {
 
       throw error;
     }
+  }
+
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(
+    @Body() body: unknown,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<ForgotPasswordResponse> {
+    const ipDecision = this.forgotPasswordRateLimiter.consume(
+      `ip:${clientIp(request)}`,
+    );
+
+    if (!ipDecision.allowed) {
+      response.setHeader("Retry-After", String(ipDecision.retryAfterSeconds));
+
+      throw new HttpException(
+        {
+          code: "TOO_MANY_REQUESTS",
+          message: FORGOT_PASSWORD_RATE_LIMIT_MESSAGE,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const validation = validateForgotPasswordInput(body);
+
+    if (!validation.ok) {
+      throw new BadRequestException({
+        code: "VALIDATION_ERROR",
+        message: FORGOT_PASSWORD_VALIDATION_MESSAGE,
+        fieldErrors: validation.fieldErrors,
+      });
+    }
+
+    const emailDecision = this.forgotPasswordRateLimiter.consume(
+      `email:${validation.value.email}`,
+    );
+
+    if (!emailDecision.allowed) {
+      response.setHeader(
+        "Retry-After",
+        String(emailDecision.retryAfterSeconds),
+      );
+
+      throw new HttpException(
+        {
+          code: "TOO_MANY_REQUESTS",
+          message: FORGOT_PASSWORD_RATE_LIMIT_MESSAGE,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    await this.requestPasswordReset.execute(validation.value);
+
+    return { message: FORGOT_PASSWORD_SUCCESS_MESSAGE };
   }
 
   @Get("me")

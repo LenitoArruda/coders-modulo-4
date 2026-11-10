@@ -25,6 +25,9 @@ describe("loadEnv", () => {
       signUpRateLimitWindowSeconds: 60,
       confirmationRateLimitMax: 10,
       confirmationRateLimitWindowSeconds: 60,
+      resetTokenTtlSeconds: 3_600,
+      forgotPasswordRateLimitMax: 5,
+      forgotPasswordRateLimitWindowSeconds: 60,
       smtpHost: "127.0.0.1",
       smtpPort: 54_325,
       smtpFrom: "no-reply@localhost",
@@ -120,6 +123,35 @@ describe("loadEnv", () => {
     expect(() =>
       loadEnv({ ...validEnv, CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS: "0" }),
     ).toThrow(/CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS/);
+  });
+
+  it("deve aplicar a configuração de recuperação de senha quando informada", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        RESET_TOKEN_TTL_SECONDS: "7200",
+        FORGOT_PASSWORD_RATE_LIMIT_MAX: "10",
+        FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS: "120",
+      }),
+    ).toMatchObject({
+      resetTokenTtlSeconds: 7_200,
+      forgotPasswordRateLimitMax: 10,
+      forgotPasswordRateLimitWindowSeconds: 120,
+    });
+  });
+
+  it("deve falhar quando a configuração de recuperação de senha é inválida", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, RESET_TOKEN_TTL_SECONDS: "abc" }),
+    ).toThrow(/RESET_TOKEN_TTL_SECONDS/);
+
+    expect(() =>
+      loadEnv({ ...validEnv, FORGOT_PASSWORD_RATE_LIMIT_MAX: "0" }),
+    ).toThrow(/FORGOT_PASSWORD_RATE_LIMIT_MAX/);
+
+    expect(() =>
+      loadEnv({ ...validEnv, FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS: "0" }),
+    ).toThrow(/FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS/);
   });
 
   it("deve falhar quando a porta do SMTP é inválida", () => {

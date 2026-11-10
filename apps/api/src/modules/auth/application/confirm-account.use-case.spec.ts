@@ -15,6 +15,7 @@ import { ConfirmAccountUseCase } from "./confirm-account.use-case";
 import { CreateSessionUseCase } from "./create-session.use-case";
 
 const SESSION_TTL_SECONDS = 604_800;
+const WEB_ORIGIN = "http://localhost:3000";
 
 function setup() {
   const users = new InMemoryUsersRepository();
@@ -28,6 +29,7 @@ function setup() {
     sessionTokens,
     emails,
     3600,
+    WEB_ORIGIN,
   );
   const useCase = new ConfirmAccountUseCase(
     users,

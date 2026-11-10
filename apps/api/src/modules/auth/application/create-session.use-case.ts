@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import { log } from "../../shared/observability/app-logger";
-import { SESSION_TTL_SECONDS } from "../auth.tokens";
+import { SESSION_TTL_SECONDS, WEB_ORIGIN } from "../auth.tokens";
 import type { AuthUser } from "../domain/auth-user";
 import type { Session, SessionOrigin } from "../domain/session";
 
@@ -49,6 +49,8 @@ export class CreateSessionUseCase {
     private readonly emails: EmailSenderPort,
     @Inject(SESSION_TTL_SECONDS)
     private readonly ttlSeconds: number,
+    @Inject(WEB_ORIGIN)
+    private readonly webOrigin: string,
   ) {}
 
   async execute(input: CreateSessionInput): Promise<CreatedSession> {
@@ -66,9 +68,14 @@ export class CreateSessionUseCase {
       sessionId: session.id,
     });
 
+    const passwordResetUrl = new URL(
+      "/auth/forgot-password",
+      this.webOrigin,
+    ).toString();
+
     try {
       await this.emails.send(
-        buildNewSessionEmail(input.user, session.createdAt),
+        buildNewSessionEmail(input.user, session.createdAt, passwordResetUrl),
       );
     } catch (error) {
       // A failed notification must never block the session.

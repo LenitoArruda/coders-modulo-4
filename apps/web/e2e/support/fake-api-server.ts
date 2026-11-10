@@ -27,6 +27,8 @@ const user = {
 };
 
 const SIGN_UP_SUCCESS_MESSAGE = "Check your email to confirm your account.";
+const FORGOT_PASSWORD_SUCCESS_MESSAGE =
+  "If an account exists for this email, we sent a password reset link.";
 
 const CONFIRM_INVALID_MESSAGE =
   "This confirmation link is invalid or has expired.";
@@ -208,6 +210,45 @@ async function handleConfirm(
   });
 }
 
+async function handleForgotPassword(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const body = asRecord(await readJsonBody(request));
+  const email = readString(body, "email").trim().toLowerCase();
+
+  if (email.length === 0) {
+    sendJson(response, 400, {
+      code: "VALIDATION_ERROR",
+      message: "Check the highlighted fields and try again.",
+      fieldErrors: { email: "Enter your email address." },
+    });
+    return;
+  }
+
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    sendJson(response, 400, {
+      code: "VALIDATION_ERROR",
+      message: "Check the highlighted fields and try again.",
+      fieldErrors: { email: "Enter a valid email address." },
+    });
+    return;
+  }
+
+  if (email === "rate-limited@example.com") {
+    response.setHeader("Retry-After", "60");
+    sendJson(response, 429, {
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many attempts. Wait a moment and try again.",
+    });
+    return;
+  }
+
+  // Every syntactically valid email gets the same generic answer, existing
+  // account or not, mirroring the real API's anti-enumeration contract.
+  sendJson(response, 200, { message: FORGOT_PASSWORD_SUCCESS_MESSAGE });
+}
+
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${host}:${port}`)
     .pathname;
@@ -225,6 +266,14 @@ const server = createServer(async (request, response) => {
 
   if (pathname === "/api/v1/auth/confirm" && request.method === "POST") {
     await handleConfirm(request, response);
+    return;
+  }
+
+  if (
+    pathname === "/api/v1/auth/forgot-password" &&
+    request.method === "POST"
+  ) {
+    await handleForgotPassword(request, response);
     return;
   }
 

@@ -9,6 +9,8 @@ import { FakeSessionToken } from "../../../test/fakes/fake-session-token";
 import { InMemoryEmailSender } from "../../../test/fakes/in-memory-email.sender";
 import { InMemorySessionsRepository } from "../../../test/fakes/in-memory-sessions.repository";
 
+const WEB_ORIGIN = "http://localhost:3000";
+
 const user: AuthUser = {
   id: "11111111-1111-1111-1111-111111111111",
   firstName: "Ada",
@@ -24,6 +26,7 @@ describe("CreateSessionUseCase", () => {
       new FakeSessionToken(),
       new InMemoryEmailSender(),
       3600,
+      WEB_ORIGIN,
     );
 
     const { session } = await useCase.execute({ user, origin: "sign_in" });
@@ -59,6 +62,7 @@ describe("CreateSessionUseCase", () => {
       new FakeSessionToken(),
       new InMemoryEmailSender(),
       3600,
+      WEB_ORIGIN,
     );
 
     const { session } = await useCase.execute({ user, origin: "sign_in" });
@@ -90,6 +94,7 @@ describe("CreateSessionUseCase", () => {
       new FakeSessionToken(),
       new InMemoryEmailSender(),
       3600,
+      WEB_ORIGIN,
     );
 
     await useCase.execute({ user, origin: "sign_in" });
@@ -105,6 +110,7 @@ describe("CreateSessionUseCase", () => {
       tokens,
       new InMemoryEmailSender(),
       3600,
+      WEB_ORIGIN,
     );
 
     const { token, session } = await useCase.execute({
@@ -124,6 +130,7 @@ describe("CreateSessionUseCase", () => {
       new FakeSessionToken(),
       emails,
       3600,
+      WEB_ORIGIN,
     );
 
     const { session } = await useCase.execute({ user, origin: "sign_in" });
@@ -134,6 +141,9 @@ describe("CreateSessionUseCase", () => {
       subject: "New session on your account",
     });
     expect(emails.messages[0]?.text).toContain("change your password");
+    expect(emails.messages[0]?.text).toContain(
+      "http://localhost:3000/auth/forgot-password",
+    );
     expect(emails.messages[0]?.text).not.toContain(session.id);
   });
 
@@ -146,6 +156,7 @@ describe("CreateSessionUseCase", () => {
       new FakeSessionToken(),
       emails,
       3600,
+      WEB_ORIGIN,
     );
 
     const result = await useCase.execute({ user, origin: "sign_in" });
@@ -160,10 +171,12 @@ describe("CreateSessionUseCase", () => {
 });
 
 describe("buildNewSessionEmail (usado pelo caso de uso)", () => {
-  it("deve ser en-US com data/hora e alerta, sem link de recuperação", () => {
+  it("deve ser en-US com data/hora, alerta e link de recuperação", () => {
+    const passwordResetUrl = "http://localhost:3000/auth/forgot-password";
     const message = buildNewSessionEmail(
       user,
       new Date("2026-11-09T15:42:00Z"),
+      passwordResetUrl,
     );
 
     expect(message.subject).toBe("New session on your account");
@@ -173,15 +186,16 @@ describe("buildNewSessionEmail (usado pelo caso de uso)", () => {
     expect(message.text).toContain(
       "If you did not start this session, change your password immediately.",
     );
-    expect(message.text).not.toMatch(/http|reset|forgot/i);
+    expect(message.text).toContain(`Reset your password: ${passwordResetUrl}`);
     expect(message.html).toContain("change your password");
-    expect(message.html).not.toMatch(/http/i);
+    expect(message.html).toContain(`<a href="${passwordResetUrl}">`);
   });
 
-  it("deve escapar HTML no primeiro nome", () => {
+  it("deve escapar HTML no primeiro nome e na URL", () => {
     const message = buildNewSessionEmail(
       { ...user, firstName: "Ada <script>" },
       new Date("2026-11-09T15:42:00Z"),
+      "http://localhost:3000/auth/forgot-password?x=<bad>",
     );
 
     expect(message.html).not.toContain("<script>");

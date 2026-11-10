@@ -41,4 +41,16 @@ export abstract class AuthTokensRepositoryPort {
     userId: string,
     purpose: AuthTokenPurpose,
   ): Promise<void>;
+
+  /**
+   * Marks every unused token of the user/purpose as used, except the token
+   * whose hash is `keepTokenHash`. Issuing a token before revoking the others
+   * (create-then-revoke) is the order that keeps a single valid token under
+   * concurrent requests.
+   */
+  abstract invalidateUnusedExcept(
+    userId: string,
+    purpose: AuthTokenPurpose,
+    keepTokenHash: string,
+  ): Promise<void>;
 }

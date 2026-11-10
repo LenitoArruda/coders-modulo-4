@@ -21,6 +21,15 @@ export const DEFAULT_CONFIRMATION_RATE_LIMIT_MAX = 10;
 /** Default confirmation rate limit window (60 seconds). */
 export const DEFAULT_CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS = 60;
 
+/** Default password reset token lifetime (1 hour), configurable via RESET_TOKEN_TTL_SECONDS. */
+export const DEFAULT_RESET_TOKEN_TTL_SECONDS = 3_600;
+
+/** Default forgot-password rate limit: requests allowed per key inside the window. */
+export const DEFAULT_FORGOT_PASSWORD_RATE_LIMIT_MAX = 5;
+
+/** Default forgot-password rate limit window (60 seconds). */
+export const DEFAULT_FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = 60;
+
 export type Env = {
   port: number;
   webOrigin: string;
@@ -36,6 +45,9 @@ export type Env = {
   signUpRateLimitWindowSeconds: number;
   confirmationRateLimitMax: number;
   confirmationRateLimitWindowSeconds: number;
+  resetTokenTtlSeconds: number;
+  forgotPasswordRateLimitMax: number;
+  forgotPasswordRateLimitWindowSeconds: number;
   smtpHost: string;
   smtpPort: number;
   smtpFrom: string;
@@ -188,6 +200,47 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS");
   }
 
+  const resetTokenTtlValue =
+    readString(source.RESET_TOKEN_TTL_SECONDS) ||
+    String(DEFAULT_RESET_TOKEN_TTL_SECONDS);
+  const resetTokenTtlSeconds = Number(resetTokenTtlValue);
+
+  if (
+    !Number.isInteger(resetTokenTtlSeconds) ||
+    resetTokenTtlSeconds < 1 ||
+    resetTokenTtlSeconds > 31_536_000
+  ) {
+    invalid.push("RESET_TOKEN_TTL_SECONDS");
+  }
+
+  const forgotPasswordRateLimitMaxValue =
+    readString(source.FORGOT_PASSWORD_RATE_LIMIT_MAX) ||
+    String(DEFAULT_FORGOT_PASSWORD_RATE_LIMIT_MAX);
+  const forgotPasswordRateLimitMax = Number(forgotPasswordRateLimitMaxValue);
+
+  if (
+    !Number.isInteger(forgotPasswordRateLimitMax) ||
+    forgotPasswordRateLimitMax < 1 ||
+    forgotPasswordRateLimitMax > 10_000
+  ) {
+    invalid.push("FORGOT_PASSWORD_RATE_LIMIT_MAX");
+  }
+
+  const forgotPasswordRateLimitWindowValue =
+    readString(source.FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS) ||
+    String(DEFAULT_FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS);
+  const forgotPasswordRateLimitWindowSeconds = Number(
+    forgotPasswordRateLimitWindowValue,
+  );
+
+  if (
+    !Number.isInteger(forgotPasswordRateLimitWindowSeconds) ||
+    forgotPasswordRateLimitWindowSeconds < 1 ||
+    forgotPasswordRateLimitWindowSeconds > 86_400
+  ) {
+    invalid.push("FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS");
+  }
+
   const smtpHost = readString(source.SMTP_HOST) || "127.0.0.1";
   const smtpPortValue = readString(source.SMTP_PORT) || "54325";
   const smtpPort = Number(smtpPortValue);
@@ -223,6 +276,9 @@ export function loadEnv(source: EnvSource = process.env): Env {
     signUpRateLimitWindowSeconds,
     confirmationRateLimitMax,
     confirmationRateLimitWindowSeconds,
+    resetTokenTtlSeconds,
+    forgotPasswordRateLimitMax,
+    forgotPasswordRateLimitWindowSeconds,
     smtpHost,
     smtpPort,
     smtpFrom,

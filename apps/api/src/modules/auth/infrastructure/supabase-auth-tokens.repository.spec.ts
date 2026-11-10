@@ -69,6 +69,34 @@ describe("SupabaseAuthTokensRepository", () => {
     expect(mock.calls[4]?.args).toEqual(["used_at", null]);
   });
 
+  it("deve invalidar tokens pendentes exceto o hash recém-criado", async () => {
+    const mock = createSupabaseClientMock();
+    const repository = new SupabaseAuthTokensRepository(mock.client);
+
+    await repository.invalidateUnusedExcept(
+      userId,
+      "password_reset",
+      "new-hash",
+    );
+
+    expect(mock.calls.map((call) => call.method)).toEqual([
+      "from",
+      "update",
+      "eq",
+      "eq",
+      "is",
+      "neq",
+    ]);
+    expect(mock.calls[0]?.args).toEqual(["auth_tokens"]);
+    expect(mock.calls[1]?.args[0]).toMatchObject({
+      used_at: expect.any(String),
+    });
+    expect(mock.calls[2]?.args).toEqual(["user_id", userId]);
+    expect(mock.calls[3]?.args).toEqual(["purpose", "password_reset"]);
+    expect(mock.calls[4]?.args).toEqual(["used_at", null]);
+    expect(mock.calls[5]?.args).toEqual(["token_hash", "new-hash"]);
+  });
+
   it("deve falhar quando a invalidação retorna erro", async () => {
     const mock = createSupabaseClientMock({
       error: { code: "42501" },
