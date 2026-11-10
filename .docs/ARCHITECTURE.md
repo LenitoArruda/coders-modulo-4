@@ -49,15 +49,15 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 └── bun.lock
 ```
 
-| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                       |
-| ---------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação e recuperação de senha na porta 3000 |
-| `apps/docs`                  | Site de documentação                    | ✅ starter rodando na porta 3001; ainda não customizado                                                                                      |
-| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot-password, contrato de erro, env, CORS, logs e OTel na porta 3333    |
-| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`; legados `button`, `card`, `code` mantidos para `apps/docs`                                     |
-| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                               |
-| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                         |
-| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                         |
+| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                              |
+| ---------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação e troca de senha na porta 3000 |
+| `apps/docs`                  | Site de documentação                    | ✅ starter rodando na porta 3001; ainda não customizado                                                                                             |
+| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, contrato de erro, env, CORS, logs e OTel na porta 3333     |
+| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`; legados `button`, `card`, `code` mantidos para `apps/docs`                                            |
+| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                      |
+| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                |
+| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                |
 
 ---
 
@@ -209,8 +209,8 @@ Regras centrais:
 
 O detalhamento de campos e constraints está em `.specs/001-auth-schema.md`. A fatia 002 entrega a
 infraestrutura de sessão descrita na §4.5, a fatia 004 o sign-up e a fatia 005 a confirmação
-descritos na §4.6, a fatia 006 o sign-in na §4.7 e a fatia 007 a solicitação de recuperação de senha na §4.8; os endpoints de
-sign-out e a troca de senha em si entram nas fatias 007 e 008.
+descritos na §4.6, a fatia 006 o sign-in na §4.7 e as fatias 007 e 008 a solicitação de recuperação e a troca de senha
+na §4.8; o endpoint de sign-out ainda não existe.
 
 ### 4.5 Sessão de autenticação
 
@@ -378,13 +378,13 @@ Regras:
 - Logs carregam só `outcome` e `userId`; nunca e-mail, senha ou token.
 - O rate limit é em memória por processo (store compartilhado é follow-up multi-instância).
 
-### 4.8 Recuperação de senha
+### 4.8 Recuperação e troca de senha
 
 A recuperação é pública e sempre responde a mesma mensagem para qualquer e-mail sintaticamente
 válido, exista ou não a conta. O web envia o formulário por uma Server Action para
 `POST /api/v1/auth/forgot-password`; a API valida o e-mail, aplica rate limit por IP e por e-mail
 normalizado e, apenas quando a conta existe, emite um token opaco de uso único e dispara o e-mail
-com o link `/auth/reset-password?token=...` (a troca de senha é a fatia 008).
+com o link `/auth/reset-password?token=...` (a troca de senha é descrita na seção "Troca de senha" abaixo).
 
 ```text
 /auth/forgot-password (web) ── Server Action ──► POST /api/v1/auth/forgot-password
@@ -417,6 +417,62 @@ Regras:
 - O formulário usa `useActionState`, label visível, `aria-describedby`, resumo `role="alert"` e
   estado de sucesso `role="status"` que substitui o formulário. A UI é en-US e light-only.
 - O rate limit é local ao processo; um store compartilhado fica como follow-up.
+
+#### Troca de senha (fatia 008)
+
+`/auth/reset-password?token=...` é pública e acessível com ou sem sessão. A página (Server Component)
+lê o `token` no servidor e o entrega ao formulário; o formulário (`ResetPasswordForm`) remove o token
+da barra de endereços com `history.replaceState` assim que carrega, mantém o valor no estado e o
+envia, junto com a nova senha e a confirmação, por uma Server Action para
+`POST /api/v1/auth/reset-password`. A rota responde com `Referrer-Policy: no-referrer`
+(`headers()` do `next.config.js`), não carrega recursos externos e não é registrada no log de
+requisições do `next dev`. Token ausente mostra o estado de link inválido, sem formulário.
+
+```text
+/auth/reset-password (web) ── Server Action ──► POST /api/v1/auth/reset-password
+                                                   │ rate limit por IP (429 + Retry-After)
+                                                   │ valida senha + confirmação (VALIDATION_ERROR, token intacto)
+                                                   └─► ResetPasswordUseCase
+                                                         1. hash da nova senha (scrypt)
+                                                         2. consome o token (used_at is null)
+                                                         3. users.updatePassword
+                                                         4. users.confirmEmail (se ainda não confirmado)
+                                                         5. auth_tokens.invalidateUnused (password_reset)
+                                                         6. sessions.revokeAllActive
+                                                         7. e-mail "Your password has been changed"
+```
+
+| Peça                       | Responsabilidade                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `password-policy`          | Política de senha (8–128, sem composição) e mensagens, compartilhadas com o sign-up               |
+| `ResetPasswordInput`       | Valida senha e confirmação (token só é aparado) e devolve mensagem en-US por campo                |
+| `ResetPasswordUseCase`     | Valida o token por hash e executa as escritas na ordem acima                                      |
+| `password-changed-email`   | Template en-US "Your password has been changed" com orientação para solicitar novo reset          |
+| `ResetPasswordRateLimiter` | Janela deslizante em memória por IP; `RESET_PASSWORD_RATE_LIMIT_MAX` (5) e `_WINDOW_SECONDS` (60) |
+| `UsersRepositoryPort`      | Ganha `updatePassword(id, passwordHash)`                                                          |
+| `SessionsRepositoryPort`   | Ganha `revokeAllActive(userId)` (todas as sessões ativas, sem exceção)                            |
+
+Regras:
+
+- Respostas: `200` com "Your password has been updated. Sign in with your new password.", `400`
+  `INVALID_RESET_TOKEN` (token ausente, desconhecido, expirado, já usado, de outro propósito ou
+  consumido por requisição concorrente), `400` `VALIDATION_ERROR` com `fieldErrors.password` e
+  `fieldErrors.passwordConfirmation`, `429` com `Retry-After` e `500` genérico. Se token e senha são
+  inválidos ao mesmo tempo vale `VALIDATION_ERROR`, e um erro de senha nunca consome o token.
+- Uma senha que falha na própria política também reporta "Passwords do not match." na confirmação,
+  como no sign-up (a política e o algoritmo de confirmação são os mesmos).
+- Não há transação de banco: a consistência vem da **ordem** das escritas. O hash é calculado antes
+  de consumir o token; o consumo é condicional (`used_at is null`), então de dois resets
+  simultâneos com o mesmo token apenas um vence e o outro recebe `INVALID_RESET_TOKEN`. Se uma etapa
+  falhar após o consumo, a pessoa solicita um novo link; nenhuma sessão antiga permanece válida
+  após o `200`. A atomicidade estrita em banco segue como evolução (ADR 0013).
+- O reset confirma o e-mail ainda não confirmado (o token prova a posse do endereço) e invalida os
+  outros tokens `password_reset` não usados.
+- Falha no e-mail de sucesso é registrada (`outcome` sem PII) e não reverte a troca.
+- Após o `200`, o web mostra a confirmação (`role="status"`) e faz `router.replace` para
+  `/auth/sign-in?reset=success`; o sign-in exibe a mensagem de sucesso (`role="status"`). O cookie
+  antigo é tratado como ausente pelo guard, pois a sessão foi revogada.
+- Logs carregam só `userId` e `outcome`; nunca token, senha ou e-mail.
 
 ### 4.9 Rotas do web e guard
 
@@ -483,10 +539,11 @@ Fluxo resumido:
 > `/auth/sign-up`, hash scrypt, token de confirmação e e-mail), a confirmação de conta
 > (`POST /api/v1/auth/confirm`, `/auth/confirm`, sessão única, cookie e `/app` personalizado), a
 > solicitação de recuperação de senha (`POST /api/v1/auth/forgot-password`,
-> `/auth/forgot-password`, token de reset e e-mail) e o sign-in real
+> `/auth/forgot-password`, token de reset e e-mail), a troca de senha
+> (`POST /api/v1/auth/reset-password`, `/auth/reset-password`, revogação de sessões) e o sign-in real
 > (`POST /api/v1/auth/sign-in`, `/auth/sign-in`, `returnTo` seguro) e o esqueleto de navegação
 > (`/auth/*` público, `/app/*` privado com shell e guard, raiz redirecionando por sessão). O
-> schema de auth veio na fatia 001; sign-out e a troca de senha em si entram nas fatias 007 e 008.
+> schema de auth veio na fatia 001; o sign-out ainda não existe.
 
 ---
 

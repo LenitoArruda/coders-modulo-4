@@ -53,18 +53,22 @@ Execute na raiz do monorepo:
 > API não inicia. Os testes não dependem do `.env`: `apps/api/src/test/setup-env.ts` define as
 > variáveis mínimas (incluindo `JWT_SECRET`, `SESSION_TTL_SECONDS`,
 > `CONFIRMATION_TOKEN_TTL_SECONDS`, `RESET_TOKEN_TTL_SECONDS` e as dos rate limits de sign-up,
-> sign-in e forgot-password).
+> sign-in, forgot-password e reset-password).
 >
 > O E2E do web (`bun run test:e2e`) sobe uma **API fake** local em `127.0.0.1:3434`
 > (`apps/web/e2e/support/fake-api-server.ts`) e aponta `API_BASE_URL` do web para ela. Assim os
-> cenários de sessão, sign-up, sign-in e forgot-password (sucesso, `400`, `401`, `403`, `409`, `429` e `503`) são
+> cenários de sessão, sign-up, sign-in, forgot-password e reset-password (sucesso, `400`, `401`, `403`, `409`, `429` e `503`) são
 > determinísticos e não dependem do banco compartilhado, de credenciais ou de `JWT_SECRET`.
 > E-mails especiais da fake no sign-up: `taken@example.com` (`409`),
 > `mail-failure@example.com` (`503`) e `resend@example.com` (`200`); no forgot-password,
 > `rate-limited@example.com` (`429`) e qualquer e-mail válido recebe `200` genérico. No sign-in,
 > `<nome>@signin.example.com` com a senha `correct-password` entra (cada token novo invalida o
 > anterior do mesmo e-mail), `unconfirmed@example.com` (`403` só com a senha correta),
-> `rate-limited@example.com` (`429`) e `server-error@example.com` (`500`); o resto é `401`. Não deixe um
+> `rate-limited@example.com` (`429`) e `server-error@example.com` (`500`); o resto é `401`. No
+> reset-password, o token `reset-token:<nome>:<único>` vale uma única vez e, ao ser usado, troca a
+> senha de `<nome>@signin.example.com` e revoga as sessões dela (a senha antiga passa a falhar);
+> `rate-limited-reset-token` responde `429`, qualquer outro token responde `INVALID_RESET_TOKEN` e
+> a senha é validada antes do token, como na API real. Não deixe um
 > `bun run dev` antigo ocupando a porta 3000 antes do E2E, pois o Playwright reutiliza o servidor
 > existente em modo local.
 
@@ -291,6 +295,35 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] `returnTo` externo, `//`, barra invertida, `..` ou fora de `/app` cai em `/app`.
 - [ ] 6ª tentativa do mesmo IP + e-mail em `SIGN_IN_RATE_LIMIT_WINDOW_SECONDS` (padrão 60 s) →
       `429` com `Retry-After`; sem e-mail, senha ou token nos logs.
+
+### 5.14 Troca de senha (fatia 008)
+
+- [ ] `/auth/reset-password` substitui o placeholder, usa en-US, light-only e permanece acessível
+      com e sem sessão; campos "New password" e "Confirm new password" com label visível,
+      `autocomplete="new-password"`, foco visível e erros com `aria-describedby` e `role="alert"`.
+- [ ] Token válido + senha e confirmação válidas → `200`, hash atualizado (nunca a senha em
+      claro), token consumido, outros tokens `password_reset` invalidados, **todas** as sessões
+      revogadas e e-mail "Your password has been changed" en-US no Mailpit
+      (`http://127.0.0.1:54324`) com orientação para solicitar novo reset.
+- [ ] Após o sucesso o web mostra a confirmação, redireciona para `/auth/sign-in?reset=success` e o
+      sign-in exibe "Your password has been updated. Sign in with your new password."
+- [ ] Token ausente, desconhecido, expirado ou já usado → `400` `INVALID_RESET_TOKEN`, página mostra
+      "This password reset link is invalid or has expired." e link para `/auth/forgot-password`;
+      a senha não muda e nenhuma sessão é criada.
+- [ ] Senha fora da política (8–128) ou confirmação diferente → `400` `VALIDATION_ERROR` com
+      `fieldErrors`, mensagens do sign-up, e o token **não** é consumido (a nova tentativa funciona).
+- [ ] Conta não confirmada: o reset confirma o e-mail e a pessoa entra com a nova senha.
+- [ ] JWT antigo → `/me` responde `401`; sign-in com a senha antiga falha e com a nova funciona.
+- [ ] Dois resets simultâneos com o mesmo token: apenas um responde `200`; o outro `INVALID_RESET_TOKEN`.
+- [ ] Falha de SMTP no e-mail de sucesso não reverte a senha nem muda o `200`.
+- [ ] Rate limit por IP: a 6ª tentativa em `RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS` (padrão 60 s,
+      `RESET_PASSWORD_RATE_LIMIT_MAX` = 5) → `429` com `Retry-After`.
+- [ ] O token sai da barra de endereços (`history.replaceState`), a resposta da rota traz
+      `Referrer-Policy: no-referrer`, a página não carrega recursos externos e nenhum token, senha
+      ou e-mail aparece em logs do web ou da API.
+- [ ] E2E cobre fluxo completo, URL limpa, `Referrer-Policy`, link inválido/ausente, segundo uso,
+      sessão antiga invalidada, validação, `429`, foco visível, light-only e 360/768/1280 px sem
+      rolagem horizontal.
 
 ---
 
