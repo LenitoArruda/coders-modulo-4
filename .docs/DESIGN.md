@@ -131,11 +131,14 @@ Regras:
 
 ## 8. Conteúdo e tom
 
-- Textos de interface em **PT-BR**, claros e diretos.
+- Textos de interface, telas de autenticação e e-mails transacionais em **en-US**; claros e diretos.
+  A documentação interna continua em PT-BR.
 - Preferir voz ativa e sentence case.
-- Botões descrevem a ação: "Conectar fonte", não "OK".
+- Botões descrevem a ação: "Connect source", não "OK".
 - Erros explicam **o que aconteceu** e **como resolver**.
 - Evitar jargão técnico para o usuário final.
+- As telas de auth (`/auth/*`) e a área privada (`/app/*`) seguem as mesmas regras visuais desta
+  direção: light-only, tokens do design system, contraste AA e responsividade.
 
 ---
 

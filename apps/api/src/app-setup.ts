@@ -1,5 +1,10 @@
 import type { INestApplication } from "@nestjs/common";
 
+import {
+  CORS_ALLOWED_HEADERS,
+  CORS_METHODS,
+  isAllowedCorsOrigin,
+} from "./modules/shared/config/cors";
 import { loadEnv, type Env } from "./modules/shared/config/env";
 import { notFoundOutsidePrefixMiddleware } from "./modules/shared/interface/not-found.middleware";
 import { requestLoggingMiddleware } from "./modules/shared/logging/request-logging.middleware";
@@ -15,11 +20,10 @@ export function configureApp(app: INestApplication, env: Env = loadEnv()): Env {
       origin: string | undefined,
       callback: (error: Error | null, allow?: boolean) => void,
     ) => {
-      const isAllowed = !origin || origin === env.webOrigin;
-
-      callback(null, isAllowed);
+      callback(null, isAllowedCorsOrigin(origin, env.webOrigin));
     },
-    methods: ["GET", "HEAD", "OPTIONS"],
+    methods: [...CORS_METHODS],
+    allowedHeaders: [...CORS_ALLOWED_HEADERS],
   });
 
   return env;

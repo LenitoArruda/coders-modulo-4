@@ -6,6 +6,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../../../app.module";
 import { configureApp } from "../../../app-setup";
 
+function headerList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 describe("GET /api/v1/hello", () => {
   let app: INestApplication;
 
@@ -55,6 +62,34 @@ describe("GET /api/v1/hello", () => {
     const response = await request(app.getHttpServer())
       .get("/api/v1/hello")
       .set("Origin", "http://malicious.example");
+
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("deve aceitar o preflight com métodos e headers do fluxo de auth", async () => {
+    const response = await request(app.getHttpServer())
+      .options("/api/v1/hello")
+      .set("Origin", "http://localhost:3000")
+      .set("Access-Control-Request-Method", "POST")
+      .set("Access-Control-Request-Headers", "authorization,content-type")
+      .expect(204);
+
+    expect(response.headers["access-control-allow-origin"]).toBe(
+      "http://localhost:3000",
+    );
+    expect(
+      headerList(response.headers["access-control-allow-methods"]),
+    ).toEqual(expect.arrayContaining(["get", "head", "post", "options"]));
+    expect(
+      headerList(response.headers["access-control-allow-headers"]),
+    ).toEqual(expect.arrayContaining(["authorization", "content-type"]));
+  });
+
+  it("não deve liberar o preflight de uma origem não permitida", async () => {
+    const response = await request(app.getHttpServer())
+      .options("/api/v1/hello")
+      .set("Origin", "http://malicious.example")
+      .set("Access-Control-Request-Method", "POST");
 
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
   });

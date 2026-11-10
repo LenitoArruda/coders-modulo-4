@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão de auth implementadas — produto não implementado · **Atualizado em:** 2026-11-09
+> **Status:** fundação + sessão + rotas de auth implementadas — produto não implementado · **Atualizado em:** 2026-11-09
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
@@ -51,7 +51,7 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 
 | App/Pacote                   | Responsabilidade                        | Estado                                                                                                   |
 | ---------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `apps/web`                   | Interface principal do produto          | ✅ hello world com Tailwind/shadcn na porta 3000 + ponte de sessão (`lib/auth`, sem UI de login)         |
+| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard e ponte de sessão na porta 3000         |
 | `apps/docs`                  | Site de documentação                    | ✅ starter rodando na porta 3001; ainda não customizado                                                  |
 | `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, contrato de erro, env, CORS, logs e OTel na porta 3333       |
 | `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`; legados `button`, `card`, `code` mantidos para `apps/docs` |
@@ -249,6 +249,31 @@ Regras:
 - O e-mail de nova sessão contém data/hora e alerta de senha, **sem** link de recuperação (o link
   entra na fatia 007). Falha de e-mail não derruba a sessão já criada.
 
+### 4.6 Rotas do web e guard
+
+O web organiza a navegação em dois grupos do App Router, cada um com layout próprio:
+
+| Grupo                | URL       | Acesso  | Layout / proteção                                                          |
+| -------------------- | --------- | ------- | -------------------------------------------------------------------------- |
+| `apps/web/app/auth/` | `/auth/*` | Público | Layout de autenticação light-only; sign-up, sign-in, confirm, forgot/reset |
+| `apps/web/app/app/`  | `/app/*`  | Privado | Shell privado; o layout aplica o guard server-side antes de renderizar     |
+
+Regras:
+
+- O guard de `/app/*` lê o cookie `session_token` no servidor e consulta `GET /api/v1/auth/me`.
+  Sem cookie, `401` ou erro da API, a pessoa é redirecionada para `/auth/sign-up` (a fatia 006
+  troca o destino para `/auth/sign-in`). O destino vive em uma constante única em
+  `apps/web/lib/auth/route-rules.ts`.
+- Pessoa autenticada em `/auth/sign-up`, `/auth/sign-in` ou `/auth/confirm` é enviada para
+  `/app`; `/auth/forgot-password` e `/auth/reset-password` permanecem acessíveis.
+- A raiz `/` não renderiza produto: redireciona para `/app` com sessão e para `/auth/sign-up`
+  sem sessão.
+- 404 de rotas inexistentes é resolvido dentro do layout do grupo (catch-all + `not-found.tsx`),
+  para manter o shell público ou privado.
+- O guard é uma camada de experiência; a autorização real continua na API, que valida o Bearer em
+  toda rota protegida.
+- Textos de UI e metadados são **en-US** (`html lang="en-US"`); a documentação interna é PT-BR.
+
 ---
 
 ## 5. Fluxo de dados alvo
@@ -279,9 +304,11 @@ Fluxo resumido:
 5. Logs, métricas e traces são emitidos desde o dia 0.
 
 > O fluxo acima é o alvo do produto. Hoje estão implementados o caminho web → API versionada
-> (`GET /api/v1/hello`), a telemetria e a infraestrutura de sessão (`GET /api/v1/auth/me`, JWT,
-> cookie `HttpOnly` e e-mail de nova sessão). O schema de auth veio na fatia 001; os fluxos de
-> confirmação, sign-in, sign-out e recuperação de senha entram nas fatias 004 a 008.
+> (`GET /api/v1/hello`), a telemetria, a infraestrutura de sessão (`GET /api/v1/auth/me`, JWT,
+> cookie `HttpOnly` e e-mail de nova sessão) e o esqueleto de navegação (`/auth/*` público com
+> placeholders, `/app/*` privado com shell e guard, raiz redirecionando por sessão). O schema de
+> auth veio na fatia 001; os fluxos de confirmação, sign-in, sign-out e recuperação de senha entram
+> nas fatias 004 a 008.
 
 ---
 
@@ -291,27 +318,28 @@ Cada decisão abaixo possui um registro correspondente em [`.adrs/`](../.adrs/RE
 contexto, alternativas e consequências. Decisões ainda em aberto permanecem na §7 até serem
 tomadas.
 
-| Decisão                                     | Motivo                                                                         | Estado               |
-| ------------------------------------------- | ------------------------------------------------------------------------------ | -------------------- |
-| Monorepo com Turborepo + Bun                | Compartilhar código, cache e execução paralela                                 | ✅                   |
-| Next.js App Router no front-end             | Server Components, streaming e SEO                                             | ✅                   |
-| API separada em NestJS                      | Isolar domínio, ingestão e orquestração do front                               | ✅                   |
-| Supabase local via CLI                      | Ambiente reproduzível sem instalação global                                    | ✅                   |
-| Auth própria na API (sem Supabase Auth)     | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação        | ✅ (schema + sessão) |
-| Sessão com JWT HS256 + registro server-side | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`      | ✅                   |
-| Cookie `HttpOnly` com ponte `Bearer` no web | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API         | ✅                   |
-| Sessão única com create-then-revoke         | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)       | ✅ (follow-up)       |
-| Namespace `/api/v1`                         | Versionar a API e manter contrato estável desde a primeira rota                | ✅                   |
-| Contrato de erro global `{ code, message }` | Respostas previsíveis para o web sem stack, SQL ou detalhes internos           | ✅                   |
-| Arquitetura em camadas + vertical slices    | Baixo acoplamento e evolução por domínio                                       | ✅ (`hello`)         |
-| Light theme único                           | Direção visual definida em `DESIGN.md`                                         | ✅                   |
-| Tailwind CSS + shadcn/ui em `packages/ui`   | Base visual compartilhada e tokens únicos                                      | ✅                   |
-| TypeScript `strict`                         | Segurança de tipos no monorepo                                                 | ✅                   |
-| OpenTelemetry + Grafana LGTM desde o dia 0  | Diagnosticar ingestão e respostas de IA                                        | ✅                   |
-| Vitest + Playwright + Supertest             | Unitário, E2E e API                                                            | ✅                   |
-| LGTM all-in-one via Compose                 | Menos configuração e versões fixadas                                           | ✅                   |
-| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`, indisponível por padrão no Docker Desktop | ✅                   |
-| PostgreSQL local em `15`                    | Workaround de ambiente; a versão alvo será decidida antes de produção          | ✅                   |
+| Decisão                                     | Motivo                                                                          | Estado               |
+| ------------------------------------------- | ------------------------------------------------------------------------------- | -------------------- |
+| Monorepo com Turborepo + Bun                | Compartilhar código, cache e execução paralela                                  | ✅                   |
+| Next.js App Router no front-end             | Server Components, streaming e SEO                                              | ✅                   |
+| API separada em NestJS                      | Isolar domínio, ingestão e orquestração do front                                | ✅                   |
+| Supabase local via CLI                      | Ambiente reproduzível sem instalação global                                     | ✅                   |
+| Auth própria na API (sem Supabase Auth)     | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação         | ✅ (schema + sessão) |
+| Sessão com JWT HS256 + registro server-side | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`       | ✅                   |
+| Cookie `HttpOnly` com ponte `Bearer` no web | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API          | ✅                   |
+| Sessão única com create-then-revoke         | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)        | ✅ (follow-up)       |
+| Namespace `/api/v1`                         | Versionar a API e manter contrato estável desde a primeira rota                 | ✅                   |
+| Grupos `/auth/*` público e `/app/*` privado | Separar fluxo de auth da área privada, com guard server-side e layouts próprios | ✅                   |
+| Contrato de erro global `{ code, message }` | Respostas previsíveis para o web sem stack, SQL ou detalhes internos            | ✅                   |
+| Arquitetura em camadas + vertical slices    | Baixo acoplamento e evolução por domínio                                        | ✅ (`hello`)         |
+| Light theme único                           | Direção visual definida em `DESIGN.md`                                          | ✅                   |
+| Tailwind CSS + shadcn/ui em `packages/ui`   | Base visual compartilhada e tokens únicos                                       | ✅                   |
+| TypeScript `strict`                         | Segurança de tipos no monorepo                                                  | ✅                   |
+| OpenTelemetry + Grafana LGTM desde o dia 0  | Diagnosticar ingestão e respostas de IA                                         | ✅                   |
+| Vitest + Playwright + Supertest             | Unitário, E2E e API                                                             | ✅                   |
+| LGTM all-in-one via Compose                 | Menos configuração e versões fixadas                                            | ✅                   |
+| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`, indisponível por padrão no Docker Desktop  | ✅                   |
+| PostgreSQL local em `15`                    | Workaround de ambiente; a versão alvo será decidida antes de produção           | ✅                   |
 
 ---
 

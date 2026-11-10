@@ -52,6 +52,12 @@ Execute na raiz do monorepo:
 > A API exige `JWT_SECRET` com no mínimo 32 caracteres no boot (veja `.env.example`); sem ele, a
 > API não inicia. Os testes não dependem do `.env`: `apps/api/src/test/setup-env.ts` define as
 > variáveis mínimas (incluindo `JWT_SECRET` e `SESSION_TTL_SECONDS`).
+>
+> O E2E do web (`bun run test:e2e`) sobe uma **API fake** local em `127.0.0.1:3434`
+> (`apps/web/e2e/support/fake-api-server.ts`) e aponta `API_BASE_URL` do web para ela. Assim os
+> cenários de sessão válida/inválida são determinísticos e não dependem do banco compartilhado,
+> de credenciais ou de `JWT_SECRET`. Não deixe um `bun run dev` antigo ocupando a porta 3000 antes
+> do E2E, pois o Playwright reutiliza o servidor existente em modo local.
 
 ### 2.1 Comando do OpenCode
 
@@ -104,7 +110,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Labels e nomes acessíveis.
 - [ ] Layout em 360px, 768px e 1280px, sem rolagem horizontal.
 - [ ] Estados: loading, vazio, erro, disabled.
-- [ ] Textos em PT-BR e sem erros.
+- [ ] Textos de UI em en-US e sem erros; documentação interna em PT-BR.
 
 ### 5.2 API
 
@@ -185,6 +191,20 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Logs sem JWT, cookie, e-mail completo, senha ou segredo; use `userId`/`sessionId`.
 - [ ] Rotas em `/api/v1`; caminhos fora do prefixo (incluindo `GET /`) respondem 404 com contrato.
 
+### 5.10 Navegação e rotas do web
+
+- [ ] `/` sem sessão → `/auth/sign-up`; com sessão válida → `/app`.
+- [ ] `/app` e `/app/*` sem cookie, com token inválido ou API indisponível → `/auth/sign-up`.
+- [ ] `/app` e `/app/*` com sessão válida carregam o shell e o placeholder.
+- [ ] `/auth/sign-up`, `/auth/sign-in` e `/auth/confirm` com sessão válida → `/app`.
+- [ ] `/auth/forgot-password` e `/auth/reset-password` permanecem acessíveis com sessão.
+- [ ] `/auth/*` inexistente → 404 no layout público; `/app/*` inexistente com sessão → 404 no shell.
+- [ ] `lang="en-US"`, textos en-US, light-only, foco visível e sem rolagem horizontal em
+      360 px, 768 px e 1280 px.
+- [ ] CORS aceita `WEB_ORIGIN` com `GET`, `HEAD`, `POST`, `OPTIONS` e headers `Authorization` e
+      `Content-Type`; outras origens não recebem `Access-Control-Allow-Origin`.
+- [ ] HTML/JS não expõe token, JWT ou dados de sessão.
+
 ---
 
 ## 6. QA manual — template
@@ -211,8 +231,8 @@ Inclua ambiente (navegador/dispositivo) quando for UI.
 
 Antes de finalizar, verifique se a mudança não quebrou:
 
-- [ ] Rotas existentes (`/` em `web` e `docs`; `GET /api/v1/hello` na API; `GET /` da API deve
-      responder 404 com o contrato).
+- [ ] Rotas existentes (`/` do `web` redirecionando por sessão e `/` do `docs`;
+      `GET /api/v1/hello` na API; `GET /` da API deve responder 404 com o contrato).
 - [ ] Componentes compartilhados usados por mais de um app.
 - [ ] Scripts do monorepo (`dev`, `build`, `lint`, `types:check`, `test`, `test:e2e`,
       `infra:up`, `infra:down`).
