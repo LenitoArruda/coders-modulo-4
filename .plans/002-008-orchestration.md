@@ -7,15 +7,15 @@
 
 ## 1. Specs do range
 
-| Spec | Título               | Status   | Worktree                      | Branch   | Estado   | Observações               |
-| ---- | -------------------- | -------- | ----------------------------- | -------- | -------- | ------------------------- |
-| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada | onda 1 — commit `2e523e5` |
-| 003  | Auth routes          | approved | `../coders-modulo-4-spec-003` | spec/003 | mesclada | onda 2 — commit `4a0728f` |
-| 004  | Auth sign-up         | approved | —                             | —        | pendente | onda 3                    |
-| 005  | Auth confirm account | approved | —                             | —        | pendente | onda 4 (paralela com 007) |
-| 006  | Auth sign-in         | approved | —                             | —        | pendente | onda 5                    |
-| 007  | Auth forgot password | approved | —                             | —        | pendente | onda 4 (paralela com 005) |
-| 008  | Auth reset password  | approved | —                             | —        | pendente | onda 6                    |
+| Spec | Título               | Status   | Worktree                      | Branch   | Estado     | Observações               |
+| ---- | -------------------- | -------- | ----------------------------- | -------- | ---------- | ------------------------- |
+| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada   | onda 1 — commit `2e523e5` |
+| 003  | Auth routes          | approved | `../coders-modulo-4-spec-003` | spec/003 | mesclada   | onda 2 — commit `4a0728f` |
+| 004  | Auth sign-up         | approved | `../coders-modulo-4-spec-004` | spec/004 | executando | onda 3                    |
+| 005  | Auth confirm account | approved | —                             | —        | pendente   | onda 4 (paralela com 007) |
+| 006  | Auth sign-in         | approved | —                             | —        | pendente   | onda 5                    |
+| 007  | Auth forgot password | approved | —                             | —        | pendente   | onda 4 (paralela com 005) |
+| 008  | Auth reset password  | approved | —                             | —        | pendente   | onda 6                    |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
@@ -27,8 +27,8 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 | Onda | Specs    | Lançada em | Concluída em | Merge/push                 |
 | ---- | -------- | ---------- | ------------ | -------------------------- |
 | 1    | 002      | 22:32      | 23:20        | `585efaf` / push `7f9a62f` |
-| 2    | 003      | 23:21      | 00:10        | pendente                   |
-| 3    | 004      | —          | —            | —                          |
+| 2    | 003      | 23:21      | 00:10        | `7e604c4` / push `0fd1235` |
+| 3    | 004      | 00:12      | —            | —                          |
 | 4    | 005, 007 | —          | —            | —                          |
 | 5    | 006      | —          | —            | —                          |
 | 6    | 008      | —          | —            | —                          |
@@ -53,9 +53,12 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 - 00:05 — [003] concluído: RESULTADO ok, commit `4a0728f`, worktree limpo. Exceção registrada: `--no-verify` novamente por falha do hook `commit-msg` com espaços no caminho; mensagem validada manualmente com `bunx commitlint --edit` (exit 0) e `pre-commit` passou.
 - 00:06 — onda 2: merge `--no-ff spec/003` na main concluído; iniciando QA completo.
 - 00:10 — onda 2: QA completo verde na main (lint, types:check, test API 88/88 e web 27/27, build, test:e2e 28/28); integração pronta para `commit-and-push`.
+- 00:11 — onda 2 integrada e publicada: merge `7e604c4`, commit de log `0fd1235`, push ok. Worktree desregistrado e branch `spec/003` removida.
+- 00:12 — onda 3 lançada: [004] worktree `../coders-modulo-4-spec-004`, branch `spec/004`, base `0fd1235`.
 
 ## 5. Resultado consolidado
 
 | Spec | Resultado | Commit da spec | Merge     | QA    | Bloqueios |
 | ---- | --------- | -------------- | --------- | ----- | --------- |
 | 002  | ok        | `2e523e5`      | `585efaf` | verde | —         |
+| 003  | ok        | `4a0728f`      | `7e604c4` | verde | —         |
