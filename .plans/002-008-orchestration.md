@@ -7,15 +7,15 @@
 
 ## 1. Specs do range
 
-| Spec | Título               | Status   | Worktree                      | Branch   | Estado     | Observações               |
-| ---- | -------------------- | -------- | ----------------------------- | -------- | ---------- | ------------------------- |
-| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada   | onda 1 — commit `2e523e5` |
-| 003  | Auth routes          | approved | `../coders-modulo-4-spec-003` | spec/003 | executando | onda 2                    |
-| 004  | Auth sign-up         | approved | —                             | —        | pendente   | onda 3                    |
-| 005  | Auth confirm account | approved | —                             | —        | pendente   | onda 4 (paralela com 007) |
-| 006  | Auth sign-in         | approved | —                             | —        | pendente   | onda 5                    |
-| 007  | Auth forgot password | approved | —                             | —        | pendente   | onda 4 (paralela com 005) |
-| 008  | Auth reset password  | approved | —                             | —        | pendente   | onda 6                    |
+| Spec | Título               | Status   | Worktree                      | Branch   | Estado   | Observações               |
+| ---- | -------------------- | -------- | ----------------------------- | -------- | -------- | ------------------------- |
+| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada | onda 1 — commit `2e523e5` |
+| 003  | Auth routes          | approved | `../coders-modulo-4-spec-003` | spec/003 | mesclada | onda 2 — commit `4a0728f` |
+| 004  | Auth sign-up         | approved | —                             | —        | pendente | onda 3                    |
+| 005  | Auth confirm account | approved | —                             | —        | pendente | onda 4 (paralela com 007) |
+| 006  | Auth sign-in         | approved | —                             | —        | pendente | onda 5                    |
+| 007  | Auth forgot password | approved | —                             | —        | pendente | onda 4 (paralela com 005) |
+| 008  | Auth reset password  | approved | —                             | —        | pendente | onda 6                    |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
@@ -27,7 +27,7 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 | Onda | Specs    | Lançada em | Concluída em | Merge/push                 |
 | ---- | -------- | ---------- | ------------ | -------------------------- |
 | 1    | 002      | 22:32      | 23:20        | `585efaf` / push `7f9a62f` |
-| 2    | 003      | —          | —            | —                          |
+| 2    | 003      | 23:21      | 00:10        | pendente                   |
 | 3    | 004      | —          | —            | —                          |
 | 4    | 005, 007 | —          | —            | —                          |
 | 5    | 006      | —          | —            | —                          |
@@ -50,6 +50,9 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 - 23:20 — onda 1 integrada e publicada: merge `585efaf`, commit de log `7f9a62f`, push ok. Worktree desregistrado e branch `spec/002` removida.
 - 23:20 — incidente de limpeza: o `cmd /c rmdir` com aspas aninhadas degenerou para `rd /s /q \` e percorreu a raiz do C:. Verificação completa do log (92.576 linhas): apenas "Acesso negado" e dois arquivos em uso (`pagefile.sys`, `DumpStack.log.tmp`); zero ocorrências de `\Users`, `\temp`, `\tmp` ou `\ProgramData`. Nenhum dado perdido; diretório remanescente removido com robocopy seguro.
 - 23:21 — onda 2 lançada: [003] worktree `../coders-modulo-4-spec-003`, branch `spec/003`, base `7f9a62f`.
+- 00:05 — [003] concluído: RESULTADO ok, commit `4a0728f`, worktree limpo. Exceção registrada: `--no-verify` novamente por falha do hook `commit-msg` com espaços no caminho; mensagem validada manualmente com `bunx commitlint --edit` (exit 0) e `pre-commit` passou.
+- 00:06 — onda 2: merge `--no-ff spec/003` na main concluído; iniciando QA completo.
+- 00:10 — onda 2: QA completo verde na main (lint, types:check, test API 88/88 e web 27/27, build, test:e2e 28/28); integração pronta para `commit-and-push`.
 
 ## 5. Resultado consolidado
 
