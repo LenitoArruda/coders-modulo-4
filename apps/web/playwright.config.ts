@@ -8,6 +8,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
+  // Cold `next dev` compiles of /app can exceed the 5 s default on the first hit.
+  expect: { timeout: 15_000 },
   reporter: [["list"]],
   use: {
     baseURL: "http://127.0.0.1:3000",

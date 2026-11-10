@@ -8,6 +8,8 @@ import {
   E2E_CONFIRM_RATE_LIMITED_TOKEN,
   E2E_CONFIRM_TOKEN,
   E2E_CONFIRM_USED_TOKEN,
+  E2E_SIGN_IN_DOMAIN,
+  E2E_SIGN_IN_PASSWORD,
   E2E_VALID_SESSION_TOKEN,
 } from "./fake-session";
 
@@ -37,7 +39,25 @@ const CONFIRM_ALREADY_CONFIRMED_MESSAGE =
 const CONFIRM_RATE_LIMITED_MESSAGE =
   "Too many attempts. Wait a moment and try again.";
 
+const SIGN_IN_INVALID_MESSAGE = "Invalid email or password.";
+const SIGN_IN_NOT_CONFIRMED_MESSAGE =
+  "Please confirm your email before signing in.";
+
 type Body = Record<string, unknown>;
+
+/**
+ * Stateful single-session policy for sign-in: only the latest token issued to
+ * each `<local>@signin.example.com` account is accepted by `/me`, mirroring
+ * the real API where a new session revokes the previous one. Each E2E test
+ * uses its own local part, so parallel tests never invalidate each other.
+ */
+const latestSignInSession = new Map<string, number>();
+
+function signInTokenOwner(token: string): { local: string; n: number } | null {
+  const match = /^signin-(.+)-(\d+)$/.exec(token);
+
+  return match === null ? null : { local: match[1] ?? "", n: Number(match[2]) };
+}
 
 function sendJson(
   response: ServerResponse,
@@ -210,6 +230,65 @@ async function handleConfirm(
   });
 }
 
+async function handleSignIn(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const body = asRecord(await readJsonBody(request));
+  const email = readString(body, "email").trim().toLowerCase();
+  const password = readString(body, "password");
+
+  if (email === "rate-limited@example.com") {
+    response.setHeader("Retry-After", "60");
+    sendJson(response, 429, {
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many attempts. Wait a moment and try again.",
+    });
+    return;
+  }
+
+  // Like the real API, 403 only follows a correct password.
+  if (email === "unconfirmed@example.com") {
+    if (password === E2E_SIGN_IN_PASSWORD) {
+      sendJson(response, 403, {
+        code: "EMAIL_NOT_CONFIRMED",
+        message: SIGN_IN_NOT_CONFIRMED_MESSAGE,
+      });
+      return;
+    }
+  }
+
+  if (email === "server-error@example.com") {
+    sendJson(response, 500, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error.",
+    });
+    return;
+  }
+
+  if (
+    password !== E2E_SIGN_IN_PASSWORD ||
+    !email.endsWith(`@${E2E_SIGN_IN_DOMAIN}`)
+  ) {
+    sendJson(response, 401, {
+      code: "INVALID_CREDENTIALS",
+      message: SIGN_IN_INVALID_MESSAGE,
+    });
+    return;
+  }
+
+  const local = email.slice(0, email.indexOf("@"));
+  const n = (latestSignInSession.get(local) ?? 0) + 1;
+
+  latestSignInSession.set(local, n);
+  sendJson(response, 200, {
+    accessToken: `signin-${local}-${n}`,
+    tokenType: "Bearer",
+    expiresIn: 604_800,
+    user: { ...user, email },
+  });
+}
+
 async function handleForgotPassword(
   request: IncomingMessage,
   response: ServerResponse,
@@ -269,6 +348,11 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (pathname === "/api/v1/auth/sign-in" && request.method === "POST") {
+    await handleSignIn(request, response);
+    return;
+  }
+
   if (
     pathname === "/api/v1/auth/forgot-password" &&
     request.method === "POST"
@@ -282,6 +366,17 @@ const server = createServer(async (request, response) => {
 
     if (authorization === `Bearer ${E2E_VALID_SESSION_TOKEN}`) {
       sendJson(response, 200, { user });
+      return;
+    }
+
+    const owner = signInTokenOwner(
+      (authorization ?? "").replace(/^Bearer /, ""),
+    );
+
+    if (owner !== null && latestSignInSession.get(owner.local) === owner.n) {
+      sendJson(response, 200, {
+        user: { ...user, email: `${owner.local}@${E2E_SIGN_IN_DOMAIN}` },
+      });
       return;
     }
 

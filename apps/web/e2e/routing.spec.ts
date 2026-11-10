@@ -8,7 +8,6 @@ import {
 const AUTH_PLACEHOLDERS = [
   ["/auth/sign-up", "Create your account"],
   ["/auth/sign-in", "Sign in"],
-  ["/auth/confirm", "Confirm your email"],
   ["/auth/forgot-password", "Forgot your password?"],
   ["/auth/reset-password", "Reset your password"],
 ] as const;
@@ -43,17 +42,15 @@ async function expectNoHorizontalScroll(page: Page): Promise<void> {
 }
 
 test.describe("public auth routes", () => {
-  test("visitante na raiz é enviado para o sign-up em en-US", async ({
+  test("visitante na raiz é enviado para o sign-in em en-US", async ({
     page,
   }) => {
     await page.goto("/");
 
-    await expect(page).toHaveURL(/\/auth\/sign-up$/);
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
     await expect(page.locator('[data-layout="auth"]')).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      "Create your account",
-    );
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in");
   });
 
   for (const [path, title] of AUTH_PLACEHOLDERS) {
@@ -80,16 +77,34 @@ test.describe("public auth routes", () => {
 });
 
 test.describe("private area without a session", () => {
-  for (const path of ["/app", "/app/settings"] as const) {
-    test(`${path} redireciona para o sign-up`, async ({ page }) => {
-      await page.goto(path);
+  test("/app redireciona para o sign-in sem returnTo", async ({ page }) => {
+    await page.goto("/app");
 
-      await expect(page).toHaveURL(/\/auth\/sign-up$/);
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        "Create your account",
-      );
-    });
-  }
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in");
+  });
+
+  test("/app/settings redireciona para o sign-in com returnTo", async ({
+    page,
+  }) => {
+    await page.goto("/app/settings");
+
+    await expect(page).toHaveURL(
+      /\/auth\/sign-in\?returnTo=%2Fapp%2Fsettings$/,
+    );
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in");
+  });
+
+  test("header x-return-to forjado não vira redirect externo", async ({
+    page,
+  }) => {
+    await page.setExtraHTTPHeaders({ "x-return-to": "https://evil.example" });
+    await page.goto("/app/settings");
+
+    await expect(page).toHaveURL(
+      /\/auth\/sign-in\?returnTo=%2Fapp%2Fsettings$/,
+    );
+  });
 
   test("sessão inválida ou revogada é tratada como ausência de sessão", async ({
     page,
@@ -97,14 +112,14 @@ test.describe("private area without a session", () => {
     await setSessionCookie(page, E2E_INVALID_SESSION_TOKEN);
     await page.goto("/app");
 
-    await expect(page).toHaveURL(/\/auth\/sign-up$/);
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
   });
 
-  test("raiz com sessão inválida vai para o sign-up", async ({ page }) => {
+  test("raiz com sessão inválida vai para o sign-in", async ({ page }) => {
     await setSessionCookie(page, E2E_INVALID_SESSION_TOKEN);
     await page.goto("/");
 
-    await expect(page).toHaveURL(/\/auth\/sign-up$/);
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
   });
 });
 

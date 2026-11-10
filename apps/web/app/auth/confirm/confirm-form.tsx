@@ -94,10 +94,10 @@ export function ConfirmForm({ token }: ConfirmFormProps) {
             {state.message}
           </div>
           <p className="text-muted-foreground">
-            <AuthLink href={AUTH_SIGN_UP_PATH}>Create an account</AuthLink> and
-            request a new confirmation link, or{" "}
-            <AuthLink href={AUTH_SIGN_IN_PATH}>sign in</AuthLink> if your email
-            is already confirmed.
+            <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink> if your email
+            is already confirmed, or{" "}
+            <AuthLink href={AUTH_SIGN_UP_PATH}>create an account</AuthLink> to
+            request a new confirmation link.
           </p>
           {state.canRetry ? (
             <Button type="submit" disabled={isPending} className="w-full">

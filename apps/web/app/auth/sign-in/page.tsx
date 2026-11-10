@@ -2,31 +2,34 @@ import type { Metadata } from "next";
 
 import { redirectSignedInUserToApp } from "../../../lib/auth/guards";
 import {
-  AUTH_FORGOT_PASSWORD_PATH,
-  AUTH_SIGN_UP_PATH,
+  RETURN_TO_PARAM,
+  sanitizeReturnTo,
 } from "../../../lib/auth/route-rules";
-import { AuthCard, AuthLink } from "../_components/auth-card";
+import { AuthCard } from "../_components/auth-card";
+
+import { SignInForm } from "./sign-in-form";
 
 export const metadata: Metadata = {
   title: "Sign in",
 };
 
-export default async function SignInPage() {
+type SignInPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function SignInPage({ searchParams }: SignInPageProps) {
   await redirectSignedInUserToApp();
+
+  const params = await searchParams;
+  const raw = params[RETURN_TO_PARAM];
+  const returnTo = sanitizeReturnTo(Array.isArray(raw) ? raw[0] : raw);
 
   return (
     <AuthCard
       title="Sign in"
-      description="Sign-in is coming soon. This placeholder reserves the public sign-in route for the next slices."
+      description="Enter your email and password to open your Experts account."
     >
-      <p>
-        New to Experts?{" "}
-        <AuthLink href={AUTH_SIGN_UP_PATH}>Create an account</AuthLink>.
-      </p>
-      <p>
-        Forgot your password?{" "}
-        <AuthLink href={AUTH_FORGOT_PASSWORD_PATH}>Recover access</AuthLink>.
-      </p>
+      <SignInForm returnTo={returnTo} />
     </AuthCard>
   );
 }
