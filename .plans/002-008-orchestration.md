@@ -7,15 +7,15 @@
 
 ## 1. Specs do range
 
-| Spec | Título               | Status   | Worktree                      | Branch   | Estado   | Observações               |
-| ---- | -------------------- | -------- | ----------------------------- | -------- | -------- | ------------------------- |
-| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada | onda 1 — commit `2e523e5` |
-| 003  | Auth routes          | approved | `../coders-modulo-4-spec-003` | spec/003 | mesclada | onda 2 — commit `4a0728f` |
-| 004  | Auth sign-up         | approved | `../coders-modulo-4-spec-004` | spec/004 | mesclada | onda 3 — commit `928889c` |
-| 005  | Auth confirm account | approved | `../coders-modulo-4-spec-005` | spec/005 | mesclada | onda 4 — commit `c3af7e7` |
-| 006  | Auth sign-in         | approved | —                             | —        | pendente | onda 5                    |
-| 007  | Auth forgot password | approved | `../coders-modulo-4-spec-007` | spec/007 | mesclada | onda 4 — commit `1e10253` |
-| 008  | Auth reset password  | approved | —                             | —        | pendente | onda 6                    |
+| Spec | Título               | Status   | Worktree                      | Branch   | Estado     | Observações               |
+| ---- | -------------------- | -------- | ----------------------------- | -------- | ---------- | ------------------------- |
+| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada   | onda 1 — commit `2e523e5` |
+| 003  | Auth routes          | approved | `../coders-modulo-4-spec-003` | spec/003 | mesclada   | onda 2 — commit `4a0728f` |
+| 004  | Auth sign-up         | approved | `../coders-modulo-4-spec-004` | spec/004 | mesclada   | onda 3 — commit `928889c` |
+| 005  | Auth confirm account | approved | `../coders-modulo-4-spec-005` | spec/005 | mesclada   | onda 4 — commit `c3af7e7` |
+| 006  | Auth sign-in         | approved | `../coders-modulo-4-spec-006` | spec/006 | executando | onda 5                    |
+| 007  | Auth forgot password | approved | `../coders-modulo-4-spec-007` | spec/007 | mesclada   | onda 4 — commit `1e10253` |
+| 008  | Auth reset password  | approved | —                             | —        | pendente   | onda 6                    |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
@@ -24,14 +24,14 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 
 ## 2. Ondas
 
-| Onda | Specs    | Lançada em | Concluída em | Merge/push                            |
-| ---- | -------- | ---------- | ------------ | ------------------------------------- |
-| 1    | 002      | 22:32      | 23:20        | `585efaf` / push `7f9a62f`            |
-| 2    | 003      | 23:21      | 00:10        | `7e604c4` / push `0fd1235`            |
-| 3    | 004      | 00:12      | 00:34        | `3bcf702` / push `8cd78bc`            |
-| 4    | 005, 007 | 00:37      | 01:18        | `ef4d80b` + `1ada1f5` / push pendente |
-| 5    | 006      | —          | —            | —                                     |
-| 6    | 008      | —          | —            | —                                     |
+| Onda | Specs    | Lançada em | Concluída em | Merge/push                             |
+| ---- | -------- | ---------- | ------------ | -------------------------------------- |
+| 1    | 002      | 22:32      | 23:20        | `585efaf` / push `7f9a62f`             |
+| 2    | 003      | 23:21      | 00:10        | `7e604c4` / push `0fd1235`             |
+| 3    | 004      | 00:12      | 00:34        | `3bcf702` / push `8cd78bc`             |
+| 4    | 005, 007 | 00:37      | 01:18        | `ef4d80b` + `1ada1f5` / push `da82e41` |
+| 5    | 006      | 01:22      | —            | —                                      |
+| 6    | 008      | —          | —            | —                                      |
 
 ## 3. Grafo de dependências
 
@@ -68,6 +68,8 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 - 01:13 — onda 4: `bun run lint`, `bun run types:check` e `bun run test` verdes na main (API 199/199, web ok). Commit do merge criado com `--no-verify` (exceção registrada): o hook `pre-commit` (lint-staged root) é defeituoso para TS (eslint root sem config por pacote e erro de `Pages directory`), mas o lint real, tipos e testes passaram antes do commit. A mensagem foi validada manualmente com `bunx commitlint --edit`.
 - 01:16 — onda 4: commit do merge `734bc87` continha BOM (`\ufeff`) no subject porque o arquivo de mensagem foi gravado pelo PowerShell com `-Encoding utf8`. Corrigido com `git commit --amend -m ...` (sem arquivo, sem BOM), gerando `1ada1f5`; `commitlint` passou no hook. Nenhum histórico publicado foi reescrito.
 - 01:18 — onda 4: QA completo verde na main: `bun run build` ok e `bun run test:e2e` 65/65. A primeira execução do e2e teve 2 flakes no caminho de sucesso da confirmação (cold start do `next dev` com 4 workers estourando o timeout de 5 s do redirect); o spec isolado passou 13/13 e a reexecução completa passou 65/65. Integração pronta para `commit-and-push`.
+- 01:19 — onda 4 integrada e publicada: merges `ef4d80b` (005) e `1ada1f5` (007), commit de log `da82e41`, push ok. Worktrees desregistrados, diretórios removidos com robocopy seguro e branches `spec/005`/`spec/007` apagadas.
+- 01:22 — onda 5 lançada: [006] worktree `../coders-modulo-4-spec-006`, branch `spec/006`, base `da82e41`; `.env` e `.agents/` copiados; subagente iniciado em background.
 
 ## 5. Resultado consolidado
 
