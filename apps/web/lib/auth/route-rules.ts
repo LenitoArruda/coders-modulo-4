@@ -16,12 +16,12 @@ export const SIGNED_OUT_REDIRECT_PATH = AUTH_SIGN_UP_PATH;
 
 /**
  * Auth pages that add no value for someone who already has a session.
- * Forgot and reset password stay accessible so recovery works anywhere.
+ * Forgot and reset password stay accessible so recovery works anywhere, and
+ * confirm is handled by its own page because it must still process a token.
  */
 const AUTH_PATHS_REDIRECTING_SIGNED_IN: readonly string[] = [
   AUTH_SIGN_UP_PATH,
   AUTH_SIGN_IN_PATH,
-  AUTH_CONFIRM_PATH,
 ];
 
 function normalizePath(pathname: string): string {
@@ -44,8 +44,8 @@ export function getPrivateAreaRedirectPath(hasSession: boolean): string | null {
 
 /**
  * Tells whether a signed-in person visiting an auth page should be sent to
- * `/app`. Only sign-up, sign-in and confirm redirect; forgot and reset keep
- * working with an active session.
+ * `/app`. Only sign-up and sign-in redirect; confirm decides based on the
+ * presence of a token, and forgot/reset keep working with an active session.
  */
 export function shouldRedirectFromAuthPath(
   pathname: string,

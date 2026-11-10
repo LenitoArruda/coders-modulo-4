@@ -15,6 +15,12 @@ export const DEFAULT_SIGN_UP_RATE_LIMIT_MAX = 5;
 /** Default sign-up rate limit window (60 seconds). */
 export const DEFAULT_SIGN_UP_RATE_LIMIT_WINDOW_SECONDS = 60;
 
+/** Default confirmation rate limit: requests allowed per IP inside the window. */
+export const DEFAULT_CONFIRMATION_RATE_LIMIT_MAX = 10;
+
+/** Default confirmation rate limit window (60 seconds). */
+export const DEFAULT_CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS = 60;
+
 export type Env = {
   port: number;
   webOrigin: string;
@@ -28,6 +34,8 @@ export type Env = {
   confirmationTokenTtlSeconds: number;
   signUpRateLimitMax: number;
   signUpRateLimitWindowSeconds: number;
+  confirmationRateLimitMax: number;
+  confirmationRateLimitWindowSeconds: number;
   smtpHost: string;
   smtpPort: number;
   smtpFrom: string;
@@ -152,6 +160,34 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("SIGN_UP_RATE_LIMIT_WINDOW_SECONDS");
   }
 
+  const confirmationRateLimitMaxValue =
+    readString(source.CONFIRMATION_RATE_LIMIT_MAX) ||
+    String(DEFAULT_CONFIRMATION_RATE_LIMIT_MAX);
+  const confirmationRateLimitMax = Number(confirmationRateLimitMaxValue);
+
+  if (
+    !Number.isInteger(confirmationRateLimitMax) ||
+    confirmationRateLimitMax < 1 ||
+    confirmationRateLimitMax > 10_000
+  ) {
+    invalid.push("CONFIRMATION_RATE_LIMIT_MAX");
+  }
+
+  const confirmationRateLimitWindowValue =
+    readString(source.CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS) ||
+    String(DEFAULT_CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS);
+  const confirmationRateLimitWindowSeconds = Number(
+    confirmationRateLimitWindowValue,
+  );
+
+  if (
+    !Number.isInteger(confirmationRateLimitWindowSeconds) ||
+    confirmationRateLimitWindowSeconds < 1 ||
+    confirmationRateLimitWindowSeconds > 86_400
+  ) {
+    invalid.push("CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS");
+  }
+
   const smtpHost = readString(source.SMTP_HOST) || "127.0.0.1";
   const smtpPortValue = readString(source.SMTP_PORT) || "54325";
   const smtpPort = Number(smtpPortValue);
@@ -185,6 +221,8 @@ export function loadEnv(source: EnvSource = process.env): Env {
     confirmationTokenTtlSeconds,
     signUpRateLimitMax,
     signUpRateLimitWindowSeconds,
+    confirmationRateLimitMax,
+    confirmationRateLimitWindowSeconds,
     smtpHost,
     smtpPort,
     smtpFrom,

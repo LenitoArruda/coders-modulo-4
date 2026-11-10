@@ -8,9 +8,30 @@ export type AuthTokenCreation = {
   expiresAt: Date;
 };
 
+/** Persisted token state used when validating a single-use token. */
+export type AuthTokenRecord = {
+  id: string;
+  userId: string;
+  purpose: AuthTokenPurpose;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+  createdAt: Date;
+};
+
 export abstract class AuthTokensRepositoryPort {
   /** Persists a token row; only the hash is ever stored. */
   abstract create(creation: AuthTokenCreation): Promise<void>;
+
+  /** Looks a token up by its at-rest hash; never by the clear value. */
+  abstract findByHash(tokenHash: string): Promise<AuthTokenRecord | null>;
+
+  /**
+   * Marks the token as used only when it is still unused. Returns `false` when
+   * another request consumed it first, which is the single-use guard under
+   * concurrency.
+   */
+  abstract consume(tokenId: string): Promise<boolean>;
 
   /**
    * Marks every unused token of the user/purpose as used, so issuing a new

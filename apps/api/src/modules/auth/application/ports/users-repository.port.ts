@@ -20,6 +20,16 @@ export abstract class UsersRepositoryPort {
   /** Case-insensitive lookup by the already normalized email. */
   abstract findByEmail(email: string): Promise<UserAccount | null>;
 
+  /** Account data (including confirmation state) by id. */
+  abstract findAccountById(id: string): Promise<UserAccount | null>;
+
+  /**
+   * Sets `email_confirmed_at` only when it is still null, so a second
+   * confirmation never overwrites the original timestamp. Returns `false`
+   * when the account was already confirmed (or does not exist).
+   */
+  abstract confirmEmail(id: string): Promise<boolean>;
+
   /**
    * Persists a new account. `email_confirmed_at` stays null: confirmation is
    * handled by the next slice.

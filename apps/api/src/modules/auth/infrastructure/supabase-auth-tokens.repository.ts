@@ -1,10 +1,39 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { AuthTokensRepositoryPort } from "../application/ports/auth-tokens-repository.port";
+import {
+  AuthTokensRepositoryPort,
+  type AuthTokenPurpose,
+  type AuthTokenRecord,
+} from "../application/ports/auth-tokens-repository.port";
 import { SUPABASE_CLIENT } from "../auth.tokens";
 
 import { databaseFailure } from "./supabase-error";
+
+const AUTH_TOKEN_COLUMNS =
+  "id, user_id, purpose, token_hash, expires_at, used_at, created_at";
+
+type AuthTokenRow = {
+  id: string;
+  user_id: string;
+  purpose: AuthTokenPurpose;
+  token_hash: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+};
+
+function toAuthToken(row: AuthTokenRow): AuthTokenRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    purpose: row.purpose,
+    tokenHash: row.token_hash,
+    expiresAt: new Date(row.expires_at),
+    usedAt: row.used_at === null ? null : new Date(row.used_at),
+    createdAt: new Date(row.created_at),
+  };
+}
 
 /**
  * Opaque token registry on top of PostgREST with the service role credential.
@@ -31,6 +60,36 @@ export class SupabaseAuthTokensRepository extends AuthTokensRepositoryPort {
     if (error !== null) {
       throw databaseFailure("create auth token", error);
     }
+  }
+
+  async findByHash(tokenHash: string): Promise<AuthTokenRecord | null> {
+    const { data, error } = await this.client
+      .from("auth_tokens")
+      .select(AUTH_TOKEN_COLUMNS)
+      .eq("token_hash", tokenHash)
+      .maybeSingle<AuthTokenRow>();
+
+    if (error !== null) {
+      throw databaseFailure("load auth token", error);
+    }
+
+    return data === null ? null : toAuthToken(data);
+  }
+
+  async consume(tokenId: string): Promise<boolean> {
+    const { data, error } = await this.client
+      .from("auth_tokens")
+      .update({ used_at: new Date().toISOString() })
+      .eq("id", tokenId)
+      .is("used_at", null)
+      .select("id")
+      .maybeSingle<{ id: string }>();
+
+    if (error !== null) {
+      throw databaseFailure("consume auth token", error);
+    }
+
+    return data !== null;
   }
 
   async invalidateUnused(

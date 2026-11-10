@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { fetchApiWithSession, getBearerToken } from "./api-client";
 
 /** API endpoint that returns the authenticated person's basic data. */
@@ -39,8 +41,11 @@ function isMeResponse(value: unknown): value is { user: SessionUser } {
  * truth: a missing cookie, an invalid/expired/revoked session or an API
  * failure all mean "no session" (fail closed). The token never leaves the
  * server and is never rendered.
+ *
+ * `cache()` deduplicates the `/me` call between the private layout and the
+ * page during the same render. Outside a React render it simply executes.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const token = await getBearerToken();
 
   if (token === null) {
@@ -62,4 +67,4 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
-}
+});

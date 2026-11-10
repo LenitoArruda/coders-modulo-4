@@ -41,6 +41,22 @@ export class InMemoryUsersRepository extends UsersRepositoryPort {
     );
   }
 
+  async findAccountById(id: string): Promise<UserAccount | null> {
+    return this.users.find((candidate) => candidate.id === id) ?? null;
+  }
+
+  async confirmEmail(id: string): Promise<boolean> {
+    const account = this.users.find((candidate) => candidate.id === id);
+
+    if (!account || account.emailConfirmedAt !== null) {
+      return false;
+    }
+
+    account.emailConfirmedAt = new Date();
+
+    return true;
+  }
+
   async create(record: CreateUserRecord): Promise<UserAccount> {
     if ((await this.findByEmail(record.email)) !== null) {
       throw new DuplicateEmailError();

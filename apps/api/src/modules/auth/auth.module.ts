@@ -4,6 +4,7 @@ import { createTransport } from "nodemailer";
 
 import { loadEnv } from "../shared/config/env";
 
+import { ConfirmAccountUseCase } from "./application/confirm-account.use-case";
 import { CreateSessionUseCase } from "./application/create-session.use-case";
 import { AuthTokensRepositoryPort } from "./application/ports/auth-tokens-repository.port";
 import { EmailSenderPort } from "./application/ports/email-sender.port";
@@ -15,6 +16,8 @@ import { UsersRepositoryPort } from "./application/ports/users-repository.port";
 import { SignUpUseCase } from "./application/sign-up.use-case";
 import { ValidateSessionUseCase } from "./application/validate-session.use-case";
 import {
+  CONFIRMATION_RATE_LIMIT_MAX,
+  CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS,
   CONFIRMATION_TOKEN_TTL_SECONDS,
   JWT_SECRET,
   SESSION_TTL_SECONDS,
@@ -33,6 +36,7 @@ import { SupabaseAuthTokensRepository } from "./infrastructure/supabase-auth-tok
 import { SupabaseSessionsRepository } from "./infrastructure/supabase-sessions.repository";
 import { SupabaseUsersRepository } from "./infrastructure/supabase-users.repository";
 import { AuthController } from "./interface/auth.controller";
+import { ConfirmationRateLimiter } from "./interface/confirmation-rate-limiter";
 import { SessionGuard } from "./interface/session.guard";
 import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
 
@@ -60,6 +64,14 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     {
       provide: SIGN_UP_RATE_LIMIT_WINDOW_SECONDS,
       useFactory: () => loadEnv().signUpRateLimitWindowSeconds,
+    },
+    {
+      provide: CONFIRMATION_RATE_LIMIT_MAX,
+      useFactory: () => loadEnv().confirmationRateLimitMax,
+    },
+    {
+      provide: CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS,
+      useFactory: () => loadEnv().confirmationRateLimitWindowSeconds,
     },
     { provide: WEB_ORIGIN, useFactory: () => loadEnv().webOrigin },
     {
@@ -97,6 +109,8 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     CreateSessionUseCase,
     SignUpUseCase,
     SignUpRateLimiter,
+    ConfirmAccountUseCase,
+    ConfirmationRateLimiter,
     ValidateSessionUseCase,
     SessionGuard,
   ],
@@ -104,6 +118,8 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     CreateSessionUseCase,
     SignUpUseCase,
     SignUpRateLimiter,
+    ConfirmAccountUseCase,
+    ConfirmationRateLimiter,
     ValidateSessionUseCase,
     SessionTokenPort,
     JoseSessionTokenAdapter,

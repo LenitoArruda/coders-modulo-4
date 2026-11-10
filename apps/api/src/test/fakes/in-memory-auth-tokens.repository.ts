@@ -4,6 +4,7 @@ import {
   AuthTokensRepositoryPort,
   type AuthTokenCreation,
   type AuthTokenPurpose,
+  type AuthTokenRecord,
 } from "../../modules/auth/application/ports/auth-tokens-repository.port";
 
 export type StoredAuthToken = AuthTokenCreation & {
@@ -40,5 +41,21 @@ export class InMemoryAuthTokensRepository extends AuthTokensRepositoryPort {
         token.usedAt = now;
       }
     }
+  }
+
+  async findByHash(tokenHash: string): Promise<AuthTokenRecord | null> {
+    return this.tokens.find((token) => token.tokenHash === tokenHash) ?? null;
+  }
+
+  async consume(tokenId: string): Promise<boolean> {
+    const token = this.tokens.find((candidate) => candidate.id === tokenId);
+
+    if (!token || token.usedAt !== null) {
+      return false;
+    }
+
+    token.usedAt = new Date();
+
+    return true;
   }
 }

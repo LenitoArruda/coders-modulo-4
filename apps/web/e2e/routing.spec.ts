@@ -119,7 +119,7 @@ test.describe("private area with a valid session", () => {
     await expect(page).toHaveURL(/\/app$/);
     await expect(page.locator('[data-layout="app"]')).toBeVisible();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      "Welcome to Experts",
+      "Welcome, Ada",
     );
   });
 
@@ -133,7 +133,7 @@ test.describe("private area with a valid session", () => {
       "/app",
     );
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      "Welcome to Experts",
+      "Welcome, Ada",
     );
   });
 
@@ -145,7 +145,7 @@ test.describe("private area with a valid session", () => {
 
       await expect(page).toHaveURL(/\/app$/);
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        "Welcome to Experts",
+        "Welcome, Ada",
       );
     });
   }
