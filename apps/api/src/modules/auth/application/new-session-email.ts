@@ -1,17 +1,9 @@
 import type { AuthUser } from "../domain/auth-user";
 
+import { renderEmailLayout } from "./email-layout";
 import type { EmailMessage } from "./ports/email-sender.port";
 
 export const NEW_SESSION_EMAIL_SUBJECT = "New session on your account";
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 function formatDateTimeUtc(date: Date): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -42,11 +34,23 @@ export function buildNewSessionEmail(
     "If you did not start this session, change your password immediately.",
     `Reset your password: ${passwordResetUrl}`,
   ].join("\n");
-  const html = `<p>Hi ${escapeHtml(user.firstName)},</p>
-<p>A new session was started on your account.</p>
-<p>When: <strong>${when}</strong></p>
-<p>If you did not start this session, change your password immediately.</p>
-<p><a href="${escapeHtml(passwordResetUrl)}">Reset your password</a></p>`;
+  const html = renderEmailLayout({
+    title: "New session on your account",
+    preheader: "A new session was started on your Experts account.",
+    greeting,
+    blocks: [
+      {
+        type: "paragraph",
+        text: "A new session was started on your account.",
+      },
+      { type: "details", items: [{ label: "When", value: when }] },
+      {
+        type: "paragraph",
+        text: "If you did not start this session, change your password immediately.",
+      },
+      { type: "action", label: "Reset your password", url: passwordResetUrl },
+    ],
+  });
 
   return {
     to: user.email,

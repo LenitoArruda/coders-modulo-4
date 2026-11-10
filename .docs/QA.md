@@ -250,6 +250,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Com JavaScript desabilitado, o botão de fallback confirma a conta e o cookie abre `/app`.
 - [ ] E2E cobre sucesso/cookie/URL sem token, inválido, `409`, `429`, link sem token, sessão ativa,
       foco visível e 360/768/1280 px sem rolagem horizontal.
+- [ ] E-mails transacionais seguem `DESIGN.md` (light-only, paleta, texto grafite sobre o botão pastel, 1 ação primária, link de fallback) e não têm rolagem horizontal em 360 px.
 - [ ] Logs do Mailtrap (`https://mailtrap.io/sending/email_logs`): e-mails "Confirm your account" e "New session on your account" inspecionados
       no QA manual, com data/hora e alerta de senha no segundo.
 - [ ] `CONFIRMATION_TOKEN_TTL_SECONDS` controla a expiração (padrão 86400) e os limites de rate

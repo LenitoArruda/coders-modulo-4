@@ -23,7 +23,7 @@ describe("buildPasswordChangedEmail", () => {
     expect(message.text).toContain("was just changed");
     expect(message.text).toContain("If you did not make this change");
     expect(message.text).toContain(forgotPasswordUrl);
-    expect(message.html).toContain(`<a href="${forgotPasswordUrl}">`);
+    expect(message.html).toContain(`href="${forgotPasswordUrl}"`);
   });
 
   it("deve escapar HTML no primeiro nome e na URL", () => {
