@@ -84,7 +84,7 @@ Execute na raiz do monorepo:
 
 | Comando               | O que faz                                                    |
 | --------------------- | ------------------------------------------------------------ |
-| `bun run dev`         | Sobe web (3000), docs (3001) e API (3333)                    |
+| `bun run dev`         | Sobe web (3000) e API (3333)                                 |
 | `bun run build`       | Build de todos os apps/pacotes via Turbo                     |
 | `bun run lint`        | ESLint em todos os apps/pacotes                              |
 | `bun run lint:commit` | Valida a mensagem de commit preparada (Conventional Commits) |
@@ -163,7 +163,6 @@ o padrão; não reescreva o histórico por causa disso.
 | Serviço         | URL                      |
 | --------------- | ------------------------ |
 | Web             | <http://localhost:3000>  |
-| Docs            | <http://localhost:3001>  |
 | API             | <http://localhost:3333>  |
 | Grafana (LGTM)  | <http://localhost:3010>  |
 | OTLP gRPC       | `localhost:4317`         |
@@ -183,7 +182,6 @@ Consulte `service_name="coders-modulo-4-api"` em Loki, Tempo ou Prometheus.
 .
 ├── apps/
 │   ├── web/                     # Next.js — porta 3000
-│   ├── docs/                    # Next.js — porta 3001 (starter, ainda não customizado)
 │   └── api/                     # NestJS — porta 3333
 ├── packages/
 │   ├── ui/                      # Tailwind/shadcn, tokens e componentes compartilhados

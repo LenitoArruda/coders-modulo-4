@@ -27,7 +27,7 @@ Execute na raiz do monorepo:
 | Comando               | O que faz                                                    |
 | --------------------- | ------------------------------------------------------------ |
 | `bun install`         | Instala dependências                                         |
-| `bun run dev`         | Sobe `web` (3000), `docs` (3001) e `api` (3333) em paralelo  |
+| `bun run dev`         | Sobe `web` (3000) e `api` (3333) em paralelo                 |
 | `bun run build`       | Build de todos os apps/pacotes via Turbo                     |
 | `bun run lint`        | ESLint em todos os apps/pacotes                              |
 | `bun run lint:commit` | Valida a mensagem de commit preparada (Conventional Commits) |
@@ -408,8 +408,6 @@ Requisitos:
 | Nenhum CI                                   | Verificação depende do ambiente local                                                                                                |
 | Commitlint apenas local                     | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
 | Produto não implementado                    | Apenas a rota de hello world e a fundação existem                                                                                    |
-| `apps/docs` ainda é o starter               | Conteúdo público de documentação não definido                                                                                        |
-| Componentes legados em `packages/ui`        | `button`, `card` e `code` são mantidos por uso em `apps/docs`                                                                        |
 | Sem Vitest/Testing Library no pacote `ui`   | Componentes compartilhados não têm testes unitários                                                                                  |
 | Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                                  |
 | PostgreSQL local em `15`                    | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                                  |

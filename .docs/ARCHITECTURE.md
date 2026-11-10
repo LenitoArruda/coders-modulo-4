@@ -28,7 +28,6 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 .
 ├── apps/
 │   ├── web/                     # Next.js — porta 3000
-│   ├── docs/                    # Next.js — porta 3001 (starter, ainda não customizado)
 │   └── api/                     # NestJS — porta 3333
 ├── packages/
 │   ├── ui/                      # Tailwind/shadcn, tokens e componentes compartilhados
@@ -52,9 +51,8 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 | App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                              |
 | ---------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação e troca de senha na porta 3000 |
-| `apps/docs`                  | Site de documentação                    | ✅ starter rodando na porta 3001; ainda não customizado                                                                                             |
 | `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, contrato de erro, env, CORS, logs e OTel na porta 3333     |
-| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`; legados `button`, `card`, `code` mantidos para `apps/docs`                                            |
+| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                        |
 | `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                      |
 | `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                |
 | `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                |
@@ -584,7 +582,6 @@ tomadas.
 | Tema                 | Pergunta                                                                                       |
 | -------------------- | ---------------------------------------------------------------------------------------------- |
 | Deploy da API        | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render). |
-| `apps/docs`          | Será o site público de documentação ou deve ser removido?                                      |
 | OXLint/OXFmt         | Migrar do ESLint/Prettier atual ou manter?                                                     |
 | Multi-tenancy        | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                     |
 | `packages/shared`    | Quais contratos realmente serão compartilhados entre web e api?                                |
