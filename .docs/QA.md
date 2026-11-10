@@ -175,7 +175,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 ### 5.8 Git e commits
 
 - [ ] Mensagem segue Conventional Commits (`<tipo>(<escopo>): <descrição>`).
-- [ ] O hook `commit-msg` está instalado (`.git/hooks/commit-msg`).
+- [ ] O hook `commit-msg` está instalado (`.git/hooks/commit-msg`). Ele roda `scripts/commitlint-hook.mjs`, que resolve o arquivo da mensagem pelo próprio git; o placeholder `{1}` do Lefthook quebra em caminhos com espaços (Windows/worktrees). `git commit` normal não deve exigir `LEFTHOOK_EXCLUDE` nem `--no-verify`.
 - [ ] `bun run lint:commit` passa para a mensagem preparada.
 - [ ] Ao final de uma spec, `commit-and-push` foi executado (commit + push).
 - [ ] `git status` sem segredos, artefatos gerados ou arquivos acidentais.

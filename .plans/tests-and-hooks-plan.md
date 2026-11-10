@@ -32,3 +32,9 @@ Fora: migração SQL já aplicada, outras specs, spec 008, `.plans/002-008-orche
 ## Plano de testes e QA manual
 
 `bun run lint`, `types:check`, `test`, `build`, `db:test`; commit real sem bypass.
+x
+
+## Notas de execução (hooks)
+
+- `{1}` do Lefthook é dividido em caminhos com espaços (com ou sem aspas); o commit-msg agora roda `scripts/commitlint-hook.mjs`, que obtém `COMMIT_EDITMSG` via `git rev-parse --git-path`.
+- O lint-staged com eslint na raiz já funciona para TS (validado com arquivo de `apps/web` staged); o erro de `Pages directory` não reproduziu.
