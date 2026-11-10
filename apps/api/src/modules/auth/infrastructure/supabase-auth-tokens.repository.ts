@@ -48,4 +48,22 @@ export class SupabaseAuthTokensRepository extends AuthTokensRepositoryPort {
       throw databaseFailure("invalidate auth tokens", error);
     }
   }
+
+  async invalidateUnusedExcept(
+    userId: string,
+    purpose: Parameters<AuthTokensRepositoryPort["invalidateUnusedExcept"]>[1],
+    keepTokenHash: string,
+  ): Promise<void> {
+    const { error } = await this.client
+      .from("auth_tokens")
+      .update({ used_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("purpose", purpose)
+      .is("used_at", null)
+      .neq("token_hash", keepTokenHash);
+
+    if (error !== null) {
+      throw databaseFailure("invalidate previous auth tokens", error);
+    }
+  }
 }

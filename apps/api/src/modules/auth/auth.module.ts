@@ -12,11 +12,15 @@ import { PasswordHasherPort } from "./application/ports/password-hasher.port";
 import { SessionTokenPort } from "./application/ports/session-token.port";
 import { SessionsRepositoryPort } from "./application/ports/sessions-repository.port";
 import { UsersRepositoryPort } from "./application/ports/users-repository.port";
+import { RequestPasswordResetUseCase } from "./application/request-password-reset.use-case";
 import { SignUpUseCase } from "./application/sign-up.use-case";
 import { ValidateSessionUseCase } from "./application/validate-session.use-case";
 import {
   CONFIRMATION_TOKEN_TTL_SECONDS,
+  FORGOT_PASSWORD_RATE_LIMIT_MAX,
+  FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
   JWT_SECRET,
+  RESET_TOKEN_TTL_SECONDS,
   SESSION_TTL_SECONDS,
   SIGN_UP_RATE_LIMIT_MAX,
   SIGN_UP_RATE_LIMIT_WINDOW_SECONDS,
@@ -33,6 +37,7 @@ import { SupabaseAuthTokensRepository } from "./infrastructure/supabase-auth-tok
 import { SupabaseSessionsRepository } from "./infrastructure/supabase-sessions.repository";
 import { SupabaseUsersRepository } from "./infrastructure/supabase-users.repository";
 import { AuthController } from "./interface/auth.controller";
+import { ForgotPasswordRateLimiter } from "./interface/forgot-password-rate-limiter";
 import { SessionGuard } from "./interface/session.guard";
 import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
 
@@ -60,6 +65,18 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     {
       provide: SIGN_UP_RATE_LIMIT_WINDOW_SECONDS,
       useFactory: () => loadEnv().signUpRateLimitWindowSeconds,
+    },
+    {
+      provide: RESET_TOKEN_TTL_SECONDS,
+      useFactory: () => loadEnv().resetTokenTtlSeconds,
+    },
+    {
+      provide: FORGOT_PASSWORD_RATE_LIMIT_MAX,
+      useFactory: () => loadEnv().forgotPasswordRateLimitMax,
+    },
+    {
+      provide: FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
+      useFactory: () => loadEnv().forgotPasswordRateLimitWindowSeconds,
     },
     { provide: WEB_ORIGIN, useFactory: () => loadEnv().webOrigin },
     {
@@ -95,8 +112,10 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     { provide: OpaqueTokenPort, useExisting: CryptoOpaqueTokenAdapter },
     { provide: EmailSenderPort, useClass: SmtpEmailSender },
     CreateSessionUseCase,
+    RequestPasswordResetUseCase,
     SignUpUseCase,
     SignUpRateLimiter,
+    ForgotPasswordRateLimiter,
     ValidateSessionUseCase,
     SessionGuard,
   ],

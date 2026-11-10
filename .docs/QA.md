@@ -52,15 +52,18 @@ Execute na raiz do monorepo:
 > A API exige `JWT_SECRET` com no mínimo 32 caracteres no boot (veja `.env.example`); sem ele, a
 > API não inicia. Os testes não dependem do `.env`: `apps/api/src/test/setup-env.ts` define as
 > variáveis mínimas (incluindo `JWT_SECRET`, `SESSION_TTL_SECONDS`,
-> `CONFIRMATION_TOKEN_TTL_SECONDS` e as do rate limit de sign-up).
+> `CONFIRMATION_TOKEN_TTL_SECONDS`, `RESET_TOKEN_TTL_SECONDS` e as dos rate limits de sign-up e
+> forgot-password).
 >
 > O E2E do web (`bun run test:e2e`) sobe uma **API fake** local em `127.0.0.1:3434`
 > (`apps/web/e2e/support/fake-api-server.ts`) e aponta `API_BASE_URL` do web para ela. Assim os
-> cenários de sessão e sign-up (sucesso, `400`, `409`, `429` e `503`) são determinísticos e não
-> dependem do banco compartilhado, de credenciais ou de `JWT_SECRET`. E-mails especiais da fake:
-> `taken@example.com` (`409`), `rate-limited@example.com` (`429`), `mail-failure@example.com`
-> (`503`) e `resend@example.com` (`200`). Não deixe um `bun run dev` antigo ocupando a porta 3000
-> antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
+> cenários de sessão, sign-up e forgot-password (sucesso, `400`, `409`, `429` e `503`) são
+> determinísticos e não dependem do banco compartilhado, de credenciais ou de `JWT_SECRET`.
+> E-mails especiais da fake no sign-up: `taken@example.com` (`409`),
+> `mail-failure@example.com` (`503`) e `resend@example.com` (`200`); no forgot-password,
+> `rate-limited@example.com` (`429`) e qualquer e-mail válido recebe `200` genérico. Não deixe um
+> `bun run dev` antigo ocupando a porta 3000 antes do E2E, pois o Playwright reutiliza o servidor
+> existente em modo local.
 
 ### 2.1 Comando do OpenCode
 
@@ -188,7 +191,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Nova sessão revoga as anteriores; o JWT antigo deixa de valer imediatamente.
 - [ ] Sessão expirada (`expires_at` no passado) não é considerada ativa.
 - [ ] E-mail de nova sessão: assunto "New session on your account", data/hora, alerta de senha e
-      **sem** link de recuperação.
+      link para `/auth/forgot-password`.
 - [ ] Cookie `session_token`: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Max-Age` = TTL e `Secure`
       somente em produção.
 - [ ] Logs sem JWT, cookie, e-mail completo, senha ou segredo; use `userId`/`sessionId`.
@@ -230,6 +233,30 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] E2E cobre erros por campo, sucesso, `409`, `429`, `503`, foco visível, light-only e
       360/768/1280 px sem rolagem horizontal; Mailpit local (`http://127.0.0.1:54324`) validado no
       QA manual.
+
+### 5.12 Recuperação de senha
+
+- [ ] `/auth/forgot-password` substitui o placeholder, usa en-US, light-only e permanece acessível
+      com e sem sessão.
+- [ ] O campo de e-mail tem label visível, `autocomplete="email"`, funciona por teclado, tem foco
+      visível e erro associado com `aria-describedby` e `role="alert"`.
+- [ ] E-mail ausente ou sintaticamente inválido → `400` com `fieldErrors.email`, sem criar token e
+      sem revelar se a conta existe.
+- [ ] Qualquer e-mail sintaticamente válido → `200` com a **mesma** mensagem
+      "If an account exists for this email, we sent a password reset link.", exista ou não a conta.
+- [ ] Conta existente (confirmada ou não) recebe e-mail "Reset your password" en-US com link
+      `/auth/reset-password?token=...`, aviso de expiração de 1 h e orientação para ignorar.
+- [ ] `auth_tokens` guarda `purpose = password_reset` e apenas `token_hash`; o token claro não
+      aparece na resposta, no banco, em logs ou em métricas.
+- [ ] `RESET_TOKEN_TTL_SECONDS` controla a expiração (padrão 3600 s); um novo pedido invalida o
+      token pendente anterior e dois pedidos simultâneos não deixam dois tokens válidos.
+- [ ] Falha de SMTP mantém o `200` genérico, registra a falha sem PII e permite nova tentativa.
+- [ ] Rate limit por IP e por e-mail: acima de `FORGOT_PASSWORD_RATE_LIMIT_MAX` em
+      `FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS` → `429` com mensagem genérica e `Retry-After`.
+- [ ] E-mail de nova sessão contém o link de recuperação.
+- [ ] E2E cobre validação, sucesso genérico, `429`, foco visível, light-only e 360/768/1280 px sem
+      rolagem horizontal; Mailpit local (`http://127.0.0.1:54324`) e o link real validados no QA
+      manual.
 
 ---
 

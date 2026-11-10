@@ -41,4 +41,23 @@ export class InMemoryAuthTokensRepository extends AuthTokensRepositoryPort {
       }
     }
   }
+
+  async invalidateUnusedExcept(
+    userId: string,
+    purpose: AuthTokenPurpose,
+    keepTokenHash: string,
+  ): Promise<void> {
+    const now = new Date();
+
+    for (const token of this.tokens) {
+      if (
+        token.userId === userId &&
+        token.purpose === purpose &&
+        token.tokenHash !== keepTokenHash &&
+        token.usedAt === null
+      ) {
+        token.usedAt = now;
+      }
+    }
+  }
 }

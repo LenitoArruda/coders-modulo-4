@@ -1,11 +1,11 @@
 # Auth forgot password — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-09
+> **Status:** done
+> **Atualizado em:** 2026-11-10
 > **Autor:** Time de engenharia
 > **Mapa:** `.plans/001-auth-breakdown.md`
 > **Depende de:** `.specs/001-auth-schema.md`, `.specs/002-auth-session.md`, `.specs/003-auth-routes.md`, `.specs/004-auth-sign-up.md`
-> **Plano:** `.plans/007-auth-forgot-password-plan.md` (a criar pelo `implement-me`)
+> **Plano:** `.plans/007-auth-forgot-password-plan.md`
 
 ## 1. Contexto e problema
 
