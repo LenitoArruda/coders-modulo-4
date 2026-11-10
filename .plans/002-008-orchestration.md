@@ -7,15 +7,15 @@
 
 ## 1. Specs do range
 
-| Spec | Título               | Status   | Worktree                      | Branch   | Estado     | Observações               |
-| ---- | -------------------- | -------- | ----------------------------- | -------- | ---------- | ------------------------- |
-| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada   | onda 1 — commit `2e523e5` |
-| 003  | Auth routes          | approved | `../coders-modulo-4-spec-003` | spec/003 | mesclada   | onda 2 — commit `4a0728f` |
-| 004  | Auth sign-up         | approved | `../coders-modulo-4-spec-004` | spec/004 | executando | onda 3                    |
-| 005  | Auth confirm account | approved | —                             | —        | pendente   | onda 4 (paralela com 007) |
-| 006  | Auth sign-in         | approved | —                             | —        | pendente   | onda 5                    |
-| 007  | Auth forgot password | approved | —                             | —        | pendente   | onda 4 (paralela com 005) |
-| 008  | Auth reset password  | approved | —                             | —        | pendente   | onda 6                    |
+| Spec | Título               | Status   | Worktree                      | Branch   | Estado   | Observações               |
+| ---- | -------------------- | -------- | ----------------------------- | -------- | -------- | ------------------------- |
+| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada | onda 1 — commit `2e523e5` |
+| 003  | Auth routes          | approved | `../coders-modulo-4-spec-003` | spec/003 | mesclada | onda 2 — commit `4a0728f` |
+| 004  | Auth sign-up         | approved | `../coders-modulo-4-spec-004` | spec/004 | mesclada | onda 3 — commit `928889c` |
+| 005  | Auth confirm account | approved | —                             | —        | pendente | onda 4 (paralela com 007) |
+| 006  | Auth sign-in         | approved | —                             | —        | pendente | onda 5                    |
+| 007  | Auth forgot password | approved | —                             | —        | pendente | onda 4 (paralela com 005) |
+| 008  | Auth reset password  | approved | —                             | —        | pendente | onda 6                    |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
@@ -28,7 +28,7 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 | ---- | -------- | ---------- | ------------ | -------------------------- |
 | 1    | 002      | 22:32      | 23:20        | `585efaf` / push `7f9a62f` |
 | 2    | 003      | 23:21      | 00:10        | `7e604c4` / push `0fd1235` |
-| 3    | 004      | 00:12      | —            | —                          |
+| 3    | 004      | 00:12      | 00:34        | `3bcf702` / push pendente  |
 | 4    | 005, 007 | —          | —            | —                          |
 | 5    | 006      | —          | —            | —                          |
 | 6    | 008      | —          | —            | —                          |
@@ -55,6 +55,9 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 - 00:10 — onda 2: QA completo verde na main (lint, types:check, test API 88/88 e web 27/27, build, test:e2e 28/28); integração pronta para `commit-and-push`.
 - 00:11 — onda 2 integrada e publicada: merge `7e604c4`, commit de log `0fd1235`, push ok. Worktree desregistrado e branch `spec/003` removida.
 - 00:12 — onda 3 lançada: [004] worktree `../coders-modulo-4-spec-004`, branch `spec/004`, base `0fd1235`.
+- 00:20 — [004] concluído: RESULTADO ok, commit `928889c`. Worktree com dois arquivos não rastreados gerados pelo `next dev` (`apps/web/AGENTS.md` e `CLAUDE.md`); removidos pelo orquestrador e adicionados ao `apps/web/.gitignore` (`aaf64b2`) como correção mínima registrada. Exceção `--no-verify` novamente pelo hook `commit-msg` com espaços no caminho; mensagem validada manualmente com `commitlint --edit`.
+- 00:21 — onda 3: merge `--no-ff spec/004` na main concluído (`3bcf702`); iniciando QA completo.
+- 00:34 — onda 3: QA completo verde na main (lint, types:check, test API 134/134 e web 35/35, build, test:e2e 41/41); árvore limpa após o e2e.
 
 ## 5. Resultado consolidado
 
