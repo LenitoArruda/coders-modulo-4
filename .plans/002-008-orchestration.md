@@ -9,7 +9,7 @@
 
 | Spec | Título               | Status   | Worktree                      | Branch   | Estado   | Observações               |
 | ---- | -------------------- | -------- | ----------------------------- | -------- | -------- | ------------------------- |
-| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | pendente | onda 1                    |
+| 002  | Auth session         | approved | `../coders-modulo-4-spec-002` | spec/002 | mesclada | onda 1 — commit `2e523e5` |
 | 003  | Auth routes          | approved | —                             | —        | pendente | onda 2                    |
 | 004  | Auth sign-up         | approved | —                             | —        | pendente | onda 3                    |
 | 005  | Auth confirm account | approved | —                             | —        | pendente | onda 4 (paralela com 007) |
@@ -26,7 +26,7 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 
 | Onda | Specs    | Lançada em | Concluída em | Merge/push |
 | ---- | -------- | ---------- | ------------ | ---------- |
-| 1    | 002      | —          | —            | —          |
+| 1    | 002      | 22:32      | 23:19        | pendente   |
 | 2    | 003      | —          | —            | —          |
 | 3    | 004      | —          | —            | —          |
 | 4    | 005, 007 | —          | —            | —          |
@@ -42,7 +42,11 @@ lançamento da onda 1 — migração aplicada, 32 testes pgTAP passando, commit 
 
 ## 4. Log de progresso
 
-- (a preencher a cada evento)
+- 22:32 — [001] verificação de banco concluída pelo orquestrador: migração aplicada, 32 testes pgTAP passando, spec fechada em `f10aef4`.
+- 22:32 — onda 1 lançada: [002] subagente iniciado em background (worktree `../coders-modulo-4-spec-002`, branch `spec/002`, base `1a86c1b`).
+- 23:15 — [002] concluído: RESULTADO ok, commit `2e523e5`, worktree limpo. Exceção registrada: o subagente usou `--no-verify` porque o hook `commit-msg` falhou com caminho contendo espaços; mensagem validada manualmente por stdin e `pre-commit` (lint-staged) passou.
+- 23:16 — onda 1: merge `--no-ff spec/002` na main concluído; iniciando QA completo.
+- 23:19 — onda 1: QA completo verde na main (lint, types:check, test API 79/79 e web 12/12, build, test:e2e 5/5); integração pronta para `commit-and-push`.
 
 ## 5. Resultado consolidado
 
