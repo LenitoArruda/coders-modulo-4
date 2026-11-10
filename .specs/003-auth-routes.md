@@ -22,13 +22,13 @@ Esta fatia cria o esqueleto de navegação do épico: `/auth/*` público, `/app/
 | Pessoa que esqueceu a senha | Conseguir abrir a recuperação mesmo com sessão ativa                        | Eventual          |
 | Desenvolvedor(a)            | Saber onde criar páginas e endpoints e como o guard se comporta             | A cada integração |
 
-Permissões: `/auth/*` é público. `/app/*` exige sessão válida. Nesta fatia, sem sessão, `/app/*` redireciona para `/auth/sign-up`; a fatia 006 troca o destino para `/auth/sign-in`.
+Permissões: `/auth/*` é público. `/app/*` exige sessão válida. Sem sessão, `/app/*` redireciona para `/auth/sign-in` com `returnTo` seguro (destino original `/auth/sign-up`, trocado pela fatia 006).
 
 ## 3. Resultado esperado
 
-O web passa a ter um grupo público `/auth/*` com layout de autenticação e páginas placeholder para sign-up, sign-in, confirmação, forgot-password e reset-password, além de um grupo privado `/app/*` com shell e página inicial placeholder. A raiz `/` redireciona para `/app` quando há sessão válida e para `/auth/sign-up` quando não há.
+O web passa a ter um grupo público `/auth/*` com layout de autenticação e páginas placeholder para sign-up, sign-in, confirmação, forgot-password e reset-password, além de um grupo privado `/app/*` com shell e página inicial placeholder. A raiz `/` redireciona para `/app` quando há sessão válida e para `/auth/sign-in` quando não há.
 
-Pessoas autenticadas que abrem `/auth/sign-in`, `/auth/sign-up` ou `/auth/confirm` são enviadas para `/app`; `/auth/forgot-password` e `/auth/reset-password` continuam acessíveis. A API mantém o namespace `/api/v1`, o hello em `/api/v1/hello`, CORS restrito à origem do web e a convenção en-US documentada.
+Pessoas autenticadas que abrem `/auth/sign-in` ou `/auth/sign-up` são enviadas para `/app`; `/auth/confirm` sem token vai para `/app` com sessão e para `/auth/sign-in` sem sessão, e com token é sempre processado; `/auth/forgot-password` e `/auth/reset-password` continuam acessíveis. A API mantém o namespace `/api/v1`, o hello em `/api/v1/hello`, CORS restrito à origem do web e a convenção en-US documentada.
 
 ## 4. Métricas de sucesso
 
@@ -41,10 +41,10 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 - Grupo de rota público `/auth/*` com layout compartilhado de autenticação, light-only e acessível.
 - Páginas placeholder em en-US para `/auth/sign-up`, `/auth/sign-in`, `/auth/confirm`, `/auth/forgot-password` e `/auth/reset-password`.
 - Grupo de rota privado `/app/*` com shell, navegação básica e página inicial placeholder em en-US.
-- Guard de `/app/*`: sem sessão válida, redirecionar para `/auth/sign-up` nesta fatia.
-- Redirecionamento de pessoa autenticada em `/auth/sign-in`, `/auth/sign-up` e `/auth/confirm` para `/app`.
+- Guard de `/app/*`: sem sessão válida, redirecionar para `/auth/sign-in` (com `returnTo` seguro).
+- Redirecionamento de pessoa autenticada em `/auth/sign-in` e `/auth/sign-up` para `/app`; `/auth/confirm` sem token vai para `/app` (com sessão) ou `/auth/sign-in` (sem sessão), e com token é processado.
 - Manutenção de `/auth/forgot-password` e `/auth/reset-password` acessíveis mesmo com sessão ativa.
-- Raiz `/`: sessão válida → `/app`; sem sessão → `/auth/sign-up`.
+- Raiz `/`: sessão válida → `/app`; sem sessão → `/auth/sign-in`.
 - CORS da API aceitando apenas a origem do web e os métodos/headers necessários para o fluxo de auth.
 - Documentação da convenção en-US em `.docs/RULES.md`, `.docs/DESIGN.md`, `.docs/DEVELOPMENT.md` e `.docs/ARCHITECTURE.md`.
 - Atualização dos testes e do E2E que hoje validam a página de demonstração em `/`.
@@ -64,34 +64,34 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 ### Fluxo principal — visitante navega
 
 1. A pessoa abre `/`.
-2. Sem sessão, o web redireciona para `/auth/sign-up`.
-3. A página placeholder de sign-up carrega dentro do layout público.
+2. Sem sessão, o web redireciona para `/auth/sign-in`.
+3. A página de sign-in carrega dentro do layout público.
 4. A pessoa abre `/app` ou `/app/*` diretamente.
-5. Sem sessão, o guard redireciona para `/auth/sign-up`.
+5. Sem sessão, o guard redireciona para `/auth/sign-in?returnTo=<caminho>`.
 
 ### Fluxo principal — pessoa autenticada navega
 
 1. A pessoa com sessão válida abre `/`.
 2. O web redireciona para `/app`.
 3. O shell privado carrega com a página inicial placeholder.
-4. A pessoa abre `/auth/sign-in`, `/auth/sign-up` ou `/auth/confirm`.
+4. A pessoa abre `/auth/sign-in`, `/auth/sign-up` ou `/auth/confirm` sem token.
 5. O web redireciona para `/app`.
 6. A pessoa abre `/auth/forgot-password` ou `/auth/reset-password` e permanece na página, mesmo com sessão ativa.
 
 ### Fluxos alternativos e de exceção
 
-- Sessão inválida, expirada ou revogada: tratar como ausência de sessão e redirecionar `/app/*` para `/auth/sign-up`.
+- Sessão inválida, expirada ou revogada: tratar como ausência de sessão e redirecionar `/app/*` para `/auth/sign-in`.
 - Rota `/auth/*` inexistente: responder `404` dentro do layout público.
 - Rota `/app/*` inexistente com sessão válida: responder `404` dentro do shell privado.
 - Origem não permitida no CORS: a API bloqueia a requisição.
-- `returnTo` ainda não é usado nesta fatia; a fatia 006 introduz o retorno seguro.
+- `returnTo` é introduzido pela fatia 006 (retorno seguro a `/app/*`).
 
 ## 7. Regras e casos de borda
 
 - `/auth/*` é público; nenhuma página de auth exige sessão.
 - `/app/*` é privado; toda rota exige sessão válida.
-- Nesta fatia, `/app/*` sem sessão redireciona para `/auth/sign-up`; a fatia 006 muda para `/auth/sign-in`.
-- Pessoa autenticada em `/auth/sign-in`, `/auth/sign-up` ou `/auth/confirm` é redirecionada para `/app`.
+- `/app/*` sem sessão redireciona para `/auth/sign-in` (destino definido pela fatia 006).
+- Pessoa autenticada em `/auth/sign-in` ou `/auth/sign-up` é redirecionada para `/app`; `/auth/confirm` sem token vai para `/app` (com sessão) ou `/auth/sign-in` (sem sessão) e com token é processado mesmo com sessão ativa.
 - `/auth/forgot-password` e `/auth/reset-password` não entram na regra de redirecionamento de pessoa autenticada.
 - A raiz `/` não exibe mais a página de demonstração; ela redireciona conforme a sessão.
 - A API responde apenas em `/api/v1/*`; `GET /` não existe e `GET /api/v1/hello` mantém `{ "message": "Hello World" }`.
@@ -106,16 +106,16 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 ### Rotas web
 
-| Rota                    | Acesso  | Comportamento nesta fatia                                        |
-| ----------------------- | ------- | ---------------------------------------------------------------- |
-| `/`                     | Público | Sessão válida → `/app`; sem sessão → `/auth/sign-up`             |
-| `/auth/sign-up`         | Público | Placeholder; com sessão → `/app`                                 |
-| `/auth/sign-in`         | Público | Placeholder; com sessão → `/app`                                 |
-| `/auth/confirm`         | Público | Placeholder; com sessão → `/app`                                 |
-| `/auth/forgot-password` | Público | Placeholder; acessível com ou sem sessão                         |
-| `/auth/reset-password`  | Público | Placeholder; acessível com ou sem sessão                         |
-| `/app`                  | Privado | Shell e página inicial placeholder; sem sessão → `/auth/sign-up` |
-| `/app/*`                | Privado | Shell; sem sessão → `/auth/sign-up`                              |
+| Rota                    | Acesso  | Comportamento nesta fatia                                                    |
+| ----------------------- | ------- | ---------------------------------------------------------------------------- |
+| `/`                     | Público | Sessão válida → `/app`; sem sessão → `/auth/sign-in`                         |
+| `/auth/sign-up`         | Público | Placeholder; com sessão → `/app`                                             |
+| `/auth/sign-in`         | Público | Com sessão → `/app`                                                          |
+| `/auth/confirm`         | Público | Com token: processado; sem token: com sessão → `/app`, sem → `/auth/sign-in` |
+| `/auth/forgot-password` | Público | Placeholder; acessível com ou sem sessão                                     |
+| `/auth/reset-password`  | Público | Placeholder; acessível com ou sem sessão                                     |
+| `/app`                  | Privado | Shell e página inicial placeholder; sem sessão → `/auth/sign-in`             |
+| `/app/*`                | Privado | Shell; sem sessão → `/auth/sign-in`                                          |
 
 ### API
 
@@ -184,28 +184,28 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 - **Unitário:** regra de redirecionamento da raiz; regra de redirecionamento de pessoa autenticada; allowlist de CORS; destino do guard.
 - **Integração:** `GET /api/v1/hello`; `GET /` retornando `404`; CORS com origem permitida e origem negada; endpoints de auth sob `/api/v1/auth/*`.
-- **E2E (Playwright):** `/` sem sessão → `/auth/sign-up`; `/app` sem sessão → `/auth/sign-up`; `/app` com sessão → shell; `/auth/sign-in`, `/auth/sign-up` e `/auth/confirm` com sessão → `/app`; forgot/reset acessíveis com sessão.
+- **E2E (Playwright):** `/` sem sessão → `/auth/sign-in`; `/app` sem sessão → `/auth/sign-in`; `/app` com sessão → shell; `/auth/sign-in` e `/auth/sign-up` com sessão → `/app`; `/auth/confirm` sem token → `/app` (com sessão) ou `/auth/sign-in` (sem sessão); forgot/reset acessíveis com sessão.
 - **Manual:** teclado, leitor de tela, foco visível, contraste AA, 360/768/1280 px, light-only e textos en-US.
 - **Documentação:** conferir que a convenção en-US está registrada nos quatro documentos.
 
 ## 14. Critérios de aceite
 
 - [x] Dado um visitante, quando abre `/auth/sign-up`, `/auth/sign-in`, `/auth/confirm`, `/auth/forgot-password` ou `/auth/reset-password`, então a página placeholder pública carrega dentro do layout de autenticação em en-US.
-- [x] Dado um visitante sem sessão, quando abre `/app` ou qualquer `/app/*`, então é redirecionado para `/auth/sign-up`.
+- [x] Dado um visitante sem sessão, quando abre `/app` ou qualquer `/app/*`, então é redirecionado para `/auth/sign-in`.
 - [x] Dada uma sessão válida, quando a pessoa abre `/app` ou `/app/*`, então o shell privado carrega e a página inicial placeholder é exibida.
-- [x] Dada uma sessão válida, quando a pessoa abre `/auth/sign-in`, `/auth/sign-up` ou `/auth/confirm`, então é redirecionada para `/app`; `/auth/forgot-password` e `/auth/reset-password` continuam acessíveis.
-- [x] Dada a raiz `/`, quando há sessão válida, então redireciona para `/app`; quando não há, redireciona para `/auth/sign-up`.
+- [x] Dada uma sessão válida, quando a pessoa abre `/auth/sign-in` ou `/auth/sign-up` (ou `/auth/confirm` sem token), então é redirecionada para `/app`; `/auth/forgot-password` e `/auth/reset-password` continuam acessíveis.
+- [x] Dada a raiz `/`, quando há sessão válida, então redireciona para `/app`; quando não há, redireciona para `/auth/sign-in`.
 - [x] Dada a API, quando os endpoints são chamados, então o hello está em `/api/v1/hello`, `GET /` não existe, auth fica sob `/api/v1/auth/*`, o CORS aceita a origem do web com `GET`/`HEAD`/`POST`/`OPTIONS` e bloqueia as demais origens.
 - [x] Dado o código e a documentação, quando a convenção é verificada, então telas de auth, `/app` e placeholders usam en-US, a regra está registrada em `RULES.md`, `DESIGN.md`, `DEVELOPMENT.md` e `ARCHITECTURE.md`, e a UI é light-only, acessível e responsiva.
 
 ## 15. Decisões e questões abertas
 
-| Tema                            | Decisão ou pergunta                                                          | Impacto                                                         | Dono               | Status                  |
-| ------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------ | ----------------------- |
-| Rotas públicas                  | `/auth/*` é público; `/app/*` é privado                                      | Define a estrutura de navegação do épico                        | Produto/Engenharia | fechada (2026-11-09)    |
-| Destino do guard nesta fatia    | `/app/*` sem sessão → `/auth/sign-up`; a fatia 006 muda para `/auth/sign-in` | Permite testar a fatia antes do sign-in existir                 | Engenharia         | fechada (2026-11-09)    |
-| Pessoa autenticada em `/auth/*` | sign-in, sign-up e confirm → `/app`; forgot e reset permanecem acessíveis    | Evita telas de auth desnecessárias sem bloquear recuperação     | Produto            | fechada (2026-11-09)    |
-| CORS                            | Apenas a origem do web; métodos e headers do fluxo de auth                   | Protege a API contra origens indevidas                          | Engenharia         | fechada (2026-11-09)    |
-| Idioma                          | UI, e-mails, rotas, endpoints e código em en-US; docs internas em PT-BR      | Alinha a entrega com o pedido                                   | Produto/Engenharia | fechada (2026-11-09)    |
-| Placeholders                    | Páginas mínimas substituídas nas fatias 004 a 008                            | Mantém cada fatia testável sem entregar formulários incompletos | Engenharia         | fechada (2026-11-09)    |
-| `returnTo`                      | Introduzido na fatia 006                                                     | Evita open redirect antes de existir sign-in                    | Engenharia         | aberta (não bloqueante) |
+| Tema                            | Decisão ou pergunta                                                                                                                                       | Impacto                                                         | Dono               | Status                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------ | ----------------------- |
+| Rotas públicas                  | `/auth/*` é público; `/app/*` é privado                                                                                                                   | Define a estrutura de navegação do épico                        | Produto/Engenharia | fechada (2026-11-09)    |
+| Destino do guard                | `/app/*` sem sessão → `/auth/sign-in` (alterado de `/auth/sign-up` pela fatia 006)                                                                        | Permite testar a fatia antes do sign-in existir                 | Engenharia         | fechada (2026-11-09)    |
+| Pessoa autenticada em `/auth/*` | sign-in e sign-up → `/app`; confirm sem token → `/app` (com sessão) ou sign-in (sem sessão), com token é processado; forgot e reset permanecem acessíveis | Evita telas de auth desnecessárias sem bloquear recuperação     | Produto            | fechada (2026-11-09)    |
+| CORS                            | Apenas a origem do web; métodos e headers do fluxo de auth                                                                                                | Protege a API contra origens indevidas                          | Engenharia         | fechada (2026-11-09)    |
+| Idioma                          | UI, e-mails, rotas, endpoints e código em en-US; docs internas em PT-BR                                                                                   | Alinha a entrega com o pedido                                   | Produto/Engenharia | fechada (2026-11-09)    |
+| Placeholders                    | Páginas mínimas substituídas nas fatias 004 a 008                                                                                                         | Mantém cada fatia testável sem entregar formulários incompletos | Engenharia         | fechada (2026-11-09)    |
+| `returnTo`                      | Introduzido na fatia 006                                                                                                                                  | Evita open redirect antes de existir sign-in                    | Engenharia         | aberta (não bloqueante) |

@@ -30,6 +30,12 @@ export const DEFAULT_FORGOT_PASSWORD_RATE_LIMIT_MAX = 5;
 /** Default forgot-password rate limit window (60 seconds). */
 export const DEFAULT_FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = 60;
 
+/** Default sign-in rate limit: attempts allowed per IP + email inside the window. */
+export const DEFAULT_SIGN_IN_RATE_LIMIT_MAX = 5;
+
+/** Default sign-in rate limit window (60 seconds). */
+export const DEFAULT_SIGN_IN_RATE_LIMIT_WINDOW_SECONDS = 60;
+
 export type Env = {
   port: number;
   webOrigin: string;
@@ -48,6 +54,8 @@ export type Env = {
   resetTokenTtlSeconds: number;
   forgotPasswordRateLimitMax: number;
   forgotPasswordRateLimitWindowSeconds: number;
+  signInRateLimitMax: number;
+  signInRateLimitWindowSeconds: number;
   smtpHost: string;
   smtpPort: number;
   smtpFrom: string;
@@ -241,6 +249,32 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS");
   }
 
+  const signInRateLimitMaxValue =
+    readString(source.SIGN_IN_RATE_LIMIT_MAX) ||
+    String(DEFAULT_SIGN_IN_RATE_LIMIT_MAX);
+  const signInRateLimitMax = Number(signInRateLimitMaxValue);
+
+  if (
+    !Number.isInteger(signInRateLimitMax) ||
+    signInRateLimitMax < 1 ||
+    signInRateLimitMax > 10_000
+  ) {
+    invalid.push("SIGN_IN_RATE_LIMIT_MAX");
+  }
+
+  const signInRateLimitWindowValue =
+    readString(source.SIGN_IN_RATE_LIMIT_WINDOW_SECONDS) ||
+    String(DEFAULT_SIGN_IN_RATE_LIMIT_WINDOW_SECONDS);
+  const signInRateLimitWindowSeconds = Number(signInRateLimitWindowValue);
+
+  if (
+    !Number.isInteger(signInRateLimitWindowSeconds) ||
+    signInRateLimitWindowSeconds < 1 ||
+    signInRateLimitWindowSeconds > 86_400
+  ) {
+    invalid.push("SIGN_IN_RATE_LIMIT_WINDOW_SECONDS");
+  }
+
   const smtpHost = readString(source.SMTP_HOST) || "127.0.0.1";
   const smtpPortValue = readString(source.SMTP_PORT) || "54325";
   const smtpPort = Number(smtpPortValue);
@@ -279,6 +313,8 @@ export function loadEnv(source: EnvSource = process.env): Env {
     resetTokenTtlSeconds,
     forgotPasswordRateLimitMax,
     forgotPasswordRateLimitWindowSeconds,
+    signInRateLimitMax,
+    signInRateLimitWindowSeconds,
     smtpHost,
     smtpPort,
     smtpFrom,

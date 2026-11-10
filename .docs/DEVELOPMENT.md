@@ -114,9 +114,11 @@ erro). Fakes de teste vivem em `apps/api/src/test/fakes/`. Novos domínios segue
   - O guard do web (`lib/auth/guards.ts`) é apenas UX: valida a sessão via `GET /api/v1/auth/me`
     e falha fechado (erro/401 → sem sessão). A API continua sendo a fonte de verdade.
 - **Redirecionamentos de navegação:** regras puras ficam em `lib/auth/route-rules.ts`, incluindo a
-  constante única do destino de `/app/*` sem sessão. Páginas de `/auth/sign-up`, `/auth/sign-in`
-  e `/auth/confirm` redirecionam pessoa autenticada para `/app`; forgot/reset permanecem
-  acessíveis.
+  constante única do destino de `/app/*` sem sessão (`/auth/sign-in`) e `sanitizeReturnTo`
+  (apenas `/app` e `/app/...`). `apps/web/proxy.ts` repassa o caminho solicitado ao guard pelo
+  header `x-return-to`. Páginas de `/auth/sign-up` e `/auth/sign-in` redirecionam pessoa
+  autenticada para `/app`; `/auth/confirm` sem token vai para `/app` (com sessão) ou
+  `/auth/sign-in` (sem sessão); forgot/reset permanecem acessíveis.
 - **Idioma:** todo texto visível (UI, metadados, `lang`) é **en-US**; a documentação interna é
   PT-BR. Rotas, arquivos, componentes e endpoints também usam en-US.
 

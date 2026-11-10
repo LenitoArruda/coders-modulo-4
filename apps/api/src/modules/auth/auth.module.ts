@@ -14,6 +14,7 @@ import { SessionTokenPort } from "./application/ports/session-token.port";
 import { SessionsRepositoryPort } from "./application/ports/sessions-repository.port";
 import { UsersRepositoryPort } from "./application/ports/users-repository.port";
 import { RequestPasswordResetUseCase } from "./application/request-password-reset.use-case";
+import { SignInUseCase } from "./application/sign-in.use-case";
 import { SignUpUseCase } from "./application/sign-up.use-case";
 import { ValidateSessionUseCase } from "./application/validate-session.use-case";
 import {
@@ -25,6 +26,8 @@ import {
   JWT_SECRET,
   RESET_TOKEN_TTL_SECONDS,
   SESSION_TTL_SECONDS,
+  SIGN_IN_RATE_LIMIT_MAX,
+  SIGN_IN_RATE_LIMIT_WINDOW_SECONDS,
   SIGN_UP_RATE_LIMIT_MAX,
   SIGN_UP_RATE_LIMIT_WINDOW_SECONDS,
   SMTP_FROM,
@@ -43,6 +46,7 @@ import { AuthController } from "./interface/auth.controller";
 import { ConfirmationRateLimiter } from "./interface/confirmation-rate-limiter";
 import { ForgotPasswordRateLimiter } from "./interface/forgot-password-rate-limiter";
 import { SessionGuard } from "./interface/session.guard";
+import { SignInRateLimiter } from "./interface/sign-in-rate-limiter";
 import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
 
 /**
@@ -90,6 +94,14 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
       provide: FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
       useFactory: () => loadEnv().forgotPasswordRateLimitWindowSeconds,
     },
+    {
+      provide: SIGN_IN_RATE_LIMIT_MAX,
+      useFactory: () => loadEnv().signInRateLimitMax,
+    },
+    {
+      provide: SIGN_IN_RATE_LIMIT_WINDOW_SECONDS,
+      useFactory: () => loadEnv().signInRateLimitWindowSeconds,
+    },
     { provide: WEB_ORIGIN, useFactory: () => loadEnv().webOrigin },
     {
       provide: SUPABASE_CLIENT,
@@ -130,6 +142,8 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     ConfirmAccountUseCase,
     ConfirmationRateLimiter,
     ForgotPasswordRateLimiter,
+    SignInUseCase,
+    SignInRateLimiter,
     ValidateSessionUseCase,
     SessionGuard,
   ],
@@ -139,6 +153,8 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     SignUpRateLimiter,
     ConfirmAccountUseCase,
     ConfirmationRateLimiter,
+    SignInUseCase,
+    SignInRateLimiter,
     ValidateSessionUseCase,
     SessionTokenPort,
     JoseSessionTokenAdapter,

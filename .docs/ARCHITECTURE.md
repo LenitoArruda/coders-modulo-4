@@ -209,8 +209,8 @@ Regras centrais:
 
 O detalhamento de campos e constraints está em `.specs/001-auth-schema.md`. A fatia 002 entrega a
 infraestrutura de sessão descrita na §4.5, a fatia 004 o sign-up e a fatia 005 a confirmação
-descritos na §4.6, e a fatia 007 a solicitação de recuperação de senha na §4.7; os endpoints de
-sign-in, sign-out e a troca de senha em si entram nas fatias 006 e 008.
+descritos na §4.6, a fatia 006 o sign-in na §4.7 e a fatia 007 a solicitação de recuperação de senha na §4.8; os endpoints de
+sign-out e a troca de senha em si entram nas fatias 007 e 008.
 
 ### 4.5 Sessão de autenticação
 
@@ -336,15 +336,49 @@ Regras:
   registrada sem PII, token ou JWT.
 - A página usa Server Component + Server Action + formulário client com auto-submit único
   (guardado por `ref`) e botão de fallback sem JavaScript. Links inválidos, expirados ou usados
-  mostram "This confirmation link is invalid or has expired." e caminho para `/auth/sign-up`;
+  mostram "This confirmation link is invalid or has expired." com o CTA principal "Sign in" (`/auth/sign-in`) e link secundário para `/auth/sign-up`;
   contas já confirmadas orientam o sign-in.
 - `getSessionUser` é envolvido em `cache()` para deduplicar a chamada a `/me` entre layout e
   página privada na mesma renderização. `/app` exibe `Welcome, <firstName>`.
 - A página de confirmação processa o token mesmo para quem já tem sessão, porque a nova sessão
-  substitui a anterior; sem token, pessoa autenticada é enviada para `/app` e visitante vê o erro
-  acionável.
+  substitui a anterior; sem token, pessoa autenticada é enviada para `/app` e visitante para
+  `/auth/sign-in`.
 
-### 4.7 Recuperação de senha
+### 4.7 Sign-in
+
+O sign-in é público. O web envia o formulário por uma Server Action para
+`POST /api/v1/auth/sign-in`; a API valida o corpo (`400`), aplica o rate limit por IP + e-mail
+normalizado (`SIGN_IN_RATE_LIMIT_MAX`, padrão 5, e `SIGN_IN_RATE_LIMIT_WINDOW_SECONDS`, padrão 60;
+a 6ª tentativa recebe `429` com `Retry-After`), localiza a conta e verifica a senha, usando um hash
+dummy real quando a conta não existe. Só depois de senha correta checa a confirmação do e-mail
+(`403 EMAIL_NOT_CONFIRMED`); credenciais inválidas respondem sempre `401 INVALID_CREDENTIALS`.
+
+```text
+/auth/sign-in (web) ── Server Action ──► POST /api/v1/auth/sign-in
+                                          ├─ parseSignInInput (400)
+                                          ├─ SignInRateLimiter (IP + e-mail → 429)
+                                          └─ SignInUseCase
+                                               ├─ users.findByEmail + PasswordHasherPort.verify
+                                               ├─ e-mail confirmado? (403, só com senha correta)
+                                               └─ CreateSessionUseCase (sign_in)
+                                                    ├─ sessions (nova + revoga as anteriores)
+                                                    ├─ JWT HS256
+                                                    └─ SMTP local (e-mail de nova sessão)
+◄── { accessToken, tokenType, expiresIn, user } ── Server Action grava cookie HttpOnly
+    e redireciona para o returnTo sanitizado (ou /app)
+```
+
+Regras:
+
+- O e-mail de nova sessão é enviado dentro do `CreateSessionUseCase` (best-effort), logo vale para
+  sign-in e confirmação.
+- Senha no login sem mínimo, com teto de 128 caracteres (acima disso `400`).
+- O `returnTo` atravessa a página (input oculto `returnTo`) e é sanitizado de novo na Server
+  Action; valores externos ou inseguros caem em `/app`.
+- Logs carregam só `outcome` e `userId`; nunca e-mail, senha ou token.
+- O rate limit é em memória por processo (store compartilhado é follow-up multi-instância).
+
+### 4.8 Recuperação de senha
 
 A recuperação é pública e sempre responde a mesma mensagem para qualquer e-mail sintaticamente
 válido, exista ou não a conta. O web envia o formulário por uma Server Action para
@@ -384,7 +418,7 @@ Regras:
   estado de sucesso `role="status"` que substitui o formulário. A UI é en-US e light-only.
 - O rate limit é local ao processo; um store compartilhado fica como follow-up.
 
-### 4.8 Rotas do web e guard
+### 4.9 Rotas do web e guard
 
 O web organiza a navegação em dois grupos do App Router, cada um com layout próprio:
 
@@ -396,13 +430,17 @@ O web organiza a navegação em dois grupos do App Router, cada um com layout pr
 Regras:
 
 - O guard de `/app/*` lê o cookie `session_token` no servidor e consulta `GET /api/v1/auth/me`.
-  Sem cookie, `401` ou erro da API, a pessoa é redirecionada para `/auth/sign-up` (a fatia 006
-  troca o destino para `/auth/sign-in`). O destino vive em uma constante única em
-  `apps/web/lib/auth/route-rules.ts`.
+  Sem cookie, `401` ou erro da API, a pessoa é redirecionada para
+  `/auth/sign-in?returnTo=<caminho>`. O destino vive em uma constante única
+  (`SIGNED_OUT_REDIRECT_PATH`) em `apps/web/lib/auth/route-rules.ts`. Como layouts não conhecem o
+  pathname, `apps/web/proxy.ts` copia `pathname + search` de `/app/*` para o header de requisição
+  `x-return-to`; o guard o sanitiza com `sanitizeReturnTo` (somente `/app` e `/app/...`, sem
+  esquema, `//`, barra invertida, `..` ou equivalentes codificados) antes de redirecionar.
 - Pessoa autenticada em `/auth/sign-up` ou `/auth/sign-in` é enviada para `/app`.
   `/auth/confirm` processa o token mesmo com sessão ativa e, sem token, envia pessoa autenticada
-  para `/app`; `/auth/forgot-password` e `/auth/reset-password` permanecem acessíveis.
-- A raiz `/` não renderiza produto: redireciona para `/app` com sessão e para `/auth/sign-up`
+  para `/app` e visitante para `/auth/sign-in`; `/auth/forgot-password` e
+  `/auth/reset-password` permanecem acessíveis.
+- A raiz `/` não renderiza produto: redireciona para `/app` com sessão e para `/auth/sign-in`
   sem sessão.
 - 404 de rotas inexistentes é resolvido dentro do layout do grupo (catch-all + `not-found.tsx`),
   para manter o shell público ou privado.
@@ -445,9 +483,10 @@ Fluxo resumido:
 > `/auth/sign-up`, hash scrypt, token de confirmação e e-mail), a confirmação de conta
 > (`POST /api/v1/auth/confirm`, `/auth/confirm`, sessão única, cookie e `/app` personalizado), a
 > solicitação de recuperação de senha (`POST /api/v1/auth/forgot-password`,
-> `/auth/forgot-password`, token de reset e e-mail) e o esqueleto de navegação (`/auth/*` público,
-> `/app/*` privado com shell e guard, raiz redirecionando por sessão). O schema de auth veio na
-> fatia 001; sign-in, sign-out e a troca de senha em si entram nas fatias 006 a 008.
+> `/auth/forgot-password`, token de reset e e-mail) e o sign-in real
+> (`POST /api/v1/auth/sign-in`, `/auth/sign-in`, `returnTo` seguro) e o esqueleto de navegação
+> (`/auth/*` público, `/app/*` privado com shell e guard, raiz redirecionando por sessão). O
+> schema de auth veio na fatia 001; sign-out e a troca de senha em si entram nas fatias 007 e 008.
 
 ---
 

@@ -125,6 +125,34 @@ describe("loadEnv", () => {
     ).toThrow(/CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS/);
   });
 
+  it("deve aplicar a configuração de sign-in quando informada", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        SIGN_IN_RATE_LIMIT_MAX: "20",
+        SIGN_IN_RATE_LIMIT_WINDOW_SECONDS: "30",
+      }),
+    ).toMatchObject({
+      signInRateLimitMax: 20,
+      signInRateLimitWindowSeconds: 30,
+    });
+  });
+
+  it("deve usar os padrões e falhar quando a configuração de sign-in é inválida", () => {
+    expect(loadEnv(validEnv)).toMatchObject({
+      signInRateLimitMax: 5,
+      signInRateLimitWindowSeconds: 60,
+    });
+
+    expect(() => loadEnv({ ...validEnv, SIGN_IN_RATE_LIMIT_MAX: "0" })).toThrow(
+      /SIGN_IN_RATE_LIMIT_MAX/,
+    );
+
+    expect(() =>
+      loadEnv({ ...validEnv, SIGN_IN_RATE_LIMIT_WINDOW_SECONDS: "abc" }),
+    ).toThrow(/SIGN_IN_RATE_LIMIT_WINDOW_SECONDS/);
+  });
+
   it("deve aplicar a configuração de recuperação de senha quando informada", () => {
     expect(
       loadEnv({

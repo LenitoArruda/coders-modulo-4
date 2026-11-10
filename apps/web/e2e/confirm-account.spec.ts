@@ -98,12 +98,11 @@ test.describe("invalid, used and rate-limited links", () => {
       CONFIRM_INVALID_MESSAGE,
     );
     await expect(
-      page.getByRole("link", { name: "Create an account" }),
+      page.getByRole("link", { name: "create an account" }),
     ).toHaveAttribute("href", "/auth/sign-up");
-    await expect(page.getByRole("link", { name: "sign in" })).toHaveAttribute(
-      "href",
-      "/auth/sign-in",
-    );
+    await expect(
+      page.getByRole("link", { name: "Sign in", exact: true }),
+    ).toHaveAttribute("href", "/auth/sign-in");
     await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(
       0,
     );
@@ -132,18 +131,13 @@ test.describe("invalid, used and rate-limited links", () => {
     await expectNoSessionCookie(page);
   });
 
-  test("link sem token mostra erro com caminho para recomeçar", async ({
+  test("link sem token e sem sessão é enviado para o sign-in", async ({
     page,
   }) => {
     await page.goto(CONFIRM_PATH);
 
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      "Confirm your email",
-    );
-    await expect(page.getByText(CONFIRM_INVALID_MESSAGE)).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Create an account" }),
-    ).toHaveAttribute("href", "/auth/sign-up");
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in");
     await expectNoSessionCookie(page);
   });
 
@@ -176,7 +170,7 @@ test.describe("confirmation accessibility and responsiveness", () => {
   }) => {
     await page.goto(confirmUrl(E2E_CONFIRM_INVALID_TOKEN));
 
-    const link = page.getByRole("link", { name: "Create an account" });
+    const link = page.getByRole("link", { name: "Sign in", exact: true });
     await link.focus();
 
     const outlineWidth = await link.evaluate(
