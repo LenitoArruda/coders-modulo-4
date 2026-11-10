@@ -57,6 +57,14 @@ export class InMemoryUsersRepository extends UsersRepositoryPort {
     return true;
   }
 
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    const account = this.users.find((candidate) => candidate.id === id);
+
+    if (account) {
+      account.passwordHash = passwordHash;
+    }
+  }
+
   async create(record: CreateUserRecord): Promise<UserAccount> {
     if ((await this.findByEmail(record.email)) !== null) {
       throw new DuplicateEmailError();

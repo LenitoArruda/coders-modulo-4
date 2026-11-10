@@ -19,6 +19,7 @@ import {
   ConfirmAccountUseCase,
 } from "../application/confirm-account.use-case";
 import { RequestPasswordResetUseCase } from "../application/request-password-reset.use-case";
+import { ResetPasswordUseCase } from "../application/reset-password.use-case";
 import {
   type SignInResult,
   SignInUseCase,
@@ -30,6 +31,8 @@ import {
   InvalidConfirmationTokenError,
 } from "../domain/confirmation.errors";
 import { validateForgotPasswordInput } from "../domain/forgot-password-input";
+import { InvalidResetTokenError } from "../domain/reset-password.errors";
+import { validateResetPasswordInput } from "../domain/reset-password-input";
 import {
   EmailNotConfirmedError,
   InvalidCredentialsError,
@@ -44,6 +47,7 @@ import {
 import { ConfirmationRateLimiter } from "./confirmation-rate-limiter";
 import { CurrentUser } from "./current-user.decorator";
 import { ForgotPasswordRateLimiter } from "./forgot-password-rate-limiter";
+import { ResetPasswordRateLimiter } from "./reset-password-rate-limiter";
 import { SessionGuard } from "./session.guard";
 import { SignInRateLimiter } from "./sign-in-rate-limiter";
 import { SignUpRateLimiter } from "./sign-up-rate-limiter";
@@ -105,6 +109,19 @@ const FORGOT_PASSWORD_VALIDATION_MESSAGE =
 const FORGOT_PASSWORD_RATE_LIMIT_MESSAGE =
   "Too many attempts. Wait a moment and try again.";
 
+export type ResetPasswordResponse = { message: string };
+
+export const RESET_PASSWORD_SUCCESS_MESSAGE =
+  "Your password has been updated. Sign in with your new password.";
+
+export const RESET_PASSWORD_INVALID_TOKEN_MESSAGE =
+  "This password reset link is invalid or has expired.";
+
+const RESET_PASSWORD_VALIDATION_MESSAGE =
+  "Check the highlighted fields and try again.";
+const RESET_PASSWORD_RATE_LIMIT_MESSAGE =
+  "Too many attempts. Wait a moment and try again.";
+
 function clientIp(request: Request): string {
   return request.ip ?? request.socket.remoteAddress ?? "unknown";
 }
@@ -139,6 +156,10 @@ export class AuthController {
     private readonly requestPasswordReset: RequestPasswordResetUseCase,
     @Inject(ForgotPasswordRateLimiter)
     private readonly forgotPasswordRateLimiter: ForgotPasswordRateLimiter,
+    @Inject(ResetPasswordUseCase)
+    private readonly resetPasswordUseCase: ResetPasswordUseCase,
+    @Inject(ResetPasswordRateLimiter)
+    private readonly resetPasswordLimiter: ResetPasswordRateLimiter,
     @Inject(SignInUseCase) private readonly signInUseCase: SignInUseCase,
     @Inject(SignInRateLimiter)
     private readonly signInLimiter: SignInRateLimiter,
@@ -325,6 +346,55 @@ export class AuthController {
     await this.requestPasswordReset.execute(validation.value);
 
     return { message: FORGOT_PASSWORD_SUCCESS_MESSAGE };
+  }
+
+  @Post("reset-password")
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body() body: unknown,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<ResetPasswordResponse> {
+    const decision = this.resetPasswordLimiter.consume(clientIp(request));
+
+    if (!decision.allowed) {
+      response.setHeader("Retry-After", String(decision.retryAfterSeconds));
+
+      throw new HttpException(
+        {
+          code: "TOO_MANY_REQUESTS",
+          message: RESET_PASSWORD_RATE_LIMIT_MESSAGE,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    // Password and confirmation are validated before the token is looked up,
+    // so a weak password never burns the token and wins over an invalid one.
+    const validation = validateResetPasswordInput(body);
+
+    if (!validation.ok) {
+      throw new BadRequestException({
+        code: "VALIDATION_ERROR",
+        message: RESET_PASSWORD_VALIDATION_MESSAGE,
+        fieldErrors: validation.fieldErrors,
+      });
+    }
+
+    try {
+      await this.resetPasswordUseCase.execute(validation.value);
+    } catch (error) {
+      if (error instanceof InvalidResetTokenError) {
+        throw new BadRequestException({
+          code: "INVALID_RESET_TOKEN",
+          message: RESET_PASSWORD_INVALID_TOKEN_MESSAGE,
+        });
+      }
+
+      throw error;
+    }
+
+    return { message: RESET_PASSWORD_SUCCESS_MESSAGE };
   }
 
   @Get("me")

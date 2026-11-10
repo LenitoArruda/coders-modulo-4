@@ -1,3 +1,10 @@
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  checkPassword,
+  checkPasswordConfirmation,
+} from "./password-policy";
+
 /**
  * Pure sign-up validation and normalization. It lives in the domain layer so
  * the rules are testable without HTTP, framework or database. Messages are
@@ -6,8 +13,8 @@
 export const FIRST_NAME_MAX_LENGTH = 100;
 export const LAST_NAME_MAX_LENGTH = 100;
 export const EMAIL_MAX_LENGTH = 254;
-export const PASSWORD_MIN_LENGTH = 8;
-export const PASSWORD_MAX_LENGTH = 128;
+
+export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH };
 
 export type SignUpInput = {
   firstName: string;
@@ -119,27 +126,15 @@ function validatePassword(
   record: Record<string, unknown>,
   fieldErrors: SignUpFieldErrors,
 ): string | null {
-  const value = readString(record, "password");
+  const check = checkPassword(readString(record, "password"));
 
-  if (value === null || value.length === 0) {
-    fieldErrors.password = "Enter a password.";
-
-    return null;
-  }
-
-  if (value.length < PASSWORD_MIN_LENGTH) {
-    fieldErrors.password = `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
+  if (!check.ok) {
+    fieldErrors.password = check.message;
 
     return null;
   }
 
-  if (value.length > PASSWORD_MAX_LENGTH) {
-    fieldErrors.password = `Password must be ${PASSWORD_MAX_LENGTH} characters or fewer.`;
-
-    return null;
-  }
-
-  return value;
+  return check.value;
 }
 
 function validatePasswordConfirmation(
@@ -147,21 +142,18 @@ function validatePasswordConfirmation(
   password: string | null,
   fieldErrors: SignUpFieldErrors,
 ): string | null {
-  const value = readString(record, "passwordConfirmation");
+  const check = checkPasswordConfirmation(
+    readString(record, "passwordConfirmation"),
+    password,
+  );
 
-  if (value === null || value.length === 0) {
-    fieldErrors.passwordConfirmation = "Confirm your password.";
-
-    return null;
-  }
-
-  if (password === null || value !== password) {
-    fieldErrors.passwordConfirmation = "Passwords do not match.";
+  if (!check.ok) {
+    fieldErrors.passwordConfirmation = check.message;
 
     return null;
   }
 
-  return value;
+  return check.value;
 }
 
 /**
