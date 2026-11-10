@@ -79,4 +79,94 @@ describe("SupabaseAuthTokensRepository", () => {
       repository.invalidateUnused(userId, "email_confirmation"),
     ).rejects.toThrow("Could not invalidate auth tokens");
   });
+
+  it("deve buscar o token pelo hash e mapear o estado de uso", async () => {
+    const mock = createSupabaseClientMock({
+      data: {
+        id: "token-id",
+        user_id: userId,
+        purpose: "email_confirmation",
+        token_hash: "hashed-token",
+        expires_at: expiresAt.toISOString(),
+        used_at: null,
+        created_at: "2026-11-09T12:00:00.000Z",
+      },
+      error: null,
+    });
+    const repository = new SupabaseAuthTokensRepository(mock.client);
+
+    await expect(repository.findByHash("hashed-token")).resolves.toEqual({
+      id: "token-id",
+      userId,
+      purpose: "email_confirmation",
+      tokenHash: "hashed-token",
+      expiresAt,
+      usedAt: null,
+      createdAt: new Date("2026-11-09T12:00:00.000Z"),
+    });
+    expect(mock.calls.map((call) => call.method)).toEqual([
+      "from",
+      "select",
+      "eq",
+    ]);
+    expect(mock.calls[2]?.args).toEqual(["token_hash", "hashed-token"]);
+  });
+
+  it("deve retornar nulo quando o hash não existe", async () => {
+    const mock = createSupabaseClientMock({ data: null, error: null });
+    const repository = new SupabaseAuthTokensRepository(mock.client);
+
+    await expect(repository.findByHash("missing")).resolves.toBeNull();
+  });
+
+  it("deve falhar quando a busca por hash retorna erro", async () => {
+    const mock = createSupabaseClientMock({
+      error: { code: "08006" },
+    });
+    const repository = new SupabaseAuthTokensRepository(mock.client);
+
+    await expect(repository.findByHash("hashed-token")).rejects.toThrow(
+      "Could not load auth token",
+    );
+  });
+
+  it("deve consumir somente token ainda não usado", async () => {
+    const mock = createSupabaseClientMock({
+      data: { id: "token-id" },
+      error: null,
+    });
+    const repository = new SupabaseAuthTokensRepository(mock.client);
+
+    await expect(repository.consume("token-id")).resolves.toBe(true);
+    expect(mock.calls.map((call) => call.method)).toEqual([
+      "from",
+      "update",
+      "eq",
+      "is",
+      "select",
+    ]);
+    expect(mock.calls[1]?.args[0]).toMatchObject({
+      used_at: expect.any(String),
+    });
+    expect(mock.calls[2]?.args).toEqual(["id", "token-id"]);
+    expect(mock.calls[3]?.args).toEqual(["used_at", null]);
+  });
+
+  it("deve retornar false quando o token já foi consumido", async () => {
+    const mock = createSupabaseClientMock({ data: null, error: null });
+    const repository = new SupabaseAuthTokensRepository(mock.client);
+
+    await expect(repository.consume("token-id")).resolves.toBe(false);
+  });
+
+  it("deve falhar quando o consumo retorna erro", async () => {
+    const mock = createSupabaseClientMock({
+      error: { code: "42501" },
+    });
+    const repository = new SupabaseAuthTokensRepository(mock.client);
+
+    await expect(repository.consume("token-id")).rejects.toThrow(
+      "Could not consume auth token",
+    );
+  });
 });

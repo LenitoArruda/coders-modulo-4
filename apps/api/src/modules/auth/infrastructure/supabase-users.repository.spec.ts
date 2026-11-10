@@ -165,4 +165,86 @@ describe("SupabaseUsersRepository", () => {
       }),
     ).rejects.toThrow("Could not create user");
   });
+
+  it("deve buscar a conta por id com o estado de confirmação", async () => {
+    const mock = createSupabaseClientMock({
+      data: accountRow,
+      error: null,
+    });
+    const repository = new SupabaseUsersRepository(mock.client);
+
+    await expect(repository.findAccountById(userId)).resolves.toEqual({
+      id: userId,
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@example.com",
+      emailConfirmedAt: new Date("2026-11-09T12:00:00.000Z"),
+      passwordHash: "stored-hash",
+    });
+    expect(mock.calls.map((call) => call.method)).toEqual([
+      "from",
+      "select",
+      "eq",
+    ]);
+    expect(mock.calls[1]?.args[0]).toContain("email_confirmed_at");
+    expect(mock.calls[2]?.args).toEqual(["id", userId]);
+  });
+
+  it("deve retornar nulo quando a conta não existe por id", async () => {
+    const mock = createSupabaseClientMock({ data: null, error: null });
+    const repository = new SupabaseUsersRepository(mock.client);
+
+    await expect(repository.findAccountById(userId)).resolves.toBeNull();
+  });
+
+  it("deve falhar quando a busca da conta por id retorna erro", async () => {
+    const mock = createSupabaseClientMock({
+      error: { code: "08006" },
+    });
+    const repository = new SupabaseUsersRepository(mock.client);
+
+    await expect(repository.findAccountById(userId)).rejects.toThrow(
+      "Could not load user account",
+    );
+  });
+
+  it("deve confirmar o e-mail só quando ainda não há timestamp", async () => {
+    const mock = createSupabaseClientMock({
+      data: { id: userId },
+      error: null,
+    });
+    const repository = new SupabaseUsersRepository(mock.client);
+
+    await expect(repository.confirmEmail(userId)).resolves.toBe(true);
+    expect(mock.calls.map((call) => call.method)).toEqual([
+      "from",
+      "update",
+      "eq",
+      "is",
+      "select",
+    ]);
+    expect(mock.calls[1]?.args[0]).toMatchObject({
+      email_confirmed_at: expect.any(String),
+    });
+    expect(mock.calls[2]?.args).toEqual(["id", userId]);
+    expect(mock.calls[3]?.args).toEqual(["email_confirmed_at", null]);
+  });
+
+  it("deve retornar false quando a conta já estava confirmada", async () => {
+    const mock = createSupabaseClientMock({ data: null, error: null });
+    const repository = new SupabaseUsersRepository(mock.client);
+
+    await expect(repository.confirmEmail(userId)).resolves.toBe(false);
+  });
+
+  it("deve falhar quando a confirmação do e-mail retorna erro", async () => {
+    const mock = createSupabaseClientMock({
+      error: { code: "42501" },
+    });
+    const repository = new SupabaseUsersRepository(mock.client);
+
+    await expect(repository.confirmEmail(userId)).rejects.toThrow(
+      "Could not confirm user email",
+    );
+  });
 });

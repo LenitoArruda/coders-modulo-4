@@ -86,6 +86,36 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
     return data === null ? null : toUserAccount(data);
   }
 
+  async findAccountById(id: string): Promise<UserAccount | null> {
+    const { data, error } = await this.client
+      .from("users")
+      .select(USER_ACCOUNT_COLUMNS)
+      .eq("id", id)
+      .maybeSingle<UserAccountRow>();
+
+    if (error !== null) {
+      throw databaseFailure("load user account", error);
+    }
+
+    return data === null ? null : toUserAccount(data);
+  }
+
+  async confirmEmail(id: string): Promise<boolean> {
+    const { data, error } = await this.client
+      .from("users")
+      .update({ email_confirmed_at: new Date().toISOString() })
+      .eq("id", id)
+      .is("email_confirmed_at", null)
+      .select("id")
+      .maybeSingle<{ id: string }>();
+
+    if (error !== null) {
+      throw databaseFailure("confirm user email", error);
+    }
+
+    return data !== null;
+  }
+
   async create(record: CreateUserRecord): Promise<UserAccount> {
     const { data, error } = await this.client
       .from("users")

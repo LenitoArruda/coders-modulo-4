@@ -4,7 +4,12 @@ import {
   type ServerResponse,
 } from "node:http";
 
-import { E2E_VALID_SESSION_TOKEN } from "./fake-session";
+import {
+  E2E_CONFIRM_RATE_LIMITED_TOKEN,
+  E2E_CONFIRM_TOKEN,
+  E2E_CONFIRM_USED_TOKEN,
+  E2E_VALID_SESSION_TOKEN,
+} from "./fake-session";
 
 /**
  * Minimal API used only by Playwright. Session validation happens on the Next
@@ -22,6 +27,13 @@ const user = {
 };
 
 const SIGN_UP_SUCCESS_MESSAGE = "Check your email to confirm your account.";
+
+const CONFIRM_INVALID_MESSAGE =
+  "This confirmation link is invalid or has expired.";
+const CONFIRM_ALREADY_CONFIRMED_MESSAGE =
+  "This account is already confirmed. Sign in instead.";
+const CONFIRM_RATE_LIMITED_MESSAGE =
+  "Too many attempts. Wait a moment and try again.";
 
 type Body = Record<string, unknown>;
 
@@ -156,6 +168,46 @@ async function handleSignUp(
   });
 }
 
+async function handleConfirm(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const body = asRecord(await readJsonBody(request));
+  const token = readString(body, "token").trim();
+
+  if (token === E2E_CONFIRM_TOKEN) {
+    sendJson(response, 200, {
+      accessToken: E2E_VALID_SESSION_TOKEN,
+      tokenType: "Bearer",
+      expiresIn: 604_800,
+      user,
+    });
+    return;
+  }
+
+  if (token === E2E_CONFIRM_USED_TOKEN) {
+    sendJson(response, 409, {
+      code: "ACCOUNT_ALREADY_CONFIRMED",
+      message: CONFIRM_ALREADY_CONFIRMED_MESSAGE,
+    });
+    return;
+  }
+
+  if (token === E2E_CONFIRM_RATE_LIMITED_TOKEN) {
+    response.setHeader("Retry-After", "60");
+    sendJson(response, 429, {
+      code: "TOO_MANY_REQUESTS",
+      message: CONFIRM_RATE_LIMITED_MESSAGE,
+    });
+    return;
+  }
+
+  sendJson(response, 400, {
+    code: "INVALID_CONFIRMATION_TOKEN",
+    message: CONFIRM_INVALID_MESSAGE,
+  });
+}
+
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${host}:${port}`)
     .pathname;
@@ -168,6 +220,11 @@ const server = createServer(async (request, response) => {
 
   if (pathname === "/api/v1/auth/sign-up" && request.method === "POST") {
     await handleSignUp(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/auth/confirm" && request.method === "POST") {
+    await handleConfirm(request, response);
     return;
   }
 

@@ -23,6 +23,8 @@ describe("loadEnv", () => {
       confirmationTokenTtlSeconds: 86_400,
       signUpRateLimitMax: 5,
       signUpRateLimitWindowSeconds: 60,
+      confirmationRateLimitMax: 10,
+      confirmationRateLimitWindowSeconds: 60,
       smtpHost: "127.0.0.1",
       smtpPort: 54_325,
       smtpFrom: "no-reply@localhost",
@@ -91,6 +93,33 @@ describe("loadEnv", () => {
     expect(() =>
       loadEnv({ ...validEnv, SIGN_UP_RATE_LIMIT_WINDOW_SECONDS: "0" }),
     ).toThrow(/SIGN_UP_RATE_LIMIT_WINDOW_SECONDS/);
+  });
+
+  it("deve aplicar a configuração de confirmação quando informada", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        CONFIRMATION_RATE_LIMIT_MAX: "20",
+        CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS: "30",
+      }),
+    ).toMatchObject({
+      confirmationRateLimitMax: 20,
+      confirmationRateLimitWindowSeconds: 30,
+    });
+  });
+
+  it("deve falhar quando a configuração de confirmação é inválida", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, CONFIRMATION_RATE_LIMIT_MAX: "abc" }),
+    ).toThrow(/CONFIRMATION_RATE_LIMIT_MAX/);
+
+    expect(() =>
+      loadEnv({ ...validEnv, CONFIRMATION_RATE_LIMIT_MAX: "0" }),
+    ).toThrow(/CONFIRMATION_RATE_LIMIT_MAX/);
+
+    expect(() =>
+      loadEnv({ ...validEnv, CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS: "0" }),
+    ).toThrow(/CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS/);
   });
 
   it("deve falhar quando a porta do SMTP é inválida", () => {

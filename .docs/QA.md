@@ -1,6 +1,6 @@
 # QA.md — Qualidade e verificação
 
-> **Status:** ativo · **Atualizado em:** 2026-11-09
+> **Status:** ativo · **Atualizado em:** 2026-11-10
 > **Use antes de declarar qualquer tarefa concluída.**
 
 Este documento é a fonte de verdade sobre **como verificar** mudanças. Se um comando citado
@@ -198,8 +198,9 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 
 - [ ] `/` sem sessão → `/auth/sign-up`; com sessão válida → `/app`.
 - [ ] `/app` e `/app/*` sem cookie, com token inválido ou API indisponível → `/auth/sign-up`.
-- [ ] `/app` e `/app/*` com sessão válida carregam o shell e o placeholder.
-- [ ] `/auth/sign-up`, `/auth/sign-in` e `/auth/confirm` com sessão válida → `/app`.
+- [ ] `/app` e `/app/*` com sessão válida carregam o shell e a página inicial com o primeiro nome.
+- [ ] `/auth/sign-up` e `/auth/sign-in` com sessão válida → `/app`; `/auth/confirm` processa um
+      token presente mesmo com sessão ativa e, sem token, envia pessoa autenticada para `/app`.
 - [ ] `/auth/forgot-password` e `/auth/reset-password` permanecem acessíveis com sessão.
 - [ ] `/auth/*` inexistente → 404 no layout público; `/app/*` inexistente com sessão → 404 no shell.
 - [ ] `lang="en-US"`, textos en-US, light-only, foco visível e sem rolagem horizontal em
@@ -224,6 +225,22 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Falha de SMTP → `503` acionável e a conta não confirmada pode ser reutilizada no retry.
 - [ ] Rate limit por IP: acima de `SIGN_UP_RATE_LIMIT_MAX` em `SIGN_UP_RATE_LIMIT_WINDOW_SECONDS`
       → `429` com mensagem genérica, sem detalhes internos.
+- [ ] `/auth/confirm?token=...` envia o token no corpo, auto-submete uma vez, grava o cookie
+      `HttpOnly` e redireciona para `/app`; após o uso, a URL não contém mais o token.
+- [ ] O terminal do `next dev` não imprime requisições para `/auth/confirm` (nem o token), via
+      `logging.incomingRequests.ignore`; requests de outras rotas continuam logados.
+- [ ] Token válido confirma `email_confirmed_at`, marca `used_at`, cria sessão com
+      `origin = sign_up_confirmation`, revoga as anteriores e dispara "New session on your account".
+- [ ] Token ausente, desconhecido, expirado ou já usado → `400`; conta já confirmada → `409` sem
+      nova sessão; em ambos não há cookie novo e a página oferece sign-up/sign-in.
+- [ ] Acima de `CONFIRMATION_RATE_LIMIT_MAX` em `CONFIRMATION_RATE_LIMIT_WINDOW_SECONDS` → `429`
+      com `Retry-After`, sem detalhes internos.
+- [ ] Confirmações simultâneas deixam exatamente uma sessão ativa e o JWT anterior passa a `401`.
+- [ ] Com JavaScript desabilitado, o botão de fallback confirma a conta e o cookie abre `/app`.
+- [ ] E2E cobre sucesso/cookie/URL sem token, inválido, `409`, `429`, link sem token, sessão ativa,
+      foco visível e 360/768/1280 px sem rolagem horizontal.
+- [ ] Mailpit local: e-mails "Confirm your account" e "New session on your account" inspecionados
+      no QA manual, com data/hora e alerta de senha no segundo.
 - [ ] `CONFIRMATION_TOKEN_TTL_SECONDS` controla a expiração (padrão 86400) e os limites de rate
       limit vêm do env; logs incluem operação/`userId`, sem e-mail, senha ou token.
 - [ ] `/app` continua redirecionando para `/auth/sign-up` sem sessão após um sign-up bem-sucedido.
@@ -311,19 +328,20 @@ Requisitos:
 
 ## 10. Lacunas conhecidas
 
-| Lacuna                                          | Impacto                                                                                                                              |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Nenhum CI                                       | Verificação depende do ambiente local                                                                                                |
-| Commitlint apenas local                         | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
-| Produto não implementado                        | Apenas a rota de hello world e a fundação existem                                                                                    |
-| `apps/docs` ainda é o starter                   | Conteúdo público de documentação não definido                                                                                        |
-| Componentes legados em `packages/ui`            | `button`, `card` e `code` são mantidos por uso em `apps/docs`                                                                        |
-| Sem Vitest/Testing Library no pacote `ui`       | Componentes compartilhados não têm testes unitários                                                                                  |
-| Supabase Analytics desabilitado                 | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                                  |
-| PostgreSQL local em `15`                        | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                                  |
-| OXLint/OXFmt não adotados                       | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
-| Skills locais em `.agents/` não versionadas     | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
-| Cookie de sessão sem fluxo público no navegador | A fatia 002 só entrega a ponte e as opções; a inspeção real no navegador entra nas fatias 005/006                                    |
-| Sessão única sem atomicidade no banco           | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                             |
+| Lacuna                                      | Impacto                                                                                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Nenhum CI                                   | Verificação depende do ambiente local                                                                                                |
+| Commitlint apenas local                     | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
+| Produto não implementado                    | Apenas a rota de hello world e a fundação existem                                                                                    |
+| `apps/docs` ainda é o starter               | Conteúdo público de documentação não definido                                                                                        |
+| Componentes legados em `packages/ui`        | `button`, `card` e `code` são mantidos por uso em `apps/docs`                                                                        |
+| Sem Vitest/Testing Library no pacote `ui`   | Componentes compartilhados não têm testes unitários                                                                                  |
+| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                                  |
+| PostgreSQL local em `15`                    | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                                  |
+| OXLint/OXFmt não adotados                   | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
+| Skills locais em `.agents/` não versionadas | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
+| Rate limit em memória                       | Limites de sign-up e confirmação são locais ao processo; store compartilhado é follow-up                                             |
+| Sem sign-out/refresh                        | Sessão só termina por expiração ou por nova sessão; fatias 006+ tratam sign-in/sign-out                                              |
+| Sessão única sem atomicidade no banco       | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                             |
 
 Ao resolver uma lacuna, atualize esta tabela e o documento relacionado.

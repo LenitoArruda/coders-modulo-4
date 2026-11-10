@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão + rotas + sign-up implementados — produto não implementado · **Atualizado em:** 2026-11-09
+> **Status:** fundação + sessão + rotas + sign-up + confirmação implementados — produto não implementado · **Atualizado em:** 2026-11-10
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
@@ -139,7 +139,7 @@ apps/api/src/
 ├── modules/
 │   ├── auth/
 │   │   ├── domain/              # Session, SessionOrigin, AuthUser, SignUpInput, erros de auth
-│   │   ├── application/         # Casos de uso (sessão, sign-up), templates de e-mail, portas
+│   │   ├── application/         # Casos de uso (sessão, sign-up, confirmação), templates, portas
 │   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios Supabase, SMTP
 │   │   └── interface/           # guard, controller, rate limiter, testes de integração
 │   ├── hello/
@@ -208,8 +208,9 @@ Regras centrais:
 - `users`, `auth_tokens` e `sessions` usam UUID e `ON DELETE CASCADE` a partir do usuário.
 
 O detalhamento de campos e constraints está em `.specs/001-auth-schema.md`. A fatia 002 entrega a
-infraestrutura de sessão descrita na §4.5 e a fatia 004 o sign-up descrito na §4.6; os endpoints
-públicos de confirmação, sign-in, sign-out e recuperação de senha entram nas fatias 005 a 008.
+infraestrutura de sessão descrita na §4.5, a fatia 004 o sign-up e a fatia 005 a confirmação
+descritos na §4.6; os endpoints públicos de sign-in, sign-out e recuperação de senha entram nas
+fatias 006 a 008.
 
 ### 4.5 Sessão de autenticação
 
@@ -253,7 +254,10 @@ Regras:
 
 O sign-up é público e não cria sessão. O web envia o formulário por uma Server Action para
 `POST /api/v1/auth/sign-up`; a API valida, persiste a conta como não confirmada, gera um token
-opaco e dispara o e-mail com o link `/auth/confirm?token=...` (a confirmação em si é a fatia 005).
+opaco e dispara o e-mail com o link `/auth/confirm?token=...`.
+
+A confirmação também é pública, consome esse token de uso único e cria a primeira sessão da
+pessoa. Juntas, as duas rotas fecham a jornada iniciada em `/auth/sign-up`.
 
 ```text
 /auth/sign-up (web) ── Server Action ──► POST /api/v1/auth/sign-up
@@ -289,6 +293,57 @@ Regras:
 - O formulário usa `useActionState`, labels visíveis, `aria-describedby` por erro, resumo
   `role="alert"` e estado de sucesso que substitui o formulário. A UI é en-US e light-only.
 
+#### Confirmação de e-mail
+
+```text
+/auth/confirm?token=... (web) ── Server Action ──► POST /api/v1/auth/confirm
+                                                       │ rate limit por IP
+                                                       └─► ConfirmAccountUseCase
+                                                             ├─ auth_tokens.findByHash (SHA-256)
+                                                             ├─ consume (used_at is null, atômico)
+                                                             ├─ users.email_confirmed_at (conditional)
+                                                             └─ CreateSessionUseCase (sign_up_confirmation)
+                                                                  ├─ sessions (revoga as anteriores)
+                                                                  ├─ JWT HS256
+                                                                  └─ SMTP local (e-mail de nova sessão)
+```
+
+| Peça                                  | Responsabilidade                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------- |
+| `ConfirmAccountUseCase`               | Valida o token, confirma a conta, consome o token e cria a sessão                 |
+| `AuthTokensRepositoryPort.findByHash` | Busca por `token_hash` sem revelar o token em claro                               |
+| `AuthTokensRepositoryPort.consume`    | Marca `used_at` só se ainda estiver nulo e sinaliza quando perde a corrida        |
+| `UsersRepositoryPort.confirmEmail`    | Preenche `email_confirmed_at` só se ainda estiver nulo                            |
+| `CreateSessionUseCase`                | Reutilizado com `origin = sign_up_confirmation`; revoga sessões ativas anteriores |
+| `ConfirmationRateLimiter`             | Janela deslizante por IP (`CONFIRMATION_RATE_LIMIT_*`), antes de validar o token  |
+
+Regras:
+
+- O web envia `{ token }` no corpo da requisição, nunca na URL da API. O token da URL do navegador
+  é removido com `router.replace("/app")` depois do sucesso.
+- O log de requests do `next dev` ignora `/auth/confirm` (`logging.incomingRequests.ignore` no
+  `next.config.js`), para que o token da URL não apareça no terminal durante o desenvolvimento.
+  Em produção o Next não registra URLs de requests de entrada.
+- Respostas: `200` com `{ accessToken, tokenType: "Bearer", expiresIn, user }`, `400`
+  `INVALID_CONFIRMATION_TOKEN` para token ausente, desconhecido, expirado ou já usado, `409`
+  `ACCOUNT_ALREADY_CONFIRMED`, `429` com `Retry-After` e `500` genérico.
+- Conta já confirmada vence o estado do token: uma segunda tentativa responde `409` e não cria
+  sessão nem reenvia confirmação.
+- O consumo condicional do token e a atualização condicional de `email_confirmed_at` garantem uso
+  único mesmo com requisições concorrentes; a sessão nova revoga as anteriores e o JWT antigo
+  passa a receber `401`.
+- Falha no e-mail de nova sessão não bloqueia o acesso: a sessão continua válida e a falha é
+  registrada sem PII, token ou JWT.
+- A página usa Server Component + Server Action + formulário client com auto-submit único
+  (guardado por `ref`) e botão de fallback sem JavaScript. Links inválidos, expirados ou usados
+  mostram "This confirmation link is invalid or has expired." e caminho para `/auth/sign-up`;
+  contas já confirmadas orientam o sign-in.
+- `getSessionUser` é envolvido em `cache()` para deduplicar a chamada a `/me` entre layout e
+  página privada na mesma renderização. `/app` exibe `Welcome, <firstName>`.
+- A página de confirmação processa o token mesmo para quem já tem sessão, porque a nova sessão
+  substitui a anterior; sem token, pessoa autenticada é enviada para `/app` e visitante vê o erro
+  acionável.
+
 ### 4.7 Rotas do web e guard
 
 O web organiza a navegação em dois grupos do App Router, cada um com layout próprio:
@@ -304,8 +359,9 @@ Regras:
   Sem cookie, `401` ou erro da API, a pessoa é redirecionada para `/auth/sign-up` (a fatia 006
   troca o destino para `/auth/sign-in`). O destino vive em uma constante única em
   `apps/web/lib/auth/route-rules.ts`.
-- Pessoa autenticada em `/auth/sign-up`, `/auth/sign-in` ou `/auth/confirm` é enviada para
-  `/app`; `/auth/forgot-password` e `/auth/reset-password` permanecem acessíveis.
+- Pessoa autenticada em `/auth/sign-up` ou `/auth/sign-in` é enviada para `/app`.
+  `/auth/confirm` processa o token mesmo com sessão ativa e, sem token, envia pessoa autenticada
+  para `/app`; `/auth/forgot-password` e `/auth/reset-password` permanecem acessíveis.
 - A raiz `/` não renderiza produto: redireciona para `/app` com sessão e para `/auth/sign-up`
   sem sessão.
 - 404 de rotas inexistentes é resolvido dentro do layout do grupo (catch-all + `not-found.tsx`),
@@ -346,10 +402,11 @@ Fluxo resumido:
 > O fluxo acima é o alvo do produto. Hoje estão implementados o caminho web → API versionada
 > (`GET /api/v1/hello`), a telemetria, a infraestrutura de sessão (`GET /api/v1/auth/me`, JWT,
 > cookie `HttpOnly` e e-mail de nova sessão), o sign-up real (`POST /api/v1/auth/sign-up`,
-> `/auth/sign-up`, hash scrypt, token de confirmação e e-mail) e o esqueleto de navegação
-> (`/auth/*` público, `/app/*` privado com shell e guard, raiz redirecionando por sessão). O schema
-> de auth veio na fatia 001; os fluxos de confirmação, sign-in, sign-out e recuperação de senha
-> entram nas fatias 005 a 008.
+> `/auth/sign-up`, hash scrypt, token de confirmação e e-mail), a confirmação de conta
+> (`POST /api/v1/auth/confirm`, `/auth/confirm`, sessão única, cookie e `/app` personalizado) e o
+> esqueleto de navegação (`/auth/*` público, `/app/*` privado com shell e guard, raiz
+> redirecionando por sessão). O schema de auth veio na fatia 001; sign-in, sign-out e recuperação
+> de senha entram nas fatias 006 a 008.
 
 ---
 

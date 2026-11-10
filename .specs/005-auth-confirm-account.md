@@ -1,11 +1,11 @@
 # Auth confirm account — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-09
+> **Status:** done
+> **Atualizado em:** 2026-11-10
 > **Autor:** Time de engenharia
 > **Mapa:** `.plans/001-auth-breakdown.md`
 > **Depende de:** `.specs/001-auth-schema.md`, `.specs/002-auth-session.md`, `.specs/003-auth-routes.md`, `.specs/004-auth-sign-up.md`
-> **Plano:** `.plans/005-auth-confirm-account-plan.md` (a criar pelo `implement-me`)
+> **Plano:** `.plans/005-auth-confirm-account-plan.md` (executado pelo `implement-me`)
 
 ## 1. Contexto e problema
 
@@ -193,13 +193,13 @@ Respostas previstas:
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um token de confirmação válido, quando a pessoa abre `/auth/confirm?token=...`, então a conta é confirmada, o token é consumido, uma sessão JWT é criada, o e-mail de nova sessão é enviado e ela é redirecionada para `/app`.
-- [ ] Dado um token inválido, expirado ou já usado, quando a pessoa abre o link, então nenhuma sessão é criada, a conta não é confirmada e a página mostra um erro acionável com caminho para recomeçar.
-- [ ] Dada uma conta já confirmada, quando o link é usado novamente, então a API responde `409`, nenhuma sessão nova é criada e a pessoa recebe orientação para fazer sign-in quando a fatia 006 estiver disponível.
-- [ ] Dada uma sessão válida, quando a pessoa acessa `/app`, então vê a página inicial em en-US com seu primeiro nome e `GET /api/v1/auth/me` devolve seus dados básicos.
-- [ ] Dada uma nova sessão criada, quando outra sessão anterior existia, então a anterior é revogada, apenas a nova acessa `/app` e o e-mail de nova sessão é enviado.
-- [ ] Dada uma sessão ausente, revogada ou expirada, quando a pessoa acessa `/app/*`, então é redirecionada para `/auth/sign-up` e chamadas protegidas à API respondem `401`.
-- [ ] Dado o JWT e o cookie, quando eles são inspecionados, então o JWT contém apenas `sub`, `sid`, `iat` e `exp`, o cookie é `HttpOnly`, `SameSite=Lax` e `Secure` em produção, e nenhum token ou PII aparece em logs.
+- [x] Dado um token de confirmação válido, quando a pessoa abre `/auth/confirm?token=...`, então a conta é confirmada, o token é consumido, uma sessão JWT é criada, o e-mail de nova sessão é enviado e ela é redirecionada para `/app`.
+- [x] Dado um token inválido, expirado ou já usado, quando a pessoa abre o link, então nenhuma sessão é criada, a conta não é confirmada e a página mostra um erro acionável com caminho para recomeçar.
+- [x] Dada uma conta já confirmada, quando o link é usado novamente, então a API responde `409`, nenhuma sessão nova é criada e a pessoa recebe orientação para fazer sign-in quando a fatia 006 estiver disponível.
+- [x] Dada uma sessão válida, quando a pessoa acessa `/app`, então vê a página inicial em en-US com seu primeiro nome e `GET /api/v1/auth/me` devolve seus dados básicos.
+- [x] Dada uma nova sessão criada, quando outra sessão anterior existia, então a anterior é revogada, apenas a nova acessa `/app` e o e-mail de nova sessão é enviado.
+- [x] Dada uma sessão ausente, revogada ou expirada, quando a pessoa acessa `/app/*`, então é redirecionada para `/auth/sign-up` e chamadas protegidas à API respondem `401`.
+- [x] Dado o JWT e o cookie, quando eles são inspecionados, então o JWT contém apenas `sub`, `sid`, `iat` e `exp`, o cookie é `HttpOnly`, `SameSite=Lax` e `Secure` em produção, e nenhum token ou PII aparece em logs.
 
 ## 15. Decisões e questões abertas
 

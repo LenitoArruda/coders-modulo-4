@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   APP_HOME_PATH,
+  AUTH_CONFIRM_PATH,
   AUTH_FORGOT_PASSWORD_PATH,
   AUTH_RESET_PASSWORD_PATH,
   AUTH_SIGN_IN_PATH,
@@ -35,10 +36,13 @@ describe("getPrivateAreaRedirectPath", () => {
 });
 
 describe("shouldRedirectFromAuthPath", () => {
-  it("deve redirecionar sign-up, sign-in e confirm com sessão", () => {
+  it("deve redirecionar sign-up e sign-in com sessão", () => {
     expect(shouldRedirectFromAuthPath(AUTH_SIGN_UP_PATH, true)).toBe(true);
     expect(shouldRedirectFromAuthPath(AUTH_SIGN_IN_PATH, true)).toBe(true);
-    expect(shouldRedirectFromAuthPath("/auth/confirm", true)).toBe(true);
+  });
+
+  it("não deve redirecionar confirm porque a página decide pelo token", () => {
+    expect(shouldRedirectFromAuthPath(AUTH_CONFIRM_PATH, true)).toBe(false);
   });
 
   it("deve manter forgot e reset acessíveis com sessão", () => {
@@ -53,7 +57,7 @@ describe("shouldRedirectFromAuthPath", () => {
   it("não deve redirecionar nenhuma página de auth sem sessão", () => {
     expect(shouldRedirectFromAuthPath(AUTH_SIGN_UP_PATH, false)).toBe(false);
     expect(shouldRedirectFromAuthPath(AUTH_SIGN_IN_PATH, false)).toBe(false);
-    expect(shouldRedirectFromAuthPath("/auth/confirm", false)).toBe(false);
+    expect(shouldRedirectFromAuthPath(AUTH_CONFIRM_PATH, false)).toBe(false);
   });
 
   it("deve normalizar barra final antes de comparar", () => {
