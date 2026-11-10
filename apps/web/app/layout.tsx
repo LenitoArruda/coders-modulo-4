@@ -13,9 +13,12 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Experts — Fundação",
+  title: {
+    default: "Experts",
+    template: "%s · Experts",
+  },
   description:
-    "Fundação do monorepo da plataforma de Experts: web, API, banco local e observabilidade.",
+    "Experts is a platform for specialized AI agents that answer questions and produce analyses from connected data sources.",
 };
 
 export default function RootLayout({
@@ -24,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="en-US">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
       </body>

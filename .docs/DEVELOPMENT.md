@@ -108,6 +108,17 @@ erro). Fakes de teste vivem em `apps/api/src/test/fakes/`. Novos domínios segue
   `fetchApiWithSession`), nunca `document.cookie`.
 - `API_BASE_URL` é lida apenas no servidor (default `http://localhost:3333`); não exponha segredo
   nem token em variáveis `NEXT_PUBLIC_*`.
+- **Grupos de rota:** o URL é a fonte da organização.
+  - `app/auth/**` → `/auth/*` é público, com layout de autenticação compartilhado.
+  - `app/app/**` → `/app/*` é privado, com shell e guard server-side no layout.
+  - O guard do web (`lib/auth/guards.ts`) é apenas UX: valida a sessão via `GET /api/v1/auth/me`
+    e falha fechado (erro/401 → sem sessão). A API continua sendo a fonte de verdade.
+- **Redirecionamentos de navegação:** regras puras ficam em `lib/auth/route-rules.ts`, incluindo a
+  constante única do destino de `/app/*` sem sessão. Páginas de `/auth/sign-up`, `/auth/sign-in`
+  e `/auth/confirm` redirecionam pessoa autenticada para `/app`; forgot/reset permanecem
+  acessíveis.
+- **Idioma:** todo texto visível (UI, metadados, `lang`) é **en-US**; a documentação interna é
+  PT-BR. Rotas, arquivos, componentes e endpoints também usam en-US.
 
 ---
 
@@ -137,7 +148,8 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 | Constantes                | `UPPER_SNAKE_CASE`                                            |
 | Tabelas/colunas SQL       | `snake_case`                                                  |
 | Identificadores de código | Inglês                                                        |
-| Textos de UI e docs       | PT-BR                                                         |
+| Textos de UI e e-mails    | en-US                                                         |
+| Docs internas             | PT-BR                                                         |
 
 - Prefira co-localização: código específico da rota/feature fica próximo dela.
 - Evite arquivos "utils" genéricos; nomeie pelo domínio.

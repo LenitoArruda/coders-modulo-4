@@ -120,7 +120,8 @@ Regras:
 - Não misture refatoração ampla com feature ou correção.
 - Atualize a documentação afetada **na mesma mudança**.
 - Toda UI deve ser acessível, responsiva e **apenas light theme**.
-- Código e identificadores em **inglês**; textos de produto e documentação em **PT-BR**.
+- Código, identificadores, rotas, endpoints e textos de produto (UI e e-mails) em **inglês/en-US**;
+  documentação interna (`.docs/`, `.specs/`, `.plans/` e ADRs) em **PT-BR**.
 - Commits seguem **Conventional Commits**, são pequenos, descritivos e no imperativo (ex.:
   `feat: add expert card`); o hook `commit-msg` valida a mensagem com **commitlint**.
 

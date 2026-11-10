@@ -1,6 +1,6 @@
 # Auth routes — Spec
 
-> **Status:** approved
+> **Status:** done
 > **Atualizado em:** 2026-11-09
 > **Autor:** Time de engenharia
 > **Mapa:** `.plans/001-auth-breakdown.md`
@@ -190,13 +190,13 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um visitante, quando abre `/auth/sign-up`, `/auth/sign-in`, `/auth/confirm`, `/auth/forgot-password` ou `/auth/reset-password`, então a página placeholder pública carrega dentro do layout de autenticação em en-US.
-- [ ] Dado um visitante sem sessão, quando abre `/app` ou qualquer `/app/*`, então é redirecionado para `/auth/sign-up`.
-- [ ] Dada uma sessão válida, quando a pessoa abre `/app` ou `/app/*`, então o shell privado carrega e a página inicial placeholder é exibida.
-- [ ] Dada uma sessão válida, quando a pessoa abre `/auth/sign-in`, `/auth/sign-up` ou `/auth/confirm`, então é redirecionada para `/app`; `/auth/forgot-password` e `/auth/reset-password` continuam acessíveis.
-- [ ] Dada a raiz `/`, quando há sessão válida, então redireciona para `/app`; quando não há, redireciona para `/auth/sign-up`.
-- [ ] Dada a API, quando os endpoints são chamados, então o hello está em `/api/v1/hello`, `GET /` não existe, auth fica sob `/api/v1/auth/*`, o CORS aceita a origem do web com `GET`/`HEAD`/`POST`/`OPTIONS` e bloqueia as demais origens.
-- [ ] Dado o código e a documentação, quando a convenção é verificada, então telas de auth, `/app` e placeholders usam en-US, a regra está registrada em `RULES.md`, `DESIGN.md`, `DEVELOPMENT.md` e `ARCHITECTURE.md`, e a UI é light-only, acessível e responsiva.
+- [x] Dado um visitante, quando abre `/auth/sign-up`, `/auth/sign-in`, `/auth/confirm`, `/auth/forgot-password` ou `/auth/reset-password`, então a página placeholder pública carrega dentro do layout de autenticação em en-US.
+- [x] Dado um visitante sem sessão, quando abre `/app` ou qualquer `/app/*`, então é redirecionado para `/auth/sign-up`.
+- [x] Dada uma sessão válida, quando a pessoa abre `/app` ou `/app/*`, então o shell privado carrega e a página inicial placeholder é exibida.
+- [x] Dada uma sessão válida, quando a pessoa abre `/auth/sign-in`, `/auth/sign-up` ou `/auth/confirm`, então é redirecionada para `/app`; `/auth/forgot-password` e `/auth/reset-password` continuam acessíveis.
+- [x] Dada a raiz `/`, quando há sessão válida, então redireciona para `/app`; quando não há, redireciona para `/auth/sign-up`.
+- [x] Dada a API, quando os endpoints são chamados, então o hello está em `/api/v1/hello`, `GET /` não existe, auth fica sob `/api/v1/auth/*`, o CORS aceita a origem do web com `GET`/`HEAD`/`POST`/`OPTIONS` e bloqueia as demais origens.
+- [x] Dado o código e a documentação, quando a convenção é verificada, então telas de auth, `/app` e placeholders usam en-US, a regra está registrada em `RULES.md`, `DESIGN.md`, `DEVELOPMENT.md` e `ARCHITECTURE.md`, e a UI é light-only, acessível e responsiva.
 
 ## 15. Decisões e questões abertas
 

@@ -93,7 +93,7 @@ Execute na raiz do monorepo:
 | `bun run types:check` | Checagem de tipos em todos os apps/pacotes                   |
 | `bun run test`        | Testes unitários e de integração da API e do web (Vitest)    |
 | `bun run test:watch`  | Vitest em modo watch (API e web)                             |
-| `bun run test:e2e`    | Smoke E2E do web (Playwright)                                |
+| `bun run test:e2e`    | E2E de navegação do web (Playwright + API fake local)        |
 | `bun run infra:up`    | Sobe LGTM (Compose) e Supabase local                         |
 | `bun run infra:down`  | Para Supabase e LGTM (idempotente)                           |
 | `bun run db:migrate`  | Aplica migrações pendentes no Supabase local                 |
@@ -240,6 +240,29 @@ A autenticação é própria da API (sem Supabase Auth) e a API é versionada em
   sign-in, sign-out e recuperação de senha entram nas fatias 004–008.
 - Erros seguem `{ code, message, fieldErrors? }`, sem stack, SQL ou detalhes internos.
 
+### Navegação e idioma
+
+O web separa o fluxo público da área privada em dois grupos de rota:
+
+| Rota                    | Acesso  | Comportamento                                        |
+| ----------------------- | ------- | ---------------------------------------------------- |
+| `/`                     | Público | Sessão válida → `/app`; sem sessão → `/auth/sign-up` |
+| `/auth/sign-up`         | Público | Placeholder; com sessão → `/app`                     |
+| `/auth/sign-in`         | Público | Placeholder; com sessão → `/app`                     |
+| `/auth/confirm`         | Público | Placeholder; com sessão → `/app`                     |
+| `/auth/forgot-password` | Público | Placeholder; acessível com ou sem sessão             |
+| `/auth/reset-password`  | Público | Placeholder; acessível com ou sem sessão             |
+| `/app` e `/app/*`       | Privado | Shell privado; sem sessão válida → `/auth/sign-up`   |
+
+- O guard de `/app/*` é server-side: lê o cookie e confirma a sessão em `GET /api/v1/auth/me`;
+  erro, `401` ou ausência de cookie contam como sem sessão. A API continua validando toda chamada.
+- Todo texto de produto (UI, metadados e e-mails), rotas e endpoints é **en-US**; a documentação
+  interna é PT-BR.
+- O E2E do web usa uma API fake local (`127.0.0.1:3434`) via override de `API_BASE_URL`, sem banco
+  compartilhado nem `JWT_SECRET`.
+- As telas de auth e `/app` desta entrega são **placeholders**; os fluxos reais entram nas fatias
+  004–008.
+
 ---
 
 ## Observabilidade
@@ -262,6 +285,8 @@ A autenticação é própria da API (sem Supabase Auth) e a API é versionada em
   `infra:down`, `db:migrate` e `db:test`.
 - ✅ Infraestrutura de sessão (spec 002): JWT HS256 + sessão server-side, `GET /api/v1/auth/me`,
   ponte de cookie `HttpOnly` no web, contrato de erro, hello em `/api/v1` e e-mail de nova sessão.
+- ✅ Navegação de auth (spec 003): `/auth/*` público com placeholders en-US, `/app/*` privado com
+  shell e guard server-side, raiz redirecionando por sessão e CORS restrito à origem do web.
 - 🧭 Fluxos públicos de auth (confirmação, sign-in, sign-out e recuperação de senha), produto,
   multi-tenancy/RLS, deploy e CI ainda não implementados.
 - 🧭 `packages/shared`, OXLint/OXFmt, date-fns, TanStack e hash de senha fora desta entrega.

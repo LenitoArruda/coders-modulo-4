@@ -62,7 +62,8 @@ Antes de iniciar qualquer desenvolvimento:
 
 ## 4. Documentação
 
-- Documentação e textos de produto em **PT-BR**; código e identificadores em **inglês**.
+- Documentação interna (`.docs/`, `.specs/`, `.plans/` e ADRs) em **PT-BR**.
+- Textos de produto (UI, e-mails transacionais), rotas, endpoints e código em **en-US**; identificadores em inglês.
 - Atualize o documento afetado na **mesma mudança** de código.
 - Evite duplicar informação entre documentos: referencie o documento dono do assunto. Repetir
   uma regra crítica de forma curta é aceitável para reforço.
