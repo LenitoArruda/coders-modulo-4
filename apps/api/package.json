@@ -25,6 +25,9 @@
     "@opentelemetry/sdk-metrics": "3.1.0",
     "@opentelemetry/sdk-node": "0.301.0",
     "@opentelemetry/semantic-conventions": "1.44.0",
+    "@supabase/supabase-js": "2.119.0",
+    "jose": "6.2.17",
+    "nodemailer": "10.4.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
   },

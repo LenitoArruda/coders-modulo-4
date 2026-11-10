@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../../../app.module";
 import { configureApp } from "../../../app-setup";
 
-describe("GET /", () => {
+describe("GET /api/v1/hello", () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -24,15 +24,26 @@ describe("GET /", () => {
   });
 
   it("deve retornar Hello World em JSON", async () => {
-    const response = await request(app.getHttpServer()).get("/").expect(200);
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/hello")
+      .expect(200);
 
     expect(response.headers["content-type"]).toMatch(/application\/json/);
     expect(response.body).toEqual({ message: "Hello World" });
   });
 
+  it("deve responder 404 com contrato de erro quando GET / não existe mais", async () => {
+    const response = await request(app.getHttpServer()).get("/").expect(404);
+
+    expect(response.body).toEqual({
+      code: "NOT_FOUND",
+      message: "Resource not found.",
+    });
+  });
+
   it("deve aceitar a origem permitida no CORS", async () => {
     const response = await request(app.getHttpServer())
-      .get("/")
+      .get("/api/v1/hello")
       .set("Origin", "http://localhost:3000");
 
     expect(response.headers["access-control-allow-origin"]).toBe(
@@ -42,7 +53,7 @@ describe("GET /", () => {
 
   it("não deve liberar uma origem não permitida", async () => {
     const response = await request(app.getHttpServer())
-      .get("/")
+      .get("/api/v1/hello")
       .set("Origin", "http://malicious.example");
 
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();

@@ -13,7 +13,11 @@ export default function Home() {
         A fundação está no ar: web, API, banco local e observabilidade.
       </p>
       <Button asChild variant="secondary">
-        <a href="http://localhost:3333/" target="_blank" rel="noreferrer">
+        <a
+          href="http://localhost:3333/api/v1/hello"
+          target="_blank"
+          rel="noreferrer"
+        >
           Abrir a API
         </a>
       </Button>

@@ -34,8 +34,8 @@ Execute na raiz do monorepo:
 | `bun run code:fix`    | ESLint `--fix` + Prettier em código, JSON, CSS e YAML        |
 | `bun run format`      | Prettier em `**/*.{ts,tsx,md}`                               |
 | `bun run types:check` | `tsc --noEmit` / typegen do Next em todos os apps/pacotes    |
-| `bun run test`        | Testes unitários e de integração da API (Vitest)             |
-| `bun run test:watch`  | Vitest em modo watch                                         |
+| `bun run test`        | Testes unitários e de integração da API e do web (Vitest)    |
+| `bun run test:watch`  | Vitest em modo watch (API e web)                             |
 | `bun run test:e2e`    | Smoke E2E do web (Playwright)                                |
 | `bun run infra:up`    | Sobe LGTM (Compose) e Supabase local                         |
 | `bun run infra:down`  | Para Supabase e LGTM (idempotente)                           |
@@ -48,6 +48,10 @@ Execute na raiz do monorepo:
 
 > Use sempre `bun run <script>`. `bun build` e `bun test` são comandos nativos do Bun e **não**
 > executam os scripts do `package.json`.
+
+> A API exige `JWT_SECRET` com no mínimo 32 caracteres no boot (veja `.env.example`); sem ele, a
+> API não inicia. Os testes não dependem do `.env`: `apps/api/src/test/setup-env.ts` define as
+> variáveis mínimas (incluindo `JWT_SECRET` e `SESSION_TTL_SECONDS`).
 
 ### 2.1 Comando do OpenCode
 
@@ -161,6 +165,26 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Ao final de uma spec, `commit-and-push` foi executado (commit + push).
 - [ ] `git status` sem segredos, artefatos gerados ou arquivos acidentais.
 
+> **Execução orquestrada:** quando a spec roda como subagente de `orchestrate-me`, o subagente
+> cria apenas o **commit local** na branch da spec; push e merge ficam com o orquestrador. Fora
+> desse modo, vale `commit-and-push`.
+
+### 5.9 Autenticação e sessão
+
+- [ ] `JWT_SECRET` ausente ou com menos de 32 caracteres impede o boot com mensagem clara.
+- [ ] JWT contém apenas `sub`, `sid`, `iat` e `exp`; expiração respeita `SESSION_TTL_SECONDS`.
+- [ ] `/me` com JWT válido **e** sessão ativa responde 200 com os dados básicos.
+- [ ] JWT ausente, inválido, expirado, revogado ou `sub` divergente responde o **mesmo** 401 do
+      contrato, sem detalhes internos.
+- [ ] Nova sessão revoga as anteriores; o JWT antigo deixa de valer imediatamente.
+- [ ] Sessão expirada (`expires_at` no passado) não é considerada ativa.
+- [ ] E-mail de nova sessão: assunto "New session on your account", data/hora, alerta de senha e
+      **sem** link de recuperação.
+- [ ] Cookie `session_token`: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Max-Age` = TTL e `Secure`
+      somente em produção.
+- [ ] Logs sem JWT, cookie, e-mail completo, senha ou segredo; use `userId`/`sessionId`.
+- [ ] Rotas em `/api/v1`; caminhos fora do prefixo (incluindo `GET /`) respondem 404 com contrato.
+
 ---
 
 ## 6. QA manual — template
@@ -187,7 +211,8 @@ Inclua ambiente (navegador/dispositivo) quando for UI.
 
 Antes de finalizar, verifique se a mudança não quebrou:
 
-- [ ] Rotas existentes (`/` em `web`, `docs` e API).
+- [ ] Rotas existentes (`/` em `web` e `docs`; `GET /api/v1/hello` na API; `GET /` da API deve
+      responder 404 com o contrato).
 - [ ] Componentes compartilhados usados por mais de um app.
 - [ ] Scripts do monorepo (`dev`, `build`, `lint`, `types:check`, `test`, `test:e2e`,
       `infra:up`, `infra:down`).
@@ -240,17 +265,19 @@ Requisitos:
 
 ## 10. Lacunas conhecidas
 
-| Lacuna                                      | Impacto                                                                                                                              |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Nenhum CI                                   | Verificação depende do ambiente local                                                                                                |
-| Commitlint apenas local                     | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
-| Produto não implementado                    | Apenas a rota de hello world e a fundação existem                                                                                    |
-| `apps/docs` ainda é o starter               | Conteúdo público de documentação não definido                                                                                        |
-| Componentes legados em `packages/ui`        | `button`, `card` e `code` são mantidos por uso em `apps/docs`                                                                        |
-| Sem Vitest/Testing Library no pacote `ui`   | Componentes compartilhados não têm testes unitários                                                                                  |
-| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                                  |
-| PostgreSQL local em `15`                    | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                                  |
-| OXLint/OXFmt não adotados                   | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
-| Skills locais em `.agents/` não versionadas | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
+| Lacuna                                          | Impacto                                                                                                                              |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Nenhum CI                                       | Verificação depende do ambiente local                                                                                                |
+| Commitlint apenas local                         | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
+| Produto não implementado                        | Apenas a rota de hello world e a fundação existem                                                                                    |
+| `apps/docs` ainda é o starter                   | Conteúdo público de documentação não definido                                                                                        |
+| Componentes legados em `packages/ui`            | `button`, `card` e `code` são mantidos por uso em `apps/docs`                                                                        |
+| Sem Vitest/Testing Library no pacote `ui`       | Componentes compartilhados não têm testes unitários                                                                                  |
+| Supabase Analytics desabilitado                 | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                                  |
+| PostgreSQL local em `15`                        | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                                  |
+| OXLint/OXFmt não adotados                       | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
+| Skills locais em `.agents/` não versionadas     | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
+| Cookie de sessão sem fluxo público no navegador | A fatia 002 só entrega a ponte e as opções; a inspeção real no navegador entra nas fatias 005/006                                    |
+| Sessão única sem atomicidade no banco           | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                             |
 
 Ao resolver uma lacuna, atualize esta tabela e o documento relacionado.
