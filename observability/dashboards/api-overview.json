@@ -1313,7 +1313,7 @@
     {
       "id": 29,
       "type": "row",
-      "title": "Alertas",
+      "title": "Banco de dados: queries da API (spans)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1326,10 +1326,1284 @@
     {
       "id": 30,
       "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 84
+      },
+      "type": "stat",
+      "title": "Queries",
+      "description": "Chamadas ao Postgres (via supabase-js) no período.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "sum(increase(traces_spanmetrics_calls_total{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 84
+      },
+      "type": "stat",
+      "title": "Taxa de erro",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "(sum(increase(traces_spanmetrics_calls_total{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\",status_code=\"STATUS_CODE_ERROR\"}[$__range])) or vector(0)) / sum(increase(traces_spanmetrics_calls_total{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 84
+      },
+      "type": "stat",
+      "title": "Latência p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\"}[$__range])))"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 84
+      },
+      "type": "stat",
+      "title": "Latência média",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.05
+              },
+              {
+                "color": "red",
+                "value": 0.25
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "sum(rate(traces_spanmetrics_latency_sum{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\"}[$__range])) / sum(rate(traces_spanmetrics_latency_count{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 88
+      },
+      "type": "timeseries",
+      "title": "Queries por operação e tabela (req/s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "{{span_name}}",
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 88
+      },
+      "type": "timeseries",
+      "title": "Latência p95 por operação e tabela",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "{{span_name}}",
+          "expr": "histogram_quantile(0.95, sum by (le, span_name) (rate(traces_spanmetrics_latency_bucket{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\"}[$__rate_interval])))"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 96
+      },
+      "type": "timeseries",
+      "title": "Queries com erro por operação (req/s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "{{span_name}}",
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service=\"coders-modulo-4-api\",span_kind=\"SPAN_KIND_CLIENT\",span_name=~\"(SELECT|INSERT|UPDATE|DELETE) .+\",status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 96
+      },
+      "type": "table",
+      "title": "Queries lentas (> 100 ms)",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "transformations": [],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "limit": 20,
+          "tableType": "traces",
+          "query": "{ resource.service.name = \"coders-modulo-4-api\" && span.db.system = \"postgresql\" && duration > 100ms }"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 104
+      },
+      "type": "table",
+      "title": "Queries com erro",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "transformations": [],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "limit": 20,
+          "tableType": "traces",
+          "query": "{ resource.service.name = \"coders-modulo-4-api\" && span.db.system = \"postgresql\" && status = error }"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "type": "row",
+      "title": "Postgres: saúde do banco (métricas do servidor)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 112
+      },
+      "panels": []
+    },
+    {
+      "id": 40,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 113
+      },
+      "type": "stat",
+      "title": "Conexões em uso",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.6
+              },
+              {
+                "color": "red",
+                "value": 0.85
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "sum(postgresql_backends{postgresql_database_name=\"postgres\"}) / max(postgresql_connection_max)"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 113
+      },
+      "type": "stat",
+      "title": "Cache hit (heap)",
+      "description": "Ideal: acima de 99%. Abaixo disso, o banco está lendo muito do disco.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.9
+              },
+              {
+                "color": "green",
+                "value": 0.99
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "sum(increase(postgresql_blocks_read_total{postgresql_database_name=\"postgres\",source=\"heap_hit\"}[$__range])) / (sum(increase(postgresql_blocks_read_total{postgresql_database_name=\"postgres\",source=\"heap_hit\"}[$__range])) + sum(increase(postgresql_blocks_read_total{postgresql_database_name=\"postgres\",source=\"heap_read\"}[$__range])))"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 113
+      },
+      "type": "stat",
+      "title": "Tamanho do banco",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "sum(postgresql_db_size_bytes{postgresql_database_name=\"postgres\"})"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 113
+      },
+      "type": "stat",
+      "title": "Rollbacks",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "sum(increase(postgresql_rollbacks_total{postgresql_database_name=\"postgres\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 113
+      },
+      "type": "stat",
+      "title": "Deadlocks",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "sum(increase(postgresql_deadlocks_total{postgresql_database_name=\"postgres\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 113
+      },
+      "type": "stat",
+      "title": "Linhas mortas",
+      "description": "Linhas aguardando vacuum. Crescimento contínuo indica bloat.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10000
+              },
+              {
+                "color": "red",
+                "value": 100000
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "expr": "sum(postgresql_rows{postgresql_database_name=\"postgres\",state=\"dead\"})"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 117
+      },
+      "type": "timeseries",
+      "title": "Conexões ativas",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "em uso",
+          "expr": "sum(postgresql_backends{postgresql_database_name=\"postgres\"})"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "máximo",
+          "expr": "max(postgresql_connection_max)"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 117
+      },
+      "type": "timeseries",
+      "title": "Transações: commits e rollbacks (por s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "commits",
+          "expr": "sum(rate(postgresql_commits_total{postgresql_database_name=\"postgres\"}[$__rate_interval]))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "rollbacks",
+          "expr": "sum(rate(postgresql_rollbacks_total{postgresql_database_name=\"postgres\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 125
+      },
+      "type": "timeseries",
+      "title": "Linhas por operação (por s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "returned",
+          "expr": "sum(rate(postgresql_tup_returned_total{postgresql_database_name=\"postgres\"}[$__rate_interval]))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "fetched",
+          "expr": "sum(rate(postgresql_tup_fetched_total{postgresql_database_name=\"postgres\"}[$__rate_interval]))"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "inserted",
+          "expr": "sum(rate(postgresql_tup_inserted_total{postgresql_database_name=\"postgres\"}[$__rate_interval]))"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "updated",
+          "expr": "sum(rate(postgresql_tup_updated_total{postgresql_database_name=\"postgres\"}[$__rate_interval]))"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "deleted",
+          "expr": "sum(rate(postgresql_tup_deleted_total{postgresql_database_name=\"postgres\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 125
+      },
+      "type": "timeseries",
+      "title": "Linhas vivas vs mortas",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "{{state}}",
+          "expr": "sum by (state) (postgresql_rows{postgresql_database_name=\"postgres\"})"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 133
+      },
+      "type": "timeseries",
+      "title": "Locks por modo",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "{{mode}}",
+          "expr": "sum by (mode) (postgresql_database_locks{postgresql_database_name=\"postgres\"})"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 133
+      },
+      "type": "timeseries",
+      "title": "Sequential scans por tabela (por s)",
+      "description": "Scans sequenciais frequentes em tabelas grandes sugerem índice faltando.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "legendFormat": "{{postgresql_table_name}}",
+          "expr": "sum by (postgresql_table_name) (rate(postgresql_sequential_scans_total{postgresql_database_name=\"postgres\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 141
+      },
+      "type": "table",
+      "title": "Tabelas por tamanho",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "postgresql_table_name": "Tabela",
+              "Value": "Tamanho"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Tamanho",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tamanho"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "format": "table",
+          "expr": "topk(15, sum by (postgresql_table_name) (postgresql_table_size_bytes{postgresql_database_name=\"postgres\",postgresql_table_name=~\"public[.].+\"}))"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "type": "row",
+      "title": "Alertas",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 149
+      },
+      "panels": []
+    },
+    {
+      "id": 54,
+      "gridPos": {
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 150
       },
       "type": "alertlist",
       "title": "Alertas do Grafana",
@@ -1352,7 +2626,7 @@
       }
     },
     {
-      "id": 31,
+      "id": 55,
       "type": "row",
       "title": "Saúde da pipeline de telemetria (OpenTelemetry Collector)",
       "collapsed": false,
@@ -1360,17 +2634,17 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 91
+        "y": 157
       },
       "panels": []
     },
     {
-      "id": 32,
+      "id": 56,
       "gridPos": {
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 92
+        "y": 158
       },
       "type": "stat",
       "title": "Collector no ar",
@@ -1419,12 +2693,12 @@
       ]
     },
     {
-      "id": 33,
+      "id": 57,
       "gridPos": {
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 92
+        "y": 158
       },
       "type": "stat",
       "title": "Registros recusados/falhos (rate)",
@@ -1474,12 +2748,12 @@
       ]
     },
     {
-      "id": 34,
+      "id": 58,
       "gridPos": {
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 92
+        "y": 158
       },
       "type": "stat",
       "title": "Fila do exporter (uso)",
@@ -1533,12 +2807,12 @@
       ]
     },
     {
-      "id": 35,
+      "id": 59,
       "gridPos": {
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 92
+        "y": 158
       },
       "type": "stat",
       "title": "Memória do collector",
@@ -1584,12 +2858,12 @@
       ]
     },
     {
-      "id": 36,
+      "id": 60,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 96
+        "y": 162
       },
       "type": "timeseries",
       "title": "Recebido pelo collector (por sinal)",
@@ -1653,12 +2927,12 @@
       ]
     },
     {
-      "id": 37,
+      "id": 61,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 96
+        "y": 162
       },
       "type": "timeseries",
       "title": "Recusado / falho no collector",

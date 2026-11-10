@@ -17,3 +17,18 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
+
+  # Métricas do Postgres do Supabase local (porta 54322 do host) -> LGTM via OTLP.
+  postgres-metrics:
+    image: otel/opentelemetry-collector-contrib:0.164.0
+    container_name: coders-modulo-4-postgres-metrics
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    depends_on:
+      - lgtm
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD:-postgres}
+    volumes:
+      - ./observability/postgres-collector.yaml:/etc/otelcol/config.yaml:ro

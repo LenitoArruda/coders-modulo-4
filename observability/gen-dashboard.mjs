@@ -6,6 +6,8 @@
 //  - Prometheus: traces_spanmetrics_* (RED por span, gerado pelo Tempo/collector) e otelcol_* (saúde da pipeline).
 //    As métricas http_server_* da API não estão sendo emitidas hoje.
 //  - Tempo: traces por requisição.
+//  - Banco: spans CLIENT "SELECT users", "UPDATE sessions"... gerados por withDbSpan (apps/api) e,
+//    para a saúde do Postgres, as métricas postgresql_* coletadas pelo serviço postgres-metrics.
 import { writeFileSync } from "node:fs";
 
 const prom = { type: "prometheus", uid: "prometheus" };
@@ -15,6 +17,10 @@ const SVC = "coders-modulo-4-api";
 const S = `{service_name="${SVC}"}`;
 const REQ = `${S} |= "HTTP request completed"`;
 const SM = `service="${SVC}"`;
+// Spans de banco da API (kind CLIENT, nome "<OPERAÇÃO> <tabela>").
+const DB = `${SM},span_kind="SPAN_KIND_CLIENT",span_name=~"(SELECT|INSERT|UPDATE|DELETE) .+"`;
+// Métricas do Postgres local (receiver postgresql).
+const PGDB = `postgresql_database_name="postgres"`;
 
 let id = 0;
 let y = 0;
@@ -446,6 +452,278 @@ line(8, [
       },
     ],
     { w: 24 },
+  ),
+]);
+
+// ───────────────────────────── 6b. Banco de dados: chamadas da API ─────────────────────────────
+row("Banco de dados: queries da API (spans)");
+line(4, [
+  stat(
+    "Queries",
+    prom,
+    `sum(increase(traces_spanmetrics_calls_total{${DB}}[$__range]))`,
+    { w: 6, description: "Chamadas ao Postgres (via supabase-js) no período." },
+  ),
+  stat(
+    "Taxa de erro",
+    prom,
+    `(sum(increase(traces_spanmetrics_calls_total{${DB},status_code="STATUS_CODE_ERROR"}[$__range])) or vector(0)) / sum(increase(traces_spanmetrics_calls_total{${DB}}[$__range]))`,
+    {
+      w: 6,
+      unit: "percentunit",
+      decimals: 2,
+      thresholds: thr(["green", null], ["yellow", 0.01], ["red", 0.05]),
+    },
+  ),
+  stat(
+    "Latência p95",
+    prom,
+    `histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{${DB}}[$__range])))`,
+    {
+      w: 6,
+      unit: "s",
+      thresholds: thr(["green", null], ["yellow", 0.1], ["red", 0.5]),
+    },
+  ),
+  stat(
+    "Latência média",
+    prom,
+    `sum(rate(traces_spanmetrics_latency_sum{${DB}}[$__range])) / sum(rate(traces_spanmetrics_latency_count{${DB}}[$__range]))`,
+    {
+      w: 6,
+      unit: "s",
+      thresholds: thr(["green", null], ["yellow", 0.05], ["red", 0.25]),
+    },
+  ),
+]);
+line(8, [
+  ts(
+    "Queries por operação e tabela (req/s)",
+    prom,
+    [
+      {
+        legendFormat: "{{span_name}}",
+        expr: `sum by (span_name) (rate(traces_spanmetrics_calls_total{${DB}}[$__rate_interval]))`,
+      },
+    ],
+    { unit: "reqps", stack: true },
+  ),
+  ts(
+    "Latência p95 por operação e tabela",
+    prom,
+    [
+      {
+        legendFormat: "{{span_name}}",
+        expr: `histogram_quantile(0.95, sum by (le, span_name) (rate(traces_spanmetrics_latency_bucket{${DB}}[$__rate_interval])))`,
+      },
+    ],
+    { unit: "s", min: 0 },
+  ),
+]);
+line(8, [
+  ts(
+    "Queries com erro por operação (req/s)",
+    prom,
+    [
+      {
+        legendFormat: "{{span_name}}",
+        expr: `sum by (span_name) (rate(traces_spanmetrics_calls_total{${DB},status_code="STATUS_CODE_ERROR"}[$__rate_interval]))`,
+      },
+    ],
+    { unit: "reqps", stack: true },
+  ),
+  table(
+    "Queries lentas (> 100 ms)",
+    tempo,
+    [
+      {
+        queryType: "traceql",
+        limit: 20,
+        tableType: "traces",
+        query: `{ resource.service.name = "${SVC}" && span.db.system = "postgresql" && duration > 100ms }`,
+      },
+    ],
+    { w: 12 },
+  ),
+]);
+line(8, [
+  table(
+    "Queries com erro",
+    tempo,
+    [
+      {
+        queryType: "traceql",
+        limit: 20,
+        tableType: "traces",
+        query: `{ resource.service.name = "${SVC}" && span.db.system = "postgresql" && status = error }`,
+      },
+    ],
+    { w: 24 },
+  ),
+]);
+
+// ───────────────────────────── 6c. Banco de dados: saúde do Postgres ─────────────────────────────
+row("Postgres: saúde do banco (métricas do servidor)");
+line(4, [
+  stat(
+    "Conexões em uso",
+    prom,
+    `sum(postgresql_backends{${PGDB}}) / max(postgresql_connection_max)`,
+    {
+      w: 4,
+      unit: "percentunit",
+      decimals: 1,
+      thresholds: thr(["green", null], ["yellow", 0.6], ["red", 0.85]),
+    },
+  ),
+  stat(
+    "Cache hit (heap)",
+    prom,
+    `sum(increase(postgresql_blocks_read_total{${PGDB},source="heap_hit"}[$__range])) / (sum(increase(postgresql_blocks_read_total{${PGDB},source="heap_hit"}[$__range])) + sum(increase(postgresql_blocks_read_total{${PGDB},source="heap_read"}[$__range])))`,
+    {
+      w: 4,
+      unit: "percentunit",
+      decimals: 1,
+      description:
+        "Ideal: acima de 99%. Abaixo disso, o banco está lendo muito do disco.",
+      thresholds: thr(["red", null], ["yellow", 0.9], ["green", 0.99]),
+    },
+  ),
+  stat("Tamanho do banco", prom, `sum(postgresql_db_size_bytes{${PGDB}})`, {
+    w: 4,
+    unit: "bytes",
+  }),
+  stat(
+    "Rollbacks",
+    prom,
+    `sum(increase(postgresql_rollbacks_total{${PGDB}}[$__range]))`,
+    { w: 4, thresholds: thr(["green", null], ["yellow", 1], ["red", 50]) },
+  ),
+  stat(
+    "Deadlocks",
+    prom,
+    `sum(increase(postgresql_deadlocks_total{${PGDB}}[$__range]))`,
+    { w: 4, thresholds: thr(["green", null], ["red", 1]) },
+  ),
+  stat("Linhas mortas", prom, `sum(postgresql_rows{${PGDB},state="dead"})`, {
+    w: 4,
+    description: "Linhas aguardando vacuum. Crescimento contínuo indica bloat.",
+    thresholds: thr(["green", null], ["yellow", 10000], ["red", 100000]),
+  }),
+]);
+line(8, [
+  ts(
+    "Conexões ativas",
+    prom,
+    [
+      {
+        legendFormat: "em uso",
+        expr: `sum(postgresql_backends{${PGDB}})`,
+      },
+      { legendFormat: "máximo", expr: `max(postgresql_connection_max)` },
+    ],
+    { min: 0 },
+  ),
+  ts(
+    "Transações: commits e rollbacks (por s)",
+    prom,
+    [
+      {
+        legendFormat: "commits",
+        expr: `sum(rate(postgresql_commits_total{${PGDB}}[$__rate_interval]))`,
+      },
+      {
+        legendFormat: "rollbacks",
+        expr: `sum(rate(postgresql_rollbacks_total{${PGDB}}[$__rate_interval]))`,
+      },
+    ],
+    { unit: "ops" },
+  ),
+]);
+line(8, [
+  ts(
+    "Linhas por operação (por s)",
+    prom,
+    ["returned", "fetched", "inserted", "updated", "deleted"].map((op) => ({
+      legendFormat: op,
+      expr: `sum(rate(postgresql_tup_${op}_total{${PGDB}}[$__rate_interval]))`,
+    })),
+    { unit: "ops" },
+  ),
+  ts(
+    "Linhas vivas vs mortas",
+    prom,
+    [
+      {
+        legendFormat: "{{state}}",
+        expr: `sum by (state) (postgresql_rows{${PGDB}})`,
+      },
+    ],
+    { min: 0 },
+  ),
+]);
+line(8, [
+  ts(
+    "Locks por modo",
+    prom,
+    [
+      {
+        legendFormat: "{{mode}}",
+        expr: `sum by (mode) (postgresql_database_locks{${PGDB}})`,
+      },
+    ],
+    { stack: true, min: 0 },
+  ),
+  ts(
+    "Sequential scans por tabela (por s)",
+    prom,
+    [
+      {
+        legendFormat: "{{postgresql_table_name}}",
+        expr: `sum by (postgresql_table_name) (rate(postgresql_sequential_scans_total{${PGDB}}[$__rate_interval]))`,
+      },
+    ],
+    {
+      unit: "ops",
+      description:
+        "Scans sequenciais frequentes em tabelas grandes sugerem índice faltando.",
+    },
+  ),
+]);
+line(8, [
+  table(
+    "Tabelas por tamanho",
+    prom,
+    [
+      {
+        queryType: "instant",
+        instant: true,
+        format: "table",
+        expr: `topk(15, sum by (postgresql_table_name) (postgresql_table_size_bytes{${PGDB},postgresql_table_name=~"public[.].+"}))`,
+      },
+    ],
+    {
+      w: 24,
+      transformations: [
+        {
+          id: "organize",
+          options: {
+            excludeByName: { Time: true },
+            renameByName: { postgresql_table_name: "Tabela", Value: "Tamanho" },
+          },
+        },
+        {
+          id: "sortBy",
+          options: { fields: {}, sort: [{ field: "Tamanho", desc: true }] },
+        },
+      ],
+      overrides: [
+        {
+          matcher: { id: "byName", options: "Tamanho" },
+          properties: [{ id: "unit", value: "bytes" }],
+        },
+      ],
+    },
   ),
 ]);
 
