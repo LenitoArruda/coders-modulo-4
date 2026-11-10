@@ -9,6 +9,10 @@ services:
       - "3010:3000"
       - "4317:4317"
       - "4318:4318"
+    volumes:
+      - ./observability/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/coders-modulo-4.yaml:ro
+      - ./observability/dashboards:/otel-lgtm/custom-dashboards:ro
+      - ./observability/lgtm-builtin-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/grafana-dashboards.yaml:ro
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
