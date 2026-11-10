@@ -8,6 +8,8 @@ import {
   E2E_CONFIRM_RATE_LIMITED_TOKEN,
   E2E_CONFIRM_TOKEN,
   E2E_CONFIRM_USED_TOKEN,
+  E2E_RESET_RATE_LIMITED_TOKEN,
+  E2E_RESET_TOKEN_PREFIX,
   E2E_SIGN_IN_DOMAIN,
   E2E_SIGN_IN_PASSWORD,
   E2E_VALID_SESSION_TOKEN,
@@ -52,6 +54,17 @@ type Body = Record<string, unknown>;
  * uses its own local part, so parallel tests never invalidate each other.
  */
 const latestSignInSession = new Map<string, number>();
+
+/** Passwords changed by a successful reset, per `<local>` of the sign-in account. */
+const passwordByLocal = new Map<string, string>();
+
+/** Reset tokens already consumed: a token works exactly once. */
+const usedResetTokens = new Set<string>();
+
+const RESET_PASSWORD_SUCCESS_MESSAGE =
+  "Your password has been updated. Sign in with your new password.";
+const RESET_PASSWORD_INVALID_MESSAGE =
+  "This password reset link is invalid or has expired.";
 
 function signInTokenOwner(token: string): { local: string; n: number } | null {
   const match = /^signin-(.+)-(\d+)$/.exec(token);
@@ -237,6 +250,7 @@ async function handleSignIn(
   const body = asRecord(await readJsonBody(request));
   const email = readString(body, "email").trim().toLowerCase();
   const password = readString(body, "password");
+  const local = email.slice(0, Math.max(email.indexOf("@"), 0));
 
   if (email === "rate-limited@example.com") {
     response.setHeader("Retry-After", "60");
@@ -267,7 +281,7 @@ async function handleSignIn(
   }
 
   if (
-    password !== E2E_SIGN_IN_PASSWORD ||
+    password !== (passwordByLocal.get(local) ?? E2E_SIGN_IN_PASSWORD) ||
     !email.endsWith(`@${E2E_SIGN_IN_DOMAIN}`)
   ) {
     sendJson(response, 401, {
@@ -277,7 +291,6 @@ async function handleSignIn(
     return;
   }
 
-  const local = email.slice(0, email.indexOf("@"));
   const n = (latestSignInSession.get(local) ?? 0) + 1;
 
   latestSignInSession.set(local, n);
@@ -328,6 +341,76 @@ async function handleForgotPassword(
   sendJson(response, 200, { message: FORGOT_PASSWORD_SUCCESS_MESSAGE });
 }
 
+function resetTokenOwner(token: string): string | null {
+  const match = /^reset-token:([^:]+):[^:]+$/.exec(token);
+
+  return match === null ? null : (match[1] ?? null);
+}
+
+/**
+ * Mirrors the real contract: rate limit first, then password validation (which
+ * never burns the token), then the single-use token. A successful reset
+ * changes the password and revokes every session of the account.
+ */
+async function handleResetPassword(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const body = asRecord(await readJsonBody(request));
+  const token = readString(body, "token").trim();
+  const password = readString(body, "password");
+  const passwordConfirmation = readString(body, "passwordConfirmation");
+
+  if (token === E2E_RESET_RATE_LIMITED_TOKEN) {
+    response.setHeader("Retry-After", "60");
+    sendJson(response, 429, {
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many attempts. Wait a moment and try again.",
+    });
+    return;
+  }
+
+  const fieldErrors: Record<string, string> = {};
+
+  if (password.length === 0) fieldErrors.password = "Enter a password.";
+  else if (password.length < 8)
+    fieldErrors.password = "Password must be at least 8 characters.";
+  else if (password.length > 128)
+    fieldErrors.password = "Password must be 128 characters or fewer.";
+
+  if (passwordConfirmation.length === 0)
+    fieldErrors.passwordConfirmation = "Confirm your password.";
+  else if (passwordConfirmation !== password || fieldErrors.password)
+    fieldErrors.passwordConfirmation = "Passwords do not match.";
+
+  if (Object.keys(fieldErrors).length > 0) {
+    sendJson(response, 400, {
+      code: "VALIDATION_ERROR",
+      message: "Check the highlighted fields and try again.",
+      fieldErrors,
+    });
+    return;
+  }
+
+  const local = token.startsWith(E2E_RESET_TOKEN_PREFIX)
+    ? resetTokenOwner(token)
+    : null;
+
+  if (local === null || usedResetTokens.has(token)) {
+    sendJson(response, 400, {
+      code: "INVALID_RESET_TOKEN",
+      message: RESET_PASSWORD_INVALID_MESSAGE,
+    });
+    return;
+  }
+
+  usedResetTokens.add(token);
+  passwordByLocal.set(local, password);
+  // Revoke every issued session: only a token newer than the last one is valid.
+  latestSignInSession.set(local, (latestSignInSession.get(local) ?? 0) + 1);
+  sendJson(response, 200, { message: RESET_PASSWORD_SUCCESS_MESSAGE });
+}
+
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${host}:${port}`)
     .pathname;
@@ -358,6 +441,11 @@ const server = createServer(async (request, response) => {
     request.method === "POST"
   ) {
     await handleForgotPassword(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/auth/reset-password" && request.method === "POST") {
+    await handleResetPassword(request, response);
     return;
   }
 
