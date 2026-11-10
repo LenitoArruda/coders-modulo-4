@@ -4,7 +4,8 @@ pre-commit:
     - name: lint-staged
       run: bunx lint-staged
 
+# The script resolves the message file itself: {1} breaks on paths with spaces.
 commit-msg:
   jobs:
     - name: commitlint
-      run: bunx commitlint --edit {1}
+      run: node scripts/commitlint-hook.mjs

@@ -1,7 +1,16 @@
 import type { INestApplication } from "@nestjs/common";
 import { Test, type TestingModule } from "@nestjs/testing";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { AppModule } from "../../../app.module";
 import { configureApp } from "../../../app-setup";
@@ -89,6 +98,10 @@ describe("POST /api/v1/auth/confirm", () => {
     emails.messages.length = 0;
     emails.failure = null;
     limiter.reset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   afterAll(async () => {
@@ -327,5 +340,42 @@ describe("POST /api/v1/auth/confirm", () => {
     );
 
     expect(active.filter((candidate) => candidate !== null)).toHaveLength(1);
+  });
+
+  it("não deve registrar e-mail, token ou JWT nos logs", async () => {
+    const lines: string[] = [];
+    const capture = (...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    };
+
+    vi.spyOn(console, "log").mockImplementation(capture);
+    vi.spyOn(console, "warn").mockImplementation(capture);
+    vi.spyOn(console, "error").mockImplementation(capture);
+
+    seedAccount();
+    const token = await seedToken(user);
+
+    const ok = await request(app.getHttpServer())
+      .post("/api/v1/auth/confirm")
+      .send({ token })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/confirm")
+      .send({ token })
+      .expect(409);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/confirm")
+      .send({ token: "invalid-token-value" })
+      .expect(400);
+
+    const output = lines.join("\n");
+
+    expect(output.length).toBeGreaterThan(0);
+    expect(output).not.toContain(user.email);
+    expect(output).not.toContain(token);
+    expect(output).not.toContain("invalid-token-value");
+    expect(output).not.toContain(ok.body.accessToken as string);
   });
 });

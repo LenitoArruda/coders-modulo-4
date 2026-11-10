@@ -42,7 +42,7 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 - Índices para busca por e-mail, token hash, usuário e sessão ativa.
 - RLS habilitado nas tabelas de auth, sem policies para `anon` ou `authenticated`; a API acessa com credencial de servidor.
 - Documentação do modelo de dados em `.docs/ARCHITECTURE.md` e atualização do `.env.example` se a conexão exigir variável nova.
-- Testes de migração, constraints e rollback.
+- Testes de migração e de constraints (pgTAP). O rollback é manual e documentado em comentário na migração; não há migração de descida nem teste de rollback.
 
 ### Fora
 
@@ -64,8 +64,8 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 ### Fluxos alternativos e de exceção
 
-- Banco já migrado: aplicar novamente não recria tabelas nem perde dados.
-- Rollback: a migração de descida remove as tabelas na ordem inversa das dependências.
+- Banco já migrado: a reaplicação é garantida pelo controle de migrações do Supabase (`supabase_migrations.schema_migrations`), que não reexecuta uma migração já registrada; a migração não usa `if not exists` para isso.
+- Rollback: manual, documentado em comentário no fim da migração (`drop` na ordem inversa das dependências, apenas local); não há migração de descida.
 - Violação de unicidade de e-mail: o banco rejeita a segunda linha com o mesmo e-mail normalizado.
 - Token expirado ou usado: a linha permanece para auditoria, mas não é considerada válida pelas consultas.
 - Sessão revogada: a linha permanece com `revoked_at` preenchido e não é considerada ativa.
@@ -73,13 +73,15 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 ## 7. Regras e casos de borda
 
-- `users.email` é obrigatório, normalizado para minúsculas, sem espaços nas extremidades, com limite de 254 caracteres e único de forma case-insensitive.
+- `users.email` é obrigatório, normalizado para minúsculas, sem espaços nas extremidades, com tamanho entre 3 e 254 caracteres (`users_email_length`), formato `local@dominio.tld` sem espaços nem segundo `@` (`users_email_format`) e único de forma case-insensitive (índice `users_email_unique` sobre `lower(email)`).
 - `users.first_name` e `users.last_name` são obrigatórios, com limite de 100 caracteres cada.
-- `users.password_hash` é obrigatório e armazena apenas hash forte; nunca a senha em claro.
+- `users.password_hash` é obrigatório, tem entre 20 e 255 caracteres (`users_password_hash_length`) e armazena apenas hash forte; nunca a senha em claro.
 - `users.email_confirmed_at` é nulo enquanto a conta não for confirmada e recebe timestamp UTC quando a confirmação acontece.
 - `auth_tokens.purpose` aceita apenas `email_confirmation` e `password_reset`.
 - `auth_tokens.token_hash` é único e armazena apenas o hash do token opaco; o valor em claro nunca é persistido.
-- `auth_tokens.expires_at` é obrigatório; confirmação usa 24 horas e reset usa 1 hora por padrão.
+- `auth_tokens.token_hash` tem entre 32 e 256 caracteres (`auth_tokens_token_hash_length`).
+- `auth_tokens.expires_at` é obrigatório e posterior a `created_at` (`auth_tokens_expiry_after_creation`); confirmação usa 24 horas e reset usa 1 hora por padrão.
+- `sessions.expires_at` também deve ser posterior a `created_at` (`sessions_expiry_after_creation`).
 - `auth_tokens.used_at` marca o consumo; token com `used_at` preenchido não pode ser reutilizado.
 - `sessions.origin` aceita apenas `sign_up_confirmation` e `sign_in`.
 - `sessions.expires_at` é obrigatório; o padrão proposto é 7 dias, configurável.
@@ -93,16 +95,16 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 
 ### `users`
 
-| Campo                | Regra                                                                |
-| -------------------- | -------------------------------------------------------------------- |
-| `id`                 | Identificador único, gerado pelo banco                               |
-| `first_name`         | Obrigatório, até 100 caracteres                                      |
-| `last_name`          | Obrigatório, até 100 caracteres                                      |
-| `email`              | Obrigatório, normalizado, único case-insensitive, até 254 caracteres |
-| `password_hash`      | Obrigatório, apenas hash                                             |
-| `email_confirmed_at` | Nulo até a confirmação; timestamp UTC depois                         |
-| `created_at`         | Timestamp UTC de criação                                             |
-| `updated_at`         | Timestamp UTC da última alteração                                    |
+| Campo                | Regra                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| `id`                 | Identificador único, gerado pelo banco                                               |
+| `first_name`         | Obrigatório, até 100 caracteres                                                      |
+| `last_name`          | Obrigatório, até 100 caracteres                                                      |
+| `email`              | Obrigatório, normalizado, único case-insensitive, 3 a 254 caracteres, formato válido |
+| `password_hash`      | Obrigatório, apenas hash, 20 a 255 caracteres                                        |
+| `email_confirmed_at` | Nulo até a confirmação; timestamp UTC depois                                         |
+| `created_at`         | Timestamp UTC de criação                                                             |
+| `updated_at`         | Timestamp UTC da última alteração                                                    |
 
 ### `auth_tokens`
 
@@ -111,7 +113,7 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 | `id`         | Identificador único, gerado pelo banco                 |
 | `user_id`    | Referência a `users`, obrigatória, `ON DELETE CASCADE` |
 | `purpose`    | `email_confirmation` ou `password_reset`               |
-| `token_hash` | Único, obrigatório, apenas hash                        |
+| `token_hash` | Único, obrigatório, apenas hash, 32 a 256 caracteres   |
 | `expires_at` | Obrigatório, timestamp UTC                             |
 | `used_at`    | Nulo até o consumo; uso único                          |
 | `created_at` | Timestamp UTC de criação                               |
@@ -130,7 +132,7 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 ### Migração e acesso
 
 - A migração é versionada em `supabase/migrations/` e aplicada por `bun run db:migrate`.
-- A migração tem descida segura para o ambiente local.
+- O rollback é manual (comentário na migração, apenas local); não há migração de descida.
 - As tabelas têm RLS habilitado e nenhuma policy para `anon` ou `authenticated`.
 - A API acessa o banco com credencial de servidor, nunca com a chave anônima.
 
@@ -146,38 +148,38 @@ Não aplicável nesta fatia. A verificação é feita pelos critérios de aceite
 ## 10. Requisitos não funcionais
 
 - A migração aplica em até 5 s no ambiente local.
-- A migração é idempotente e pode ser reaplicada sem perda de dados.
+- A reaplicação é garantida pelo controle de migrações do Supabase: uma migração já registrada não é reexecutada, então nenhum dado é perdido.
 - As constraints e índices não impedem o uso normal das fatias seguintes.
 - O schema é compatível com o Postgres do Supabase local e com a versão usada em produção.
 - A documentação do modelo de dados fica em `.docs/ARCHITECTURE.md`.
 
 ## 11. Dependências e riscos
 
-| Dependência ou risco                 | Impacto                                | Mitigação                                                 | Dono       |
-| ------------------------------------ | -------------------------------------- | --------------------------------------------------------- | ---------- |
-| Supabase local e CLI                 | Sem banco, a migração não roda         | `bun run infra:up` e `bun run db:migrate` documentados    | Engenharia |
-| Migração aplicada em banco com dados | Pode falhar ou perder dados            | Migração nova, sem alteração destrutiva; rollback testado | Engenharia |
-| Unicidade case-insensitive           | E-mails com maiúsculas podem duplicar  | Normalização na API e constraint no banco                 | Engenharia |
-| RLS mal configurado                  | Exposição de dados de auth             | RLS habilitado e teste de acesso anônimo negado           | Segurança  |
-| Tokens persistidos em claro          | Comprometimento de confirmação e reset | Persistir apenas hash e testar                            | Segurança  |
-| Sessões sem revogação                | Sessão antiga continua válida          | `revoked_at` e consulta de sessão ativa                   | Engenharia |
+| Dependência ou risco                 | Impacto                                | Mitigação                                                            | Dono       |
+| ------------------------------------ | -------------------------------------- | -------------------------------------------------------------------- | ---------- |
+| Supabase local e CLI                 | Sem banco, a migração não roda         | `bun run infra:up` e `bun run db:migrate` documentados               | Engenharia |
+| Migração aplicada em banco com dados | Pode falhar ou perder dados            | Migração nova, sem alteração destrutiva; rollback manual documentado | Engenharia |
+| Unicidade case-insensitive           | E-mails com maiúsculas podem duplicar  | Normalização na API e constraint no banco                            | Engenharia |
+| RLS mal configurado                  | Exposição de dados de auth             | RLS habilitado e teste de acesso anônimo negado                      | Segurança  |
+| Tokens persistidos em claro          | Comprometimento de confirmação e reset | Persistir apenas hash e testar                                       | Segurança  |
+| Sessões sem revogação                | Sessão antiga continua válida          | `revoked_at` e consulta de sessão ativa                              | Engenharia |
 
 ## 12. Rollout e migração
 
 - Não há usuários existentes; a migração cria o schema do zero.
 - A migração é aplicada no ambiente local e versionada no repositório.
 - Não há feature flag nesta entrega.
-- Rollback: reverter a migração e o commit; nenhum dado real é perdido no ambiente local.
+- Rollback: manual, executando os `drop` documentados em comentário na migração e revertendo o commit; nenhum dado real é perdido no ambiente local.
 - Comunicação: atualizar `.docs/ARCHITECTURE.md` na mesma mudança.
 
 ## 13. Estratégia de teste
 
-- **Migração:** aplicar em banco limpo, reaplicar e executar rollback.
-- **Constraints:** e-mail duplicado com variação de caixa, campos obrigatórios, limites de tamanho e `purpose` inválido.
+- **Migração:** aplicar em banco limpo; a reaplicação é garantida pelo controle de migrações do Supabase. Não há teste de rollback (manual).
+- **Constraints (pgTAP):** e-mail duplicado (índice `users_email_unique`, SQLSTATE 23505; a variação de caixa é barrada antes por `users_email_normalized`, 23514), campos obrigatórios (23502), limites de tamanho e formato (23514) e `purpose`/`origin` inválidos.
 - **Cascata:** excluir usuário e confirmar remoção de tokens e sessões.
 - **Tokens:** persistir token e confirmar que apenas o hash está armazenado; marcar `used_at` e impedir reutilização.
 - **Sessões:** criar sessão ativa, expirar, revogar e confirmar que apenas a ativa é retornada.
-- **Acesso:** tentar ler as tabelas com a chave anônima e confirmar negação.
+- **Acesso:** com `set local role anon`/`authenticated`, tentar ler e escrever nas tabelas e confirmar negação (42501).
 - **Manual:** inspecionar o schema no Supabase Studio e conferir índices e relacionamentos.
 
 ## 14. Critérios de aceite

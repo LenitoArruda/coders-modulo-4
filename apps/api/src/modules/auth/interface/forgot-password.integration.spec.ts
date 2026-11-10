@@ -1,7 +1,16 @@
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { AppModule } from "../../../app.module";
 import { configureApp } from "../../../app-setup";
@@ -75,6 +84,10 @@ describe("POST /api/v1/auth/forgot-password", () => {
     emails.messages.length = 0;
     emails.failure = null;
     limiter.reset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   afterAll(async () => {
@@ -223,5 +236,44 @@ describe("POST /api/v1/auth/forgot-password", () => {
     expect(authTokens.tokens[0]?.usedAt).not.toBeNull();
     expect(authTokens.tokens[1]?.usedAt).toBeNull();
     expect(emails.messages).toHaveLength(1);
+  });
+
+  it("não deve registrar e-mail ou token nos logs", async () => {
+    const lines: string[] = [];
+    const capture = (...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    };
+
+    vi.spyOn(console, "log").mockImplementation(capture);
+    vi.spyOn(console, "warn").mockImplementation(capture);
+    vi.spyOn(console, "error").mockImplementation(capture);
+
+    users.seed(seededUser);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/forgot-password")
+      .send({ email: seededUser.email })
+      .expect(200);
+
+    const clearToken = extractToken(emails.messages[0]?.text ?? "");
+
+    emails.failure = new Error(`smtp down for ${seededUser.email}`);
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/forgot-password")
+      .send({ email: seededUser.email })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/forgot-password")
+      .send({ email: "nobody@example.com" })
+      .expect(200);
+
+    const output = lines.join("\n");
+
+    expect(output.length).toBeGreaterThan(0);
+    expect(output).not.toContain(seededUser.email);
+    expect(output).not.toContain("nobody@example.com");
+    expect(output).not.toContain(clearToken);
+    expect(output).not.toContain(authTokens.tokens[0]?.tokenHash ?? "");
   });
 });
