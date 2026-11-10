@@ -7,3 +7,6 @@ process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4317";
 process.env.OTEL_SDK_DISABLED = "true";
 process.env.JWT_SECRET = "test-jwt-secret-with-at-least-32-characters";
 process.env.SESSION_TTL_SECONDS = "3600";
+process.env.CONFIRMATION_TOKEN_TTL_SECONDS = "86400";
+process.env.SIGN_UP_RATE_LIMIT_MAX = "5";
+process.env.SIGN_UP_RATE_LIMIT_WINDOW_SECONDS = "60";

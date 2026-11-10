@@ -1,13 +1,19 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { UsersRepositoryPort } from "../application/ports/users-repository.port";
+import {
+  UsersRepositoryPort,
+  type CreateUserRecord,
+  type UserAccount,
+} from "../application/ports/users-repository.port";
 import { SUPABASE_CLIENT } from "../auth.tokens";
 import type { AuthUser } from "../domain/auth-user";
+import { DuplicateEmailError } from "../domain/sign-up.errors";
 
 import { databaseFailure } from "./supabase-error";
 
 const USER_COLUMNS = "id, first_name, last_name, email";
+const USER_ACCOUNT_COLUMNS = `${USER_COLUMNS}, email_confirmed_at, password_hash`;
 
 type UserRow = {
   id: string;
@@ -16,7 +22,30 @@ type UserRow = {
   email: string;
 };
 
-/** Reads the basic account data exposed by authenticated endpoints. */
+type UserAccountRow = UserRow & {
+  email_confirmed_at: string | null;
+  password_hash: string;
+};
+
+function toAuthUser(row: UserRow): AuthUser {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+  };
+}
+
+function toUserAccount(row: UserAccountRow): UserAccount {
+  return {
+    ...toAuthUser(row),
+    emailConfirmedAt:
+      row.email_confirmed_at === null ? null : new Date(row.email_confirmed_at),
+    passwordHash: row.password_hash,
+  };
+}
+
+/** Reads and creates the account data used by auth flows. */
 @Injectable()
 export class SupabaseUsersRepository extends UsersRepositoryPort {
   constructor(
@@ -40,11 +69,48 @@ export class SupabaseUsersRepository extends UsersRepositoryPort {
       return null;
     }
 
-    return {
-      id: data.id,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      email: data.email,
-    };
+    return toAuthUser(data);
+  }
+
+  async findByEmail(email: string): Promise<UserAccount | null> {
+    const { data, error } = await this.client
+      .from("users")
+      .select(USER_ACCOUNT_COLUMNS)
+      .eq("email", email)
+      .maybeSingle<UserAccountRow>();
+
+    if (error !== null) {
+      throw databaseFailure("load user by email", error);
+    }
+
+    return data === null ? null : toUserAccount(data);
+  }
+
+  async create(record: CreateUserRecord): Promise<UserAccount> {
+    const { data, error } = await this.client
+      .from("users")
+      .insert({
+        first_name: record.firstName,
+        last_name: record.lastName,
+        email: record.email,
+        password_hash: record.passwordHash,
+      })
+      .select(USER_ACCOUNT_COLUMNS)
+      .single<UserAccountRow>();
+
+    if (error !== null) {
+      // Unique index violation: another request created the same email first.
+      if (error.code === "23505") {
+        throw new DuplicateEmailError();
+      }
+
+      throw databaseFailure("create user", error);
+    }
+
+    if (data === null) {
+      throw databaseFailure("create user", error);
+    }
+
+    return toUserAccount(data);
   }
 }

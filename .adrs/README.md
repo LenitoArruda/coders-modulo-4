@@ -43,12 +43,13 @@ escolha ao longo do tempo.
 | [0011](./0011-eslint-prettier-e-config-raiz.md)      | ESLint + Prettier com config raiz para lint-staged | `aceito` | 2026-11-09 |
 | [0012](./0012-auth-propria-na-api.md)                | Autenticação própria na API, sem Supabase Auth     | `aceito` | 2026-11-09 |
 | [0013](./0013-auth-session-jwt-cookie.md)            | Sessão com JWT, registro server-side e cookie      | `aceito` | 2026-11-09 |
+| [0014](./0014-hash-de-senha-com-scrypt.md)           | Hash de senha com scrypt nativo                    | `aceito` | 2026-11-09 |
 
 ## Decisões em aberto
 
 Temas ainda não decididos permanecem em
 [`.docs/ARCHITECTURE.md` §7](../.docs/ARCHITECTURE.md#7-decisões-em-aberto): deploy da API,
-multi-tenancy/RLS, algoritmo de hash de senha, futuro de `apps/docs`, OXLint/OXFmt, contratos de
-`packages/shared`, versão de PostgreSQL em produção e reativação do Supabase Analytics.
+multi-tenancy/RLS, futuro de `apps/docs`, OXLint/OXFmt, contratos de `packages/shared`, versão de
+PostgreSQL em produção e reativação do Supabase Analytics.
 
 Quando uma delas for fechada, crie o ADR correspondente e mova a linha para o índice acima.

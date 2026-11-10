@@ -1,11 +1,11 @@
 # Auth sign-up — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-09
+> **Status:** done
+> **Atualizado em:** 2026-11-10
 > **Autor:** Time de engenharia
 > **Mapa:** `.plans/001-auth-breakdown.md`
 > **Depende de:** `.specs/001-auth-schema.md`, `.specs/002-auth-session.md`, `.specs/003-auth-routes.md`
-> **Plano:** `.plans/004-auth-sign-up-plan.md` (a criar pelo `implement-me`)
+> **Plano:** `.plans/004-auth-sign-up-plan.md`
 
 ## 1. Contexto e problema
 
@@ -197,13 +197,13 @@ Formato de erro padrão:
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um visitante em `/auth/sign-up`, quando envia first name, last name, email, password e confirm password válidos, então uma conta não confirmada é criada e um e-mail de confirmação en-US é enviado.
-- [ ] Dados campos ausentes, e-mail inválido, senha fora da política ou confirmação diferente, quando o formulário é enviado, então nenhuma conta é criada, os erros aparecem junto aos campos e a interface continua acessível por teclado e leitor de tela.
-- [ ] Dado um e-mail já confirmado, quando alguém tenta se cadastrar, então a API responde `409` e não cria duplicata; dado um e-mail não confirmado, então a API responde `200`, reenvia a confirmação e não duplica a conta.
-- [ ] Dado um sign-up bem-sucedido, quando o e-mail é inspecionado, então o link aponta para `/auth/confirm?token=...`, o token é de uso único, expira em 24 horas e não aparece em logs.
-- [ ] Dado um sign-up bem-sucedido, quando a resposta é inspecionada, então nenhuma sessão, JWT ou cookie é criado e `/app` continua protegido.
-- [ ] Dado excesso de tentativas, quando o endpoint é chamado repetidamente, então a API responde `429` sem revelar detalhes internos.
-- [ ] Dado o fluxo e a documentação, quando a entrega é verificada, então a página e o e-mail usam en-US, a UI é light-only, acessível e responsiva, e nenhuma senha ou token aparece em logs.
+- [x] Dado um visitante em `/auth/sign-up`, quando envia first name, last name, email, password e confirm password válidos, então uma conta não confirmada é criada e um e-mail de confirmação en-US é enviado.
+- [x] Dados campos ausentes, e-mail inválido, senha fora da política ou confirmação diferente, quando o formulário é enviado, então nenhuma conta é criada, os erros aparecem junto aos campos e a interface continua acessível por teclado e leitor de tela.
+- [x] Dado um e-mail já confirmado, quando alguém tenta se cadastrar, então a API responde `409` e não cria duplicata; dado um e-mail não confirmado, então a API responde `200`, reenvia a confirmação e não duplica a conta.
+- [x] Dado um sign-up bem-sucedido, quando o e-mail é inspecionado, então o link aponta para `/auth/confirm?token=...`, o token é de uso único, expira em 24 horas e não aparece em logs.
+- [x] Dado um sign-up bem-sucedido, quando a resposta é inspecionada, então nenhuma sessão, JWT ou cookie é criado e `/app` continua protegido.
+- [x] Dado excesso de tentativas, quando o endpoint é chamado repetidamente, então a API responde `429` sem revelar detalhes internos.
+- [x] Dado o fluxo e a documentação, quando a entrega é verificada, então a página e o e-mail usam en-US, a UI é light-only, acessível e responsiva, e nenhuma senha ou token aparece em logs.
 
 ## 15. Decisões e questões abertas
 

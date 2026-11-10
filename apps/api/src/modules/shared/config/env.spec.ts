@@ -20,6 +20,9 @@ describe("loadEnv", () => {
       serviceName: "coders-modulo-4-api",
       jwtSecret: "test-jwt-secret-with-at-least-32-characters",
       sessionTtlSeconds: 604_800,
+      confirmationTokenTtlSeconds: 86_400,
+      signUpRateLimitMax: 5,
+      signUpRateLimitWindowSeconds: 60,
       smtpHost: "127.0.0.1",
       smtpPort: 54_325,
       smtpFrom: "no-reply@localhost",
@@ -59,6 +62,35 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ ...validEnv, SESSION_TTL_SECONDS: "0" })).toThrow(
       /SESSION_TTL_SECONDS/,
     );
+  });
+
+  it("deve aplicar a configuração de sign-up quando informada", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        CONFIRMATION_TOKEN_TTL_SECONDS: "7200",
+        SIGN_UP_RATE_LIMIT_MAX: "10",
+        SIGN_UP_RATE_LIMIT_WINDOW_SECONDS: "120",
+      }),
+    ).toMatchObject({
+      confirmationTokenTtlSeconds: 7_200,
+      signUpRateLimitMax: 10,
+      signUpRateLimitWindowSeconds: 120,
+    });
+  });
+
+  it("deve falhar quando a configuração de sign-up é inválida", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, CONFIRMATION_TOKEN_TTL_SECONDS: "abc" }),
+    ).toThrow(/CONFIRMATION_TOKEN_TTL_SECONDS/);
+
+    expect(() => loadEnv({ ...validEnv, SIGN_UP_RATE_LIMIT_MAX: "0" })).toThrow(
+      /SIGN_UP_RATE_LIMIT_MAX/,
+    );
+
+    expect(() =>
+      loadEnv({ ...validEnv, SIGN_UP_RATE_LIMIT_WINDOW_SECONDS: "0" }),
+    ).toThrow(/SIGN_UP_RATE_LIMIT_WINDOW_SECONDS/);
   });
 
   it("deve falhar quando a porta do SMTP é inválida", () => {

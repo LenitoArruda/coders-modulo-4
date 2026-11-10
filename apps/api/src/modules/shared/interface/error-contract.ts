@@ -1,6 +1,6 @@
 import { HttpException, UnauthorizedException } from "@nestjs/common";
 
-export type FieldErrors = Record<string, string[]>;
+export type FieldErrors = Record<string, string>;
 
 export type ErrorContract = {
   code: string;
@@ -71,7 +71,10 @@ export function toErrorContract(exception: unknown): {
     const status = exception.getStatus();
     const payload = exception.getResponse();
 
-    if (status >= 500) {
+    // Server errors are opaque unless the thrower explicitly used the public
+    // contract (for example, the actionable 503 for a failed confirmation
+    // email). Anything else must not leak internal details.
+    if (status >= 500 && !isContractPayload(payload)) {
       return {
         status,
         body: { code: INTERNAL_ERROR_CODE, message: INTERNAL_ERROR_MESSAGE },
