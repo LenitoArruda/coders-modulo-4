@@ -98,6 +98,11 @@ Antes de começar, verifique se existe uma skill adequada ao domínio da tarefa:
   aplica o padrão de camadas com conceitos hexagonais, um use case por fluxo e um request
   handler por endpoint (1:1), com seis subagentes sequenciais (auditoria, plano, execução, QA,
   commit/push e PR).
+- **Revisão de PR:** `code-review` (`/code-review <url-do-pr>`) — delega ao subagente
+  `code-reviewer` (`.claude/agents/code-reviewer.md`), publica comentários inline em
+  Conventional Comments e um comentário geral. Veredito determinístico: ao menos um `issue` ou
+  `blocking` ⇒ request changes; caso contrário ⇒ approve (sem review neutra). Use
+  `--dry-run` para conferir antes de publicar.
 - **UI/UX:** `frontend-design` e `web-design-guidelines` são obrigatórias **quando disponíveis**.
 - **Banco de dados:** skill de PostgreSQL/Supabase.
 - **Framework:** skill de Next.js, React ou NestJS, conforme o caso.
