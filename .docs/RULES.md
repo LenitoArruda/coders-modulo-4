@@ -32,7 +32,8 @@ Antes de iniciar qualquer desenvolvimento:
    vaga ou for necessário descobrir requisitos. Quando o pedido descrever um épico ou várias
    features, use `breakdown-specs` antes de `create-spec` para gerar o mapa em `.plans/` e as
    specs em ordem de dependência. Para executar várias specs aprovadas de uma vez, use
-   `orchestrate-me`: um subagente por spec, em paralelo, com integração por onda.
+   `orchestrate-me`: um subagente por spec, em paralelo, com integração por onda. Para refatorar
+   vertical slices da API para o padrão de camadas, use `refactor-vertical-slices`.
 
 ---
 

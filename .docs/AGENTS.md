@@ -94,6 +94,10 @@ Antes de começar, verifique se existe uma skill adequada ao domínio da tarefa:
 - **Execução paralela de specs:** `orchestrate-me` — orquestra um range de specs (ex.:
   `001-010`) com subagentes em background, um worktree por spec, ondas de dependência e
   integração por onda (merge + QA + push).
+- **Refatoração arquitetural:** `refactor-vertical-slices` — audita as vertical slices da API,
+  aplica o padrão de camadas com conceitos hexagonais, um use case por fluxo e um request
+  handler por endpoint (1:1), com seis subagentes sequenciais (auditoria, plano, execução, QA,
+  commit/push e PR).
 - **UI/UX:** `frontend-design` e `web-design-guidelines` são obrigatórias **quando disponíveis**.
 - **Banco de dados:** skill de PostgreSQL/Supabase.
 - **Framework:** skill de Next.js, React ou NestJS, conforme o caso.
