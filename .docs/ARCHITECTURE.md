@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha implementados — produto não implementado · **Atualizado em:** 2026-11-10
+> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha implementados — produto não implementado · **Atualizado em:** 2026-11-11
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
@@ -137,9 +137,10 @@ apps/api/src/
 ├── modules/
 │   ├── auth/
 │   │   ├── domain/              # Session, SessionOrigin, AuthUser, SignUpInput, erros de auth
-│   │   ├── application/         # Casos de uso (sessão, sign-up, confirmação, reset), templates, portas
+│   │   ├── application/         # Casos de uso (inclui GetCurrentUserUseCase), templates, portas
 │   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios Supabase, Mailtrap
-│   │   └── interface/           # guard, controller, rate limiter, testes de integração
+│   │   └── interface/           # request handlers (1 por endpoint), guard, rate limiter, testes de integração
+│   │       └── request-handlers/ # um handler por endpoint (sign-up, sign-in, sign-out, /me, confirm, forgot, reset)
 │   ├── hello/
 │   │   ├── domain/
 │   │   ├── application/
@@ -208,7 +209,8 @@ Regras centrais:
 O detalhamento de campos e constraints está em `.specs/001-auth-schema.md`. A fatia 002 entrega a
 infraestrutura de sessão descrita na §4.5, a fatia 004 o sign-up e a fatia 005 a confirmação
 descritos na §4.6, a fatia 006 o sign-in na §4.7 e as fatias 007 e 008 a solicitação de recuperação e a troca de senha
-na §4.8; o endpoint de sign-out ainda não existe.
+na §4.8; o sign-out é atendido por `POST /api/v1/auth/sign-out` (`204`, revoga a sessão atual e o JWT
+deixa de valer imediatamente).
 
 ### 4.5 Sessão de autenticação
 
@@ -224,20 +226,23 @@ web (server)                         api
                                                 └─► 200 { user }  |  401 UNAUTHORIZED
 ```
 
-| Peça                                 | Responsabilidade                                                                    |
-| ------------------------------------ | ----------------------------------------------------------------------------------- |
-| `CreateSessionUseCase`               | Cria a sessão, revoga as anteriores, assina o JWT e dispara o e-mail de nova sessão |
-| `ValidateSessionUseCase`             | Valida o JWT e confirma sessão ativa + dono antes de liberar a requisição           |
-| `SessionTokenPort` / `jose`          | Assina e valida HS256 com `JWT_SECRET`; claims `sub`, `sid`, `iat`, `exp`           |
-| `SessionsRepositoryPort` / Supabase  | Persiste, consulta e revoga sessões via PostgREST com `service_role`                |
-| `UsersRepositoryPort` / Supabase     | Carrega os dados básicos da pessoa autenticada                                      |
-| `EmailSenderPort` / Mailtrap         | Envia o template en-US de nova sessão pela API do Mailtrap                          |
-| `SessionGuard` + `@CurrentUser()`    | Extrai o Bearer, aplica o contrato de 401 e injeta a pessoa na rota                 |
-| `ErrorContractFilter` (`APP_FILTER`) | Serializa `{ code, message, fieldErrors? }` sem stack/SQL/detalhes internos         |
+| Peça                                                     | Responsabilidade                                                                        |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `CreateSessionUseCase`                                   | Cria a sessão, revoga as anteriores, assina o JWT e dispara o e-mail de nova sessão     |
+| `ValidateSessionUseCase`                                 | Valida o JWT e confirma sessão ativa + dono antes de liberar a requisição               |
+| `SessionTokenPort` / `jose`                              | Assina e valida HS256 com `JWT_SECRET`; claims `sub`, `sid`, `iat`, `exp`               |
+| `SessionsRepositoryPort` / Supabase                      | Persiste, consulta e revoga sessões via PostgREST com `service_role`                    |
+| `UsersRepositoryPort` / Supabase                         | Carrega os dados básicos da pessoa autenticada                                          |
+| `EmailSenderPort` / Mailtrap                             | Envia o template en-US de nova sessão pela API do Mailtrap                              |
+| `SessionGuard` + `@CurrentUser()`                        | Extrai o Bearer, aplica o contrato de 401 e injeta a pessoa na rota                     |
+| `GetCurrentUserRequestHandler` + `GetCurrentUserUseCase` | Atende `GET /auth/me` com o `AuthUser` já resolvido pelo guard, sem reler o repositório |
+| `ErrorContractFilter` (`APP_FILTER`)                     | Serializa `{ code, message, fieldErrors? }` sem stack/SQL/detalhes internos             |
 
 Regras:
 
 - Toda requisição autenticada relê a sessão: JWT válido **não** basta (revogação é imediata).
+- `GET /auth/me` não relê o usuário: o `SessionGuard` resolve o `AuthUser` e o entrega ao
+  `GetCurrentUserRequestHandler`, que delega a um `GetCurrentUserUseCase` fino (ADR 0015).
 - Sessão ativa = `revoked_at is null` e `expires_at > now`.
 - Sessão única: a criação grava a nova sessão e revoga as demais ativas (`id != novo`). Sem
   transação no banco nesta fatia, essa é a ordem que preserva o invariante sob concorrência; a
@@ -540,9 +545,10 @@ Fluxo resumido:
 > solicitação de recuperação de senha (`POST /api/v1/auth/forgot-password`,
 > `/auth/forgot-password`, token de reset e e-mail), a troca de senha
 > (`POST /api/v1/auth/reset-password`, `/auth/reset-password`, revogação de sessões) e o sign-in real
-> (`POST /api/v1/auth/sign-in`, `/auth/sign-in`, `returnTo` seguro) e o esqueleto de navegação
-> (`/auth/*` público, `/app/*` privado com shell e guard, raiz redirecionando por sessão). O
-> schema de auth veio na fatia 001; o sign-out ainda não existe.
+> (`POST /api/v1/auth/sign-in`, `/auth/sign-in`, `returnTo` seguro), o sign-out
+> (`POST /api/v1/auth/sign-out`, `204`, revoga a sessão atual e invalida o JWT imediatamente) e o
+> esqueleto de navegação (`/auth/*` público, `/app/*` privado com shell e guard, raiz
+> redirecionando por sessão). O schema de auth veio na fatia 001.
 
 ---
 
@@ -552,29 +558,30 @@ Cada decisão abaixo possui um registro correspondente em [`.adrs/`](../.adrs/RE
 contexto, alternativas e consequências. Decisões ainda em aberto permanecem na §7 até serem
 tomadas.
 
-| Decisão                                     | Motivo                                                                          | Estado                                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------- |
-| Monorepo com Turborepo + Bun                | Compartilhar código, cache e execução paralela                                  | ✅                                           |
-| Next.js App Router no front-end             | Server Components, streaming e SEO                                              | ✅                                           |
-| API separada em NestJS                      | Isolar domínio, ingestão e orquestração do front                                | ✅                                           |
-| Supabase local via CLI                      | Ambiente reproduzível sem instalação global                                     | ✅                                           |
-| Auth própria na API (sem Supabase Auth)     | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação         | ✅ (schema + sessão + sign-up + recuperação) |
-| Hash de senha com scrypt nativo             | Hash forte sem dependência nativa, com custo versionado (ADR 0014)              | ✅                                           |
-| Sessão com JWT HS256 + registro server-side | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`       | ✅                                           |
-| Cookie `HttpOnly` com ponte `Bearer` no web | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API          | ✅                                           |
-| Sessão única com create-then-revoke         | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)        | ✅ (follow-up)                               |
-| Namespace `/api/v1`                         | Versionar a API e manter contrato estável desde a primeira rota                 | ✅                                           |
-| Grupos `/auth/*` público e `/app/*` privado | Separar fluxo de auth da área privada, com guard server-side e layouts próprios | ✅                                           |
-| Contrato de erro global `{ code, message }` | Respostas previsíveis para o web sem stack, SQL ou detalhes internos            | ✅                                           |
-| Arquitetura em camadas + vertical slices    | Baixo acoplamento e evolução por domínio                                        | ✅ (`hello`)                                 |
-| Light theme único                           | Direção visual definida em `DESIGN.md`                                          | ✅                                           |
-| Tailwind CSS + shadcn/ui em `packages/ui`   | Base visual compartilhada e tokens únicos                                       | ✅                                           |
-| TypeScript `strict`                         | Segurança de tipos no monorepo                                                  | ✅                                           |
-| OpenTelemetry + Grafana LGTM desde o dia 0  | Diagnosticar ingestão e respostas de IA                                         | ✅                                           |
-| Vitest + Playwright + Supertest             | Unitário, E2E e API                                                             | ✅                                           |
-| LGTM all-in-one via Compose                 | Menos configuração e versões fixadas                                            | ✅                                           |
-| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`, indisponível por padrão no Docker Desktop  | ✅                                           |
-| PostgreSQL local em `15`                    | Workaround de ambiente; a versão alvo será decidida antes de produção           | ✅                                           |
+| Decisão                                     | Motivo                                                                            | Estado                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
+| Monorepo com Turborepo + Bun                | Compartilhar código, cache e execução paralela                                    | ✅                                           |
+| Next.js App Router no front-end             | Server Components, streaming e SEO                                                | ✅                                           |
+| API separada em NestJS                      | Isolar domínio, ingestão e orquestração do front                                  | ✅                                           |
+| Supabase local via CLI                      | Ambiente reproduzível sem instalação global                                       | ✅                                           |
+| Auth própria na API (sem Supabase Auth)     | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação           | ✅ (schema + sessão + sign-up + recuperação) |
+| Hash de senha com scrypt nativo             | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                | ✅                                           |
+| Sessão com JWT HS256 + registro server-side | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`         | ✅                                           |
+| Cookie `HttpOnly` com ponte `Bearer` no web | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API            | ✅                                           |
+| Sessão única com create-then-revoke         | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)          | ✅ (follow-up)                               |
+| Namespace `/api/v1`                         | Versionar a API e manter contrato estável desde a primeira rota                   | ✅                                           |
+| Grupos `/auth/*` público e `/app/*` privado | Separar fluxo de auth da área privada, com guard server-side e layouts próprios   | ✅                                           |
+| Contrato de erro global `{ code, message }` | Respostas previsíveis para o web sem stack, SQL ou detalhes internos              | ✅                                           |
+| Arquitetura em camadas + vertical slices    | Baixo acoplamento e evolução por domínio                                          | ✅ (auth, hello)                             |
+| Request handler 1:1 por endpoint            | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015) | ✅                                           |
+| Light theme único                           | Direção visual definida em `DESIGN.md`                                            | ✅                                           |
+| Tailwind CSS + shadcn/ui em `packages/ui`   | Base visual compartilhada e tokens únicos                                         | ✅                                           |
+| TypeScript `strict`                         | Segurança de tipos no monorepo                                                    | ✅                                           |
+| OpenTelemetry + Grafana LGTM desde o dia 0  | Diagnosticar ingestão e respostas de IA                                           | ✅                                           |
+| Vitest + Playwright + Supertest             | Unitário, E2E e API                                                               | ✅                                           |
+| LGTM all-in-one via Compose                 | Menos configuração e versões fixadas                                              | ✅                                           |
+| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`, indisponível por padrão no Docker Desktop    | ✅                                           |
+| PostgreSQL local em `15`                    | Workaround de ambiente; a versão alvo será decidida antes de produção             | ✅                                           |
 
 ---
 

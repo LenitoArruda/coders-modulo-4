@@ -67,27 +67,37 @@ apps/api/src/modules/<domain>/
 ├── application/
 ├── infrastructure/
 └── interface/
+    └── request-handlers/   # um *RequestHandler por endpoint (1:1)
 ```
 
 O slice `auth` é a referência de slice completo (quatro camadas); `hello` permanece como exemplo
-mínimo. `modules/shared` contém `config`, `logging`, `observability` e `interface` (contrato de
-erro). Fakes de teste vivem em `apps/api/src/test/fakes/`. Novos domínios seguem a mesma estrutura.
+mínimo. Cada endpoint HTTP é atendido por um `*RequestHandler` em `interface/request-handlers/`,
+com um único método de rota, que delega a um `*UseCase` — relação 1:1 entre handler, endpoint e
+caso de uso (ADR 0015). `modules/shared` contém `config`, `logging`, `observability` e `interface`
+(contrato de erro). Fakes de teste vivem em `apps/api/src/test/fakes/`. Novos domínios seguem a
+mesma estrutura.
 
 ### 3.1 Módulo auth — convenções
 
 - Portas são **classes abstratas**; os tokens de DI ficam em `modules/auth/auth.tokens.ts` e a
   montagem concreta em `auth.module.ts`. Não importe adaptadores de dentro de `application`.
-- Casos de uso não conhecem Nest nem HTTP. `CreateSessionUseCase` é **interno**: a rota pública de
-  criação de sessão entra nas fatias 005/006. `ValidateSessionUseCase` é usado pelo guard.
+- Casos de uso não conhecem Nest nem HTTP. Cada endpoint tem seu `*RequestHandler` em
+  `interface/request-handlers/`; `CreateSessionUseCase` e `ValidateSessionUseCase` são **serviços
+  internos** (o segundo é usado pelo guard), não rotas.
+- `GetCurrentUserUseCase` é fino: recebe o `AuthUser` já resolvido pelo `SessionGuard` e o devolve
+  sem reler o repositório. O guard continua validando a sessão em toda rota protegida.
 - Rotas protegidas usam `@UseGuards(SessionGuard)` e `@CurrentUser()`; a API **não** lê cookie —
   ela só aceita `Authorization: Bearer`.
-- `InvalidSessionError` é traduzido pelo guard em `401` com o contrato único da sessão; ausência,
-  expiração, revogação e assinatura inválida são indistinguíveis na resposta.
+- Erros de domínio/aplicação são traduzidos para HTTP **na interface**: cada handler mapeia o erro
+  do seu caso de uso e o guard traduz `InvalidSessionError` em `401` com o contrato único da
+  sessão; ausência, expiração, revogação e assinatura inválida são indistinguíveis na resposta.
 - Adaptadores convertem erros externos (jose, PostgREST, Mailtrap) sem vazar detalhes; falha de e-mail
   não derruba a sessão já criada.
 - Toda rota vive sob `/api/v1`; caminhos fora do prefixo respondem 404 com o mesmo contrato.
-- Testes de integração usam os fakes de repositório/e-mail e o adaptador `jose` **real** para
-  tokens; não há banco de teste nesta fatia (o banco local é coberto por QA manual + pgTAP).
+- Testes de integração são nomeados pelo fluxo (`get-current-user.integration.spec.ts`,
+  `confirm-account.integration.spec.ts`), usam os fakes de repositório/e-mail e o adaptador `jose`
+  **real** para tokens; não há banco de teste nesta fatia (o banco local é coberto por QA manual +
+  pgTAP).
 
 ---
 

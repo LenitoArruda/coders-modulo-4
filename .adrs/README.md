@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-> **Status:** ativo · **Atualizado em:** 2026-11-09
+> **Status:** ativo · **Atualizado em:** 2026-11-11
 
 Este diretório registra as decisões arquiteturais do projeto: o contexto, a decisão tomada, as
 consequências e as alternativas consideradas. A visão consolidada continua em
@@ -44,6 +44,7 @@ escolha ao longo do tempo.
 | [0012](./0012-auth-propria-na-api.md)                | Autenticação própria na API, sem Supabase Auth     | `aceito` | 2026-11-09 |
 | [0013](./0013-auth-session-jwt-cookie.md)            | Sessão com JWT, registro server-side e cookie      | `aceito` | 2026-11-09 |
 | [0014](./0014-hash-de-senha-com-scrypt.md)           | Hash de senha com scrypt nativo                    | `aceito` | 2026-11-09 |
+| [0015](./0015-request-handler-1-1.md)                | Request handler 1:1 e um use case por fluxo        | `aceito` | 2026-11-11 |
 
 ## Decisões em aberto
 

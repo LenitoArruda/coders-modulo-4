@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
 
 import { GetHelloUseCase } from "./application/get-hello.use-case";
-import { HelloController } from "./interface/hello.controller";
+import { GetHelloRequestHandler } from "./interface/request-handlers/get-hello.request-handler";
 
 @Module({
-  controllers: [HelloController],
+  controllers: [GetHelloRequestHandler],
   providers: [GetHelloUseCase],
 })
 export class HelloModule {}

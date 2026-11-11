@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: coders-modulo-4
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/custom-dashboards
+      foldersFromFilesStructure: false
