@@ -6,6 +6,7 @@ import { loadEnv } from "../shared/config/env";
 
 import { ConfirmAccountUseCase } from "./application/confirm-account.use-case";
 import { CreateSessionUseCase } from "./application/create-session.use-case";
+import { GetCurrentUserUseCase } from "./application/get-current-user.use-case";
 import { AuthTokensRepositoryPort } from "./application/ports/auth-tokens-repository.port";
 import { EmailSenderPort } from "./application/ports/email-sender.port";
 import { OpaqueTokenPort } from "./application/ports/opaque-token.port";
@@ -46,9 +47,15 @@ import { MailtrapEmailSender } from "./infrastructure/mailtrap-email.sender";
 import { SupabaseAuthTokensRepository } from "./infrastructure/supabase-auth-tokens.repository";
 import { SupabaseSessionsRepository } from "./infrastructure/supabase-sessions.repository";
 import { SupabaseUsersRepository } from "./infrastructure/supabase-users.repository";
-import { AuthController } from "./interface/auth.controller";
 import { ConfirmationRateLimiter } from "./interface/confirmation-rate-limiter";
 import { ForgotPasswordRateLimiter } from "./interface/forgot-password-rate-limiter";
+import { ConfirmAccountRequestHandler } from "./interface/request-handlers/confirm-account.request-handler";
+import { GetCurrentUserRequestHandler } from "./interface/request-handlers/get-current-user.request-handler";
+import { RequestPasswordResetRequestHandler } from "./interface/request-handlers/request-password-reset.request-handler";
+import { ResetPasswordRequestHandler } from "./interface/request-handlers/reset-password.request-handler";
+import { SignInRequestHandler } from "./interface/request-handlers/sign-in.request-handler";
+import { SignOutRequestHandler } from "./interface/request-handlers/sign-out.request-handler";
+import { SignUpRequestHandler } from "./interface/request-handlers/sign-up.request-handler";
 import { ResetPasswordRateLimiter } from "./interface/reset-password-rate-limiter";
 import { SessionGuard } from "./interface/session.guard";
 import { SignInRateLimiter } from "./interface/sign-in-rate-limiter";
@@ -60,7 +67,15 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
  * so importing the module never requires env vars.
  */
 @Module({
-  controllers: [AuthController],
+  controllers: [
+    SignOutRequestHandler,
+    GetCurrentUserRequestHandler,
+    SignInRequestHandler,
+    SignUpRequestHandler,
+    RequestPasswordResetRequestHandler,
+    ResetPasswordRequestHandler,
+    ConfirmAccountRequestHandler,
+  ],
   providers: [
     { provide: JWT_SECRET, useFactory: () => loadEnv().jwtSecret },
     {
@@ -164,20 +179,12 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     SignInUseCase,
     SignInRateLimiter,
     SignOutUseCase,
+    GetCurrentUserUseCase,
     ValidateSessionUseCase,
     SessionGuard,
   ],
-  exports: [
-    CreateSessionUseCase,
-    SignUpUseCase,
-    SignUpRateLimiter,
-    ConfirmAccountUseCase,
-    ConfirmationRateLimiter,
-    SignInUseCase,
-    SignInRateLimiter,
-    ValidateSessionUseCase,
-    SessionTokenPort,
-    JoseSessionTokenAdapter,
-  ],
+  // Exported so integration specs can sign JWTs through
+  // `moduleRef.get(SessionTokenPort)`; it is the module's only public provider.
+  exports: [SessionTokenPort],
 })
 export class AuthModule {}

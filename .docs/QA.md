@@ -130,6 +130,9 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] Status HTTP corretos (200, 201, 204, 400, 401, 403, 404, 409, 422, 500).
 - [ ] Validação de entrada e mensagens de erro claras.
 - [ ] Autenticação/autorização aplicadas.
+- [ ] Cada endpoint tem seu `*RequestHandler` em `interface/request-handlers/`, com um método de
+      rota e um `*UseCase` (1:1); não há controller multi-endpoint no escopo.
+- [ ] Erros de domínio/aplicação são traduzidos na interface, sem vazar detalhes internos.
 - [ ] Paginação, filtros e ordenação quando aplicável.
 - [ ] Nenhum detalhe interno (stack, SQL) exposto.
 - [ ] Logs com contexto e sem PII.
@@ -196,6 +199,8 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] JWT ausente, inválido, expirado, revogado ou `sub` divergente responde o **mesmo** 401 do
       contrato, sem detalhes internos.
 - [ ] Nova sessão revoga as anteriores; o JWT antigo deixa de valer imediatamente.
+- [ ] `POST /api/v1/auth/sign-out` com sessão ativa → `204` sem corpo, sessão revogada e o JWT
+      deixa de valer imediatamente; sem token ou token inválido → `401` do contrato.
 - [ ] Sessão expirada (`expires_at` no passado) não é considerada ativa.
 - [ ] E-mail de nova sessão: assunto "New session on your account", data/hora, alerta de senha e
       link para `/auth/forgot-password`.
@@ -415,7 +420,7 @@ Requisitos:
 | OXLint/OXFmt não adotados                   | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
 | Skills locais em `.agents/` não versionadas | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
 | Rate limit em memória                       | Limites de sign-up e confirmação são locais ao processo; store compartilhado é follow-up                                             |
-| Sem sign-out/refresh                        | Sessão só termina por expiração ou por nova sessão; fatias 006+ tratam sign-in/sign-out                                              |
+| Sem refresh de sessão                       | Sign-out implementado em `POST /api/v1/auth/sign-out`; a sessão ainda só é renovada por novo sign-in                                 |
 | Sessão única sem atomicidade no banco       | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                             |
 
 Ao resolver uma lacuna, atualize esta tabela e o documento relacionado.
