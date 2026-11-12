@@ -16,7 +16,7 @@ o fluxo obrigatório de trabalho e o que nunca pode ser feito.
   Jira, PDF etc.) para responder perguntas e produzir análises.
 - **Repositório:** monorepo **Turborepo** gerenciado com **Bun**.
 - **Estado atual:** **fundação implementada** — `apps/web`, `apps/api`,
-  `packages/ui` com Tailwind/shadcn, Supabase local, migrações, testes e observabilidade
+  `packages/ui` com Tailwind/shadcn, PostgreSQL 18 local, migrações, testes e observabilidade
   (LGTM). O produto e as features de negócio ainda **não estão implementados**. Veja
   [ARCHITECTURE.md](./ARCHITECTURE.md#2-estrutura-atual).
 
@@ -104,7 +104,7 @@ Antes de começar, verifique se existe uma skill adequada ao domínio da tarefa:
   `blocking` ⇒ request changes; caso contrário ⇒ approve (sem review neutra). Use
   `--dry-run` para conferir antes de publicar.
 - **UI/UX:** `frontend-design` e `web-design-guidelines` são obrigatórias **quando disponíveis**.
-- **Banco de dados:** skill de PostgreSQL/Supabase.
+- **Banco de dados:** skill de PostgreSQL.
 - **Framework:** skill de Next.js, React ou NestJS, conforme o caso.
 - **Conteúdo:** skill de copywriting ou SEO, quando houver texto público.
 

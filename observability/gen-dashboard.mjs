@@ -462,7 +462,7 @@ line(4, [
     "Queries",
     prom,
     `sum(increase(traces_spanmetrics_calls_total{${DB}}[$__range]))`,
-    { w: 6, description: "Chamadas ao Postgres (via supabase-js) no período." },
+    { w: 6, description: "Chamadas ao PostgreSQL (via pg) no período." },
   ),
   stat(
     "Taxa de erro",

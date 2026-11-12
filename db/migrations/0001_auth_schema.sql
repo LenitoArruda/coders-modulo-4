@@ -1,5 +1,5 @@
 -- Auth schema: users, opaque tokens and server-side sessions.
--- Custom auth owned by the API; Supabase/Postgres is only the database.
+-- Custom auth owned by the API; PostgreSQL is only the database.
 
 -- ---------------------------------------------------------------------------
 -- users
@@ -47,7 +47,7 @@ for each row
 execute function public.set_updated_at();
 
 comment on table public.users is
-  'Application users authenticated by the API, not by Supabase Auth.';
+  'Application users authenticated by the API.';
 comment on column public.users.email is
   'Normalized lowercase email; uniqueness is case-insensitive.';
 comment on column public.users.password_hash is
@@ -119,19 +119,12 @@ comment on column public.sessions.revoked_at is
 -- ---------------------------------------------------------------------------
 -- Access control
 -- ---------------------------------------------------------------------------
+-- The API connects as the schema owner and is the only database client.
+-- RLS stays enabled without policies as defense in depth: no other role can
+-- read or write auth data even if it receives a connection by mistake.
 alter table public.users enable row level security;
 alter table public.auth_tokens enable row level security;
 alter table public.sessions enable row level security;
-
--- No policies for anon/authenticated: the browser cannot read or write auth data.
-revoke all on table public.users from anon, authenticated;
-revoke all on table public.auth_tokens from anon, authenticated;
-revoke all on table public.sessions from anon, authenticated;
-
--- The API uses the server credential, which bypasses RLS.
-grant select, insert, update, delete on table public.users to service_role;
-grant select, insert, update, delete on table public.auth_tokens to service_role;
-grant select, insert, update, delete on table public.sessions to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Rollback (manual, local only; reverse dependency order)

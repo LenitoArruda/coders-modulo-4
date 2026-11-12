@@ -45,9 +45,8 @@ export const DEFAULT_RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = 60;
 export type Env = {
   port: number;
   webOrigin: string;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  supabaseServiceRoleKey: string;
+  /** PostgreSQL connection string; the only database configuration the API needs. */
+  databaseUrl: string;
   otlpEndpoint: string;
   serviceName: string;
   jwtSecret: string;
@@ -107,23 +106,30 @@ function isValidHttpUrl(value: string): boolean {
   }
 }
 
+/** PostgreSQL URLs are accepted with either `postgres://` or `postgresql://`. */
+function isValidPostgresUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+
+    return url.protocol === "postgres:" || url.protocol === "postgresql:";
+  } catch {
+    return false;
+  }
+}
+
 export function loadEnv(source: EnvSource = process.env): Env {
   const missing: string[] = [];
   const invalid: string[] = [];
 
   const webOrigin = readString(source.WEB_ORIGIN);
-  const supabaseUrl = readString(source.SUPABASE_URL);
-  const supabaseAnonKey = readString(source.SUPABASE_ANON_KEY);
-  const supabaseServiceRoleKey = readString(source.SUPABASE_SERVICE_ROLE_KEY);
+  const databaseUrl = readString(source.DATABASE_URL);
   const otlpEndpoint = readString(source.OTEL_EXPORTER_OTLP_ENDPOINT);
   const serviceName =
     readString(source.OTEL_SERVICE_NAME) || "coders-modulo-4-api";
   const jwtSecret = readString(source.JWT_SECRET);
 
   if (!webOrigin) missing.push("WEB_ORIGIN");
-  if (!supabaseUrl) missing.push("SUPABASE_URL");
-  if (!supabaseAnonKey) missing.push("SUPABASE_ANON_KEY");
-  if (!supabaseServiceRoleKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (!databaseUrl) missing.push("DATABASE_URL");
   if (!otlpEndpoint) missing.push("OTEL_EXPORTER_OTLP_ENDPOINT");
   if (!jwtSecret) missing.push("JWT_SECRET");
 
@@ -324,7 +330,9 @@ export function loadEnv(source: EnvSource = process.env): Env {
   }
 
   if (webOrigin && !isValidHttpUrl(webOrigin)) invalid.push("WEB_ORIGIN");
-  if (supabaseUrl && !isValidHttpUrl(supabaseUrl)) invalid.push("SUPABASE_URL");
+  if (databaseUrl && !isValidPostgresUrl(databaseUrl)) {
+    invalid.push("DATABASE_URL");
+  }
   if (otlpEndpoint && !isValidHttpUrl(otlpEndpoint)) {
     invalid.push("OTEL_EXPORTER_OTLP_ENDPOINT");
   }
@@ -336,9 +344,7 @@ export function loadEnv(source: EnvSource = process.env): Env {
   return {
     port,
     webOrigin: new URL(webOrigin).origin,
-    supabaseUrl,
-    supabaseAnonKey,
-    supabaseServiceRoleKey,
+    databaseUrl,
     otlpEndpoint,
     serviceName,
     jwtSecret,

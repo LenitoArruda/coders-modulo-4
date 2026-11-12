@@ -13,35 +13,47 @@
  * Variáveis opcionais: LOAD_USERS (padrão 300), LOAD_PASSWORD.
  * Todos os e-mails seguem `loadtest-<n>@loadtest.invalid`; o `--clean` apaga
  * apenas esse padrão (inclusive contas criadas pelo cenário de sign-up).
+ * O seed só roda contra um PostgreSQL local (loopback), nunca remoto.
  */
 import { randomBytes, scrypt } from "node:crypto";
 
-const SUPABASE_URL = process.env.SUPABASE_URL ?? "http://127.0.0.1:54321";
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import pg from "pg";
+
 const USERS = Number(process.env.LOAD_USERS ?? 300);
 const PASSWORD = process.env.LOAD_PASSWORD ?? "LoadTest#2026";
 const EMAIL_DOMAIN = "loadtest.invalid";
 const BATCH_SIZE = 100;
+const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
 // Mesmos parâmetros de scrypt-password-hasher.adapter.ts: N=2^15, r=8, p=1.
 const LOG_N = 15;
 const HASH_PREFIX = `$scrypt$ln=${LOG_N},r=8,p=1$`;
 
-if (!SERVICE_KEY) {
-  console.error(
-    "SUPABASE_SERVICE_ROLE_KEY ausente. Rode com: node --env-file=.env load-tests/seed.mjs",
-  );
+function fail(message) {
+  console.error(message);
   process.exit(1);
 }
 
-if (
-  !SUPABASE_URL.includes("127.0.0.1") &&
-  !SUPABASE_URL.includes("localhost")
-) {
-  console.error(
-    `Recusando rodar contra ${SUPABASE_URL}: o seed só é permitido no Supabase local.`,
+const DATABASE_URL = process.env.DATABASE_URL?.trim();
+
+if (!DATABASE_URL) {
+  fail(
+    "DATABASE_URL ausente. Rode com: node --env-file=.env load-tests/seed.mjs",
   );
-  process.exit(1);
+}
+
+let databaseHost;
+
+try {
+  databaseHost = new URL(DATABASE_URL).hostname;
+} catch {
+  fail("DATABASE_URL inválida: informe uma URL postgres:// ou postgresql://.");
+}
+
+if (!LOCAL_HOSTS.has(databaseHost)) {
+  fail(
+    `Recusando rodar contra ${databaseHost}: o seed só é permitido em PostgreSQL local.`,
+  );
 }
 
 function hashPassword(password) {
@@ -68,53 +80,41 @@ function hashPassword(password) {
   });
 }
 
-async function rest(path, init = {}) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: SERVICE_KEY,
-      authorization: `Bearer ${SERVICE_KEY}`,
-      "content-type": "application/json",
-      ...init.headers,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `${init.method ?? "GET"} ${path} -> ${response.status} ${await response.text()}`,
-    );
-  }
-
-  return response;
-}
-
-async function clean() {
+async function clean(client) {
   // sessions e auth_tokens saem junto (on delete cascade).
-  const response = await rest(
-    `users?email=like.${encodeURIComponent(`loadtest-%@${EMAIL_DOMAIN}`)}`,
-    { method: "DELETE", headers: { prefer: "return=representation" } },
+  const result = await client.query(
+    "delete from public.users where email like $1",
+    [`loadtest-%@${EMAIL_DOMAIN}`],
   );
-  const removed = await response.json();
 
-  console.log(`Removidos ${removed.length} usuários de carga.`);
+  console.log(`Removidos ${result.rowCount ?? 0} usuários de carga.`);
 }
 
-async function seed() {
+async function seed(client) {
   const passwordHash = await hashPassword(PASSWORD);
-  const confirmedAt = new Date().toISOString();
-  const rows = Array.from({ length: USERS }, (_, index) => ({
-    first_name: "Load",
-    last_name: `Test ${index + 1}`,
-    email: `loadtest-${index + 1}@${EMAIL_DOMAIN}`,
-    password_hash: passwordHash,
-    email_confirmed_at: confirmedAt,
-  }));
+  const rows = Array.from({ length: USERS }, (_, index) => [
+    "Load",
+    `Test ${index + 1}`,
+    `loadtest-${index + 1}@${EMAIL_DOMAIN}`,
+    passwordHash,
+    new Date(),
+  ]);
 
   for (let start = 0; start < rows.length; start += BATCH_SIZE) {
-    await rest("users", {
-      method: "POST",
-      body: JSON.stringify(rows.slice(start, start + BATCH_SIZE)),
-    });
+    const batch = rows.slice(start, start + BATCH_SIZE);
+    const values = batch
+      .map(
+        (_, index) =>
+          `($${index * 5 + 1}, $${index * 5 + 2}, $${index * 5 + 3}, $${index * 5 + 4}, $${index * 5 + 5})`,
+      )
+      .join(", ");
+
+    await client.query(
+      `insert into public.users
+         (first_name, last_name, email, password_hash, email_confirmed_at)
+       values ${values}`,
+      batch.flat(),
+    );
   }
 
   console.log(
@@ -122,8 +122,16 @@ async function seed() {
   );
 }
 
-await clean();
+const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 1 });
+const client = await pool.connect();
 
-if (!process.argv.includes("--clean")) {
-  await seed();
+try {
+  await clean(client);
+
+  if (!process.argv.includes("--clean")) {
+    await seed(client);
+  }
+} finally {
+  client.release();
+  await pool.end();
 }

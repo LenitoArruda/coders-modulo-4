@@ -35,12 +35,12 @@ interface ──► application ──► domain
              infrastructure
 ```
 
-| Camada           | Contém                                                    | Não pode                               |
-| ---------------- | --------------------------------------------------------- | -------------------------------------- |
-| `domain`         | Entidades, value objects, regras e serviços de domínio    | Importar framework, banco, HTTP ou SDK |
-| `application`    | Casos de uso, portas, orquestração                        | Conhecer implementações concretas      |
-| `infrastructure` | Repositórios, Supabase, filas, eventos, clientes externos | Conter regra de negócio                |
-| `interface`      | Controllers, DTOs, presenters, validação de entrada       | Acessar banco diretamente              |
+| Camada           | Contém                                                 | Não pode                               |
+| ---------------- | ------------------------------------------------------ | -------------------------------------- |
+| `domain`         | Entidades, value objects, regras e serviços de domínio | Importar framework, banco, HTTP ou SDK |
+| `application`    | Casos de uso, portas, orquestração                     | Conhecer implementações concretas      |
+| `infrastructure` | Repositórios (`pg`), filas, eventos, clientes externos | Conter regra de negócio                |
+| `interface`      | Controllers, DTOs, presenters, validação de entrada    | Acessar banco diretamente              |
 
 Regras:
 
@@ -91,13 +91,31 @@ mesma estrutura.
 - Erros de domínio/aplicação são traduzidos para HTTP **na interface**: cada handler mapeia o erro
   do seu caso de uso e o guard traduz `InvalidSessionError` em `401` com o contrato único da
   sessão; ausência, expiração, revogação e assinatura inválida são indistinguíveis na resposta.
-- Adaptadores convertem erros externos (jose, PostgREST, Mailtrap) sem vazar detalhes; falha de e-mail
-  não derruba a sessão já criada.
+- Adaptadores convertem erros externos (jose, `pg`/SQLSTATE, Mailtrap) sem vazar detalhes; falha de
+  e-mail não derruba a sessão já criada.
 - Toda rota vive sob `/api/v1`; caminhos fora do prefixo respondem 404 com o mesmo contrato.
 - Testes de integração são nomeados pelo fluxo (`get-current-user.integration.spec.ts`,
   `confirm-account.integration.spec.ts`), usam os fakes de repositório/e-mail e o adaptador `jose`
-  **real** para tokens; não há banco de teste nesta fatia (o banco local é coberto por QA manual +
-  pgTAP).
+  **real** para tokens; não há banco de teste nesta fatia (o schema local é coberto pelos testes
+  SQL de `db/tests/` executados com `bun run db:test`).
+
+### 3.2 Banco de dados — convenções
+
+- **Acesso:** `pg` com SQL parametrizado (`$1`, `$2`, …) e um pool global (`DatabaseModule`) — sem
+  ORM ou query builder (ADR 0016). Nunca interpole valores na string SQL.
+- **Repositórios:** cada adaptador em `infrastructure/` implementa uma porta de `application/` e
+  envolve a query em `withDbSpan` (span CLIENT `SELECT|INSERT|UPDATE|DELETE <tabela>`).
+- **Erros:** converta SQLSTATE em erro estável via `database-error.ts`; nunca logue a mensagem
+  bruta, que pode conter PII. `23505` (unique violation) vira `DuplicateEmailError` no cadastro.
+- **Migrações:** SQL versionado em `db/migrations/NNNN_<slug>.sql`, aplicado em ordem por
+  `bun run db:migrate` (`scripts/db.mjs`), com `pg_advisory_lock`, transação por arquivo e registro
+  em `schema_migrations`. Uma migração aplicada não é editada; crie a próxima.
+- **Testes de schema:** SQL em `db/tests/NNN_<slug>.test.sql`, executados por `bun run db:test`
+  dentro de `BEGIN`/`ROLLBACK`. Use `DO $$ ... RAISE EXCEPTION ... $$` para asserções.
+- **RLS:** habilitado nas tabelas de domínio, sem policies públicas. A API é o único cliente do
+  banco e acessa com o usuário do Compose; não existem papéis `anon`/`authenticated`/`service_role`.
+- **Dados locais:** descartáveis. Para recriar o schema do zero, derrube o volume do Compose e
+  rode `bun run db:migrate`.
 
 ---
 
@@ -228,7 +246,7 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 - Segredos apenas em variáveis de ambiente; valide no boot.
 - `.env` nunca é commitado.
 - Autenticação e autorização em toda rota protegida.
-- Isole dados por workspace/tenant; com Supabase, use **RLS**.
+- Isole dados por workspace/tenant; com PostgreSQL, use **RLS**.
 - Tokens de conectores criptografados e com menor privilégio.
 - Sanitize entradas e evite injeção (SQL, prompt, HTML).
 - Em IA: trate conteúdo externo como **não confiável** (prompt injection).

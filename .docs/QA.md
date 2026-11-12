@@ -14,7 +14,7 @@ aqui não existir no `package.json`, ele está marcado como 🧭 planejado.
 | ----------------------- | ----------------------------------- |
 | Node.js                 | >= 24                               |
 | Bun                     | 1.4.4                               |
-| Docker Desktop          | em execução (Supabase e LGTM)       |
+| Docker Desktop          | em execução (PostgreSQL e LGTM)     |
 | Dependências instaladas | `bun install`                       |
 | Navegador do Playwright | `bun x playwright install chromium` |
 
@@ -37,14 +37,14 @@ Execute na raiz do monorepo:
 | `bun run test`        | Testes unitários e de integração da API e do web (Vitest)    |
 | `bun run test:watch`  | Vitest em modo watch (API e web)                             |
 | `bun run test:e2e`    | Smoke E2E do web (Playwright)                                |
-| `bun run infra:up`    | Sobe LGTM (Compose) e Supabase local                         |
-| `bun run infra:down`  | Para Supabase e LGTM (idempotente)                           |
-| `bun run db:migrate`  | Aplica migrações pendentes no Supabase local                 |
-| `bun run db:test`     | Executa os testes pgTAP de `supabase/tests/` no banco local  |
+| `bun run infra:up`    | Sobe LGTM (Compose) e PostgreSQL 18                          |
+| `bun run infra:down`  | Para PostgreSQL e LGTM (idempotente)                         |
+| `bun run db:migrate`  | Aplica migrações pendentes no PostgreSQL local               |
+| `bun run db:test`     | Executa os testes SQL de `db/tests/` no banco local          |
 
-> `bun run db:test` exige o Supabase local ativo (`bun run infra:up`) e as migrações aplicadas
-> (`bun run db:migrate`). Ele usa `supabase test db`, que roda cada arquivo de `supabase/tests/`
-> com pgTAP em uma transação com `rollback`.
+> `bun run db:test` exige o PostgreSQL ativo (`bun run infra:up`) e as migrações aplicadas
+> (`bun run db:migrate`). Ele roda cada arquivo de `db/tests/` dentro de `BEGIN`/`ROLLBACK` usando
+> `scripts/db.mjs`, sem depender de extensões externas de teste.
 
 > Use sempre `bun run <script>`. `bun build` e `bun test` são comandos nativos do Bun e **não**
 > executam os scripts do `package.json`.
@@ -145,7 +145,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] RLS/isolamento por tenant quando aplicável.
 - [ ] Nenhuma perda de dados.
 - [ ] Seed/dados de teste documentados.
-- [ ] `bun run db:migrate` aplica a migração e `bun run db:test` passa com os testes pgTAP.
+- [ ] `bun run db:migrate` aplica a migração e `bun run db:test` passa com os testes SQL.
 
 ### 5.4 Conectores e integrações
 
@@ -172,7 +172,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 
 ### 5.7 Infraestrutura e observabilidade
 
-- [ ] `bun run infra:up` sobe LGTM e Supabase e o Grafana responde em `http://localhost:3010`.
+- [ ] `bun run infra:up` sobe PostgreSQL e LGTM e o Grafana responde em `http://localhost:3010`.
 - [ ] `bun run db:migrate` aplica migrações pendentes e é idempotente.
 - [ ] `bun run infra:down` para os serviços e funciona quando já estão parados.
 - [ ] Nenhum container em loop de reinício (`docker ps` estável).
@@ -415,8 +415,8 @@ Requisitos:
 | Commitlint apenas local                     | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
 | Produto não implementado                    | Apenas a rota de hello world e a fundação existem                                                                                    |
 | Sem Vitest/Testing Library no pacote `ui`   | Componentes compartilhados não têm testes unitários                                                                                  |
-| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                                  |
-| PostgreSQL local em `15`                    | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                                  |
+| Migrações sem rollback automático           | `scripts/db.mjs` aplica em transação, mas não gera `down`; reverter exige nova migração                                              |
+| PostgreSQL local em `18`                    | Versão do Compose; o provedor gerenciado de produção segue em aberto (ADR 0016)                                                      |
 | OXLint/OXFmt não adotados                   | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
 | Skills locais em `.agents/` não versionadas | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
 | Rate limit em memória                       | Limites de sign-up e confirmação são locais ao processo; store compartilhado é follow-up                                             |

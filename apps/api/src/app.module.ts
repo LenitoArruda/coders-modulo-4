@@ -3,10 +3,11 @@ import { APP_FILTER } from "@nestjs/core";
 
 import { AuthModule } from "./modules/auth/auth.module";
 import { HelloModule } from "./modules/hello/hello.module";
+import { DatabaseModule } from "./modules/shared/database/database.module";
 import { ErrorContractFilter } from "./modules/shared/interface/error-contract.filter";
 
 @Module({
-  imports: [AuthModule, HelloModule],
+  imports: [DatabaseModule, AuthModule, HelloModule],
   providers: [{ provide: APP_FILTER, useClass: ErrorContractFilter }],
 })
 export class AppModule {}

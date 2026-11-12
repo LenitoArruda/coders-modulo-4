@@ -1,5 +1,4 @@
 import { Module } from "@nestjs/common";
-import { createClient } from "@supabase/supabase-js";
 import { MailtrapClient } from "mailtrap";
 
 import { loadEnv } from "../shared/config/env";
@@ -37,16 +36,15 @@ import {
   SIGN_UP_RATE_LIMIT_WINDOW_SECONDS,
   MAIL_FROM,
   MAILTRAP_CLIENT,
-  SUPABASE_CLIENT,
   WEB_ORIGIN,
 } from "./auth.tokens";
 import { CryptoOpaqueTokenAdapter } from "./infrastructure/crypto-opaque-token.adapter";
 import { JoseSessionTokenAdapter } from "./infrastructure/jose-session-token.adapter";
 import { ScryptPasswordHasherAdapter } from "./infrastructure/scrypt-password-hasher.adapter";
 import { MailtrapEmailSender } from "./infrastructure/mailtrap-email.sender";
-import { SupabaseAuthTokensRepository } from "./infrastructure/supabase-auth-tokens.repository";
-import { SupabaseSessionsRepository } from "./infrastructure/supabase-sessions.repository";
-import { SupabaseUsersRepository } from "./infrastructure/supabase-users.repository";
+import { PostgresAuthTokensRepository } from "./infrastructure/postgres-auth-tokens.repository";
+import { PostgresSessionsRepository } from "./infrastructure/postgres-sessions.repository";
+import { PostgresUsersRepository } from "./infrastructure/postgres-users.repository";
 import { ConfirmationRateLimiter } from "./interface/confirmation-rate-limiter";
 import { ForgotPasswordRateLimiter } from "./interface/forgot-password-rate-limiter";
 import { ConfirmAccountRequestHandler } from "./interface/request-handlers/confirm-account.request-handler";
@@ -132,16 +130,6 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     },
     { provide: WEB_ORIGIN, useFactory: () => loadEnv().webOrigin },
     {
-      provide: SUPABASE_CLIENT,
-      useFactory: () => {
-        const env = loadEnv();
-
-        return createClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
-      },
-    },
-    {
       provide: MAILTRAP_CLIENT,
       useFactory: () =>
         new MailtrapClient({ token: loadEnv().mailtrapApiToken }),
@@ -156,11 +144,11 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     },
     JoseSessionTokenAdapter,
     { provide: SessionTokenPort, useExisting: JoseSessionTokenAdapter },
-    { provide: SessionsRepositoryPort, useClass: SupabaseSessionsRepository },
-    { provide: UsersRepositoryPort, useClass: SupabaseUsersRepository },
+    { provide: SessionsRepositoryPort, useClass: PostgresSessionsRepository },
+    { provide: UsersRepositoryPort, useClass: PostgresUsersRepository },
     {
       provide: AuthTokensRepositoryPort,
-      useClass: SupabaseAuthTokensRepository,
+      useClass: PostgresAuthTokensRepository,
     },
     ScryptPasswordHasherAdapter,
     { provide: PasswordHasherPort, useExisting: ScryptPasswordHasherAdapter },

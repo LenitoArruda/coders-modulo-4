@@ -33,7 +33,8 @@ Perfis (`PROFILE`): `smoke` (~35 s), `load` (8 min, 60 VUs), `stress` (9 min, at
 ## Passo a passo
 
 ```sh
-bun run infra:up                 # Supabase + LGTM
+bun run infra:up                 # PostgreSQL 18 + LGTM
+bun run db:migrate               # aplica as migrações
 bun run load:seed                # cria os usuários de carga
 
 # API em "modo carga" (a partir de apps/api):
@@ -57,7 +58,8 @@ Limpeza: `bun run load:clean` remove todas as contas `loadtest-*@loadtest.invali
 
 `scripts/k6.mjs` usa o `k6` do PATH, ou a imagem `grafana/k6:1.4.0` via Docker (padrão, sem
 instalar nada). No Docker a API é acessada por `host.docker.internal:3333`; para outro alvo
-defina `BASE_URL` (ex.: `http://localhost:3333/api/v1`). O seed só roda contra o Supabase local.
+defina `BASE_URL` (ex.: `http://localhost:3333/api/v1`). O seed só roda contra um PostgreSQL
+local (loopback) configurado em `DATABASE_URL`.
 
 ## Lendo os resultados
 

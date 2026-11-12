@@ -37,9 +37,8 @@ pessoa, contrato de erro estável e nenhum token/PII em logs.
 6. **Contrato de erro estável** `{ code, message, fieldErrors? }` renderizado por um filtro
    global; o 401 de sessão usa uma mensagem única e não distingue ausência, expiração, revogação
    ou assinatura inválida.
-7. **Adaptadores**: `jose@6` (JWT), `@supabase/supabase-js` com credencial `service_role`
-   (PostgREST, RLS contornada apenas no servidor) e `nodemailer` (SMTP local/Mailpit exposto em
-   `127.0.0.1:54325`).
+7. **Adaptadores**: `jose@6` (JWT), `pg` com pool e SQL parametrizado (PostgreSQL, sem PostgREST
+   nem credencial de provedor — ADR 0016) e `mailtrap` (API de envio de e-mail).
 
 ## Consequências
 
@@ -70,7 +69,7 @@ pessoa, contrato de erro estável e nenhum token/PII em logs.
 | `@nestjs/jwt`                              | `jose` cobre HS256 com API moderna e já foi escolhido no plano                         |
 | Ordem revoke-then-create (literal da spec) | Sob concorrência permite duas sessões ativas; create-then-revoke preserva o invariante |
 | Função/RPC transacional no Postgres        | Proibida pela spec §12 nesta fatia; registrada como follow-up                          |
-| Supabase Auth                              | ADR 0012: a autenticação é própria da API                                              |
+| Provedor de auth gerenciado                | ADR 0012: a autenticação é própria da API                                              |
 
 ## Follow-ups
 

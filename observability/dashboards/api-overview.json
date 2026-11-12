@@ -1333,7 +1333,7 @@
       },
       "type": "stat",
       "title": "Queries",
-      "description": "Chamadas ao Postgres (via supabase-js) no período.",
+      "description": "Chamadas ao PostgreSQL (via pg) no período.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

@@ -1,6 +1,28 @@
 name: coders-modulo-4
 
 services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: coders-modulo-4-postgres
+    restart: unless-stopped
+    ports:
+      # Apenas loopback: o banco não é exposto à rede local.
+      # Se a porta 5432 já estiver em uso na máquina, defina POSTGRES_PORT no .env.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-coders_modulo_4}
+    volumes:
+      # PostgreSQL 18 mudou o volume padrão para /var/lib/postgresql.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   lgtm:
     image: grafana/otel-lgtm:0.39.0
     container_name: coders-modulo-4-lgtm
@@ -18,17 +40,23 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
 
-  # Métricas do Postgres do Supabase local (porta 54322 do host) -> LGTM via OTLP.
+  # Métricas do PostgreSQL do Compose -> LGTM via OTLP.
   postgres-metrics:
     image: otel/opentelemetry-collector-contrib:0.164.0
     container_name: coders-modulo-4-postgres-metrics
     restart: unless-stopped
     command: ["--config=/etc/otelcol/config.yaml"]
     depends_on:
-      - lgtm
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      lgtm:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
-      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-coders_modulo_4}
     volumes:
       - ./observability/postgres-collector.yaml:/etc/otelcol/config.yaml:ro
+
+volumes:
+  postgres-data:

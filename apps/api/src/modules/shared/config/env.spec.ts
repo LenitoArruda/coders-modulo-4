@@ -5,9 +5,7 @@ import { ConfigurationError, loadEnv, type EnvSource } from "./env";
 const validEnv: EnvSource = {
   PORT: "3333",
   WEB_ORIGIN: "http://localhost:3000",
-  SUPABASE_URL: "http://localhost:54321",
-  SUPABASE_ANON_KEY: "anon-key",
-  SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+  DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/coders_modulo_4",
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4317",
   JWT_SECRET: "test-jwt-secret-with-at-least-32-characters",
   MAILTRAP_API_TOKEN: "test-mailtrap-token",
@@ -18,6 +16,8 @@ describe("loadEnv", () => {
     expect(loadEnv(validEnv)).toMatchObject({
       port: 3333,
       webOrigin: "http://localhost:3000",
+      databaseUrl:
+        "postgresql://postgres:postgres@127.0.0.1:5432/coders_modulo_4",
       serviceName: "coders-modulo-4-api",
       jwtSecret: "test-jwt-secret-with-at-least-32-characters",
       sessionTtlSeconds: 604_800,
@@ -52,6 +52,42 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ ...validEnv, JWT_SECRET: "short-secret" })).toThrow(
       /JWT_SECRET/,
     );
+  });
+
+  it("deve falhar quando a URL do banco está ausente", () => {
+    const source = { ...validEnv, DATABASE_URL: undefined };
+
+    try {
+      loadEnv(source);
+      expect.unreachable("loadEnv deveria lançar ConfigurationError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigurationError);
+      expect((error as ConfigurationError).missing).toContain("DATABASE_URL");
+    }
+  });
+
+  it("deve falhar quando a URL do banco não é PostgreSQL", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, DATABASE_URL: "mysql://user:pass@localhost/db" }),
+    ).toThrow(/DATABASE_URL/);
+
+    expect(() => loadEnv({ ...validEnv, DATABASE_URL: "not-a-url" })).toThrow(
+      /DATABASE_URL/,
+    );
+  });
+
+  it("deve aceitar postgres:// e postgresql://", () => {
+    expect(
+      loadEnv({ ...validEnv, DATABASE_URL: "postgres://u:p@localhost:5432/db" })
+        .databaseUrl,
+    ).toBe("postgres://u:p@localhost:5432/db");
+
+    expect(
+      loadEnv({
+        ...validEnv,
+        DATABASE_URL: "postgresql://u:p@localhost:5432/db",
+      }).databaseUrl,
+    ).toBe("postgresql://u:p@localhost:5432/db");
   });
 
   it("deve aplicar o TTL de sessão configurado", () => {
@@ -247,7 +283,7 @@ describe("loadEnv", () => {
       expect(error).toBeInstanceOf(ConfigurationError);
       expect((error as ConfigurationError).missing).toContain("WEB_ORIGIN");
       expect((error as ConfigurationError).message).not.toContain(
-        "service-role-key",
+        "postgres:postgres",
       );
     }
   });

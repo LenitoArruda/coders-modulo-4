@@ -11,17 +11,17 @@ infraestrutura de sessão de auth — e **não** implementa ainda funcionalidade
 
 ## Stack
 
-| Camada                 | Tecnologia                                             |
-| ---------------------- | ------------------------------------------------------ |
-| Monorepo               | Turborepo 2 + Bun 1.4                                  |
-| Web / Docs             | Next.js 16 (App Router) + React 19                     |
-| UI                     | Tailwind CSS 4 + shadcn/ui (`packages/ui`)             |
-| API                    | NestJS 12 + TypeScript (CommonJS)                      |
-| Sessão / e-mail        | jose (JWT HS256) + SDK Mailtrap (API de envio)         |
-| Banco / Auth / Storage | Supabase local via CLI 3 (`@supabase/supabase-js`)     |
-| Testes                 | Vitest + Supertest (API), Vitest (web) e Playwright    |
-| Observabilidade        | OpenTelemetry → Grafana LGTM (métricas, logs e traces) |
-| Lint / formato         | ESLint + Prettier + Lefthook/lint-staged               |
+| Camada          | Tecnologia                                                  |
+| --------------- | ----------------------------------------------------------- |
+| Monorepo        | Turborepo 2 + Bun 1.4                                       |
+| Web / Docs      | Next.js 16 (App Router) + React 19                          |
+| UI              | Tailwind CSS 4 + shadcn/ui (`packages/ui`)                  |
+| API             | NestJS 12 + TypeScript (CommonJS)                           |
+| Sessão / e-mail | jose (JWT HS256) + SDK Mailtrap (API de envio)              |
+| Banco           | PostgreSQL 18 via Docker Compose (`pg` + SQL parametrizado) |
+| Testes          | Vitest + Supertest (API), Vitest (web) e Playwright         |
+| Observabilidade | OpenTelemetry → Grafana LGTM (métricas, logs e traces)      |
+| Lint / formato  | ESLint + Prettier + Lefthook/lint-staged                    |
 
 ---
 
@@ -29,15 +29,14 @@ infraestrutura de sessão de auth — e **não** implementa ainda funcionalidade
 
 - **Node.js** `>= 24`
 - **Bun** `1.4.4`
-- **Docker Desktop** em execução (Supabase local e LGTM)
+- **Docker Desktop** em execução (PostgreSQL e LGTM)
 - **Playwright Chromium** na primeira execução dos testes E2E:
 
 ```sh
 bun x playwright install chromium
 ```
 
-> A CLI do Supabase é devDependency e é executada com `bun x supabase`; não é necessário
-> instalar globalmente.
+> O PostgreSQL sobe pelo `docker-compose.yml`; não há CLI de banco para instalar.
 
 ---
 
@@ -46,7 +45,7 @@ bun x playwright install chromium
 ```sh
 bun install
 cp .env.example .env        # PowerShell: Copy-Item .env.example .env
-bun run infra:up            # LGTM + Supabase local
+bun run infra:up            # LGTM + PostgreSQL 18
 bun run db:migrate          # aplica as migrações pendentes
 bun run dev                 # web, docs e API em paralelo
 ```
@@ -61,9 +60,7 @@ quando alguma chave está ausente ou inválida.
 | ----------------------------- | ---------------------------------------------------------------------------------- |
 | `PORT`                        | Porta da API (padrão `3333`)                                                       |
 | `WEB_ORIGIN`                  | Origem liberada no CORS (`http://localhost:3000`)                                  |
-| `SUPABASE_URL`                | URL da API local do Supabase                                                       |
-| `SUPABASE_ANON_KEY`           | Chave pública local                                                                |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Chave de serviço local (nunca use em produção)                                     |
+| `DATABASE_URL`                | String de conexão do PostgreSQL (`postgresql://...`)                               |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP gRPC do LGTM (`http://localhost:4317`)                               |
 | `OTEL_SERVICE_NAME`           | Nome do serviço na telemetria                                                      |
 | `JWT_SECRET`                  | Segredo HS256 do JWT (obrigatório, ≥ 32 caracteres)                                |
@@ -94,10 +91,10 @@ Execute na raiz do monorepo:
 | `bun run test`        | Testes unitários e de integração da API e do web (Vitest)    |
 | `bun run test:watch`  | Vitest em modo watch (API e web)                             |
 | `bun run test:e2e`    | E2E de navegação do web (Playwright + API fake local)        |
-| `bun run infra:up`    | Sobe LGTM (Compose) e Supabase local                         |
-| `bun run infra:down`  | Para Supabase e LGTM (idempotente)                           |
-| `bun run db:migrate`  | Aplica migrações pendentes no Supabase local                 |
-| `bun run db:test`     | Executa os testes pgTAP de `supabase/tests/`                 |
+| `bun run infra:up`    | Sobe LGTM (Compose) e PostgreSQL 18                          |
+| `bun run infra:down`  | Para PostgreSQL e LGTM (idempotente)                         |
+| `bun run db:migrate`  | Aplica migrações pendentes no PostgreSQL local               |
+| `bun run db:test`     | Executa os testes SQL de `db/tests/`                         |
 
 > Use sempre `bun run <script>`. `bun test` e `bun build` são comandos nativos do Bun e **não**
 > executam os scripts do monorepo.
@@ -160,16 +157,14 @@ o padrão; não reescreva o histórico por causa disso.
 
 ## Portas
 
-| Serviço         | URL                      |
-| --------------- | ------------------------ |
-| Web             | <http://localhost:3000>  |
-| API             | <http://localhost:3333>  |
-| Grafana (LGTM)  | <http://localhost:3010>  |
-| OTLP gRPC       | `localhost:4317`         |
-| OTLP HTTP       | `localhost:4318`         |
-| Supabase API    | <http://localhost:54321> |
-| Supabase DB     | `localhost:54322`        |
-| Supabase Studio | <http://localhost:54323> |
+| Serviço        | URL                     |
+| -------------- | ----------------------- |
+| Web            | <http://localhost:3000> |
+| API            | <http://localhost:3333> |
+| Grafana (LGTM) | <http://localhost:3010> |
+| OTLP gRPC      | `localhost:4317`        |
+| OTLP HTTP      | `localhost:4318`        |
+| PostgreSQL     | `localhost:5432`        |
 
 O Grafana do LGTM sobe com acesso anônimo (Admin) e já recebe logs, métricas e traces da API.
 Consulte `service_name="coders-modulo-4-api"` em Loki, Tempo ou Prometheus.
@@ -187,9 +182,10 @@ Consulte `service_name="coders-modulo-4-api"` em Loki, Tempo ou Prometheus.
 │   ├── ui/                      # Tailwind/shadcn, tokens e componentes compartilhados
 │   ├── eslint-config/           # Configurações ESLint compartilhadas
 │   └── typescript-config/       # tsconfig base/nextjs/react-library
-├── scripts/infra.mjs            # Orquestra Compose (LGTM) + Supabase CLI
-├── supabase/                    # config.toml e migrações
-├── docker-compose.yml           # LGTM: Grafana + OTel Collector + Loki/Tempo/Prometheus
+├── scripts/infra.mjs            # Orquestra Compose (PostgreSQL + LGTM)
+├── scripts/db.mjs               # Executor de migrações e testes SQL
+├── db/                          # Migrações versionadas e testes de schema
+├── docker-compose.yml           # PostgreSQL 18 + LGTM (Grafana, Loki, Tempo, Prometheus)
 ├── .docs/                       # Documentação do projeto (fonte de verdade)
 ├── .adrs/                       # Architecture Decision Records (ADRs)
 ├── .specs/                      # Specs de feature
@@ -218,7 +214,7 @@ apps/api/src/
 
 ## Auth e sessão
 
-A autenticação é própria da API (sem Supabase Auth) e a API é versionada em `/api/v1`:
+A autenticação é própria da API (sem provedor externo) e a API é versionada em `/api/v1`:
 
 | Rota                          | Comportamento                                                |
 | ----------------------------- | ------------------------------------------------------------ |
@@ -266,17 +262,15 @@ O web separa o fluxo público da área privada em dois grupos de rota:
 - A API emite **logs estruturados em JSON**, métricas (`http.server.*`) e traces via
   OpenTelemetry (OTLP gRPC).
 - O `docker-compose.yml` usa a imagem all-in-one `grafana/otel-lgtm`, que já inclui Grafana,
-  OTel Collector, Loki, Tempo e Prometheus.
-- O Supabase Analytics fica desabilitado em `supabase/config.toml`: o coletor `vector` depende do
-  Docker API em `host.docker.internal:2375`, porta não exposta por padrão no Docker Desktop. A
-  observabilidade da aplicação não depende dele.
+  OTel Collector, Loki, Tempo e Prometheus. O coletor `postgres-metrics` lê o PostgreSQL do
+  Compose e publica as métricas como `service.name = coders-modulo-4-postgres`.
 
 ---
 
 ## Status
 
-- ✅ Fundação implementada: web, docs, API, Supabase local, migrações, testes, lint/tipos/build e
-  observabilidade.
+- ✅ Fundação implementada: web, docs, API, PostgreSQL nativo, migrações, testes, lint/tipos/build
+  e observabilidade.
 - ✅ Scripts `code:fix`, `types:check`, `test`, `test:watch`, `test:e2e`, `infra:up`,
   `infra:down`, `db:migrate` e `db:test`.
 - ✅ Infraestrutura de sessão (spec 002): JWT HS256 + sessão server-side, `GET /api/v1/auth/me`,
@@ -297,8 +291,8 @@ Detalhes e decisões: [`.docs/ARCHITECTURE.md`](./.docs/ARCHITECTURE.md) e
 - O Docker Desktop em Windows usa containerd snapshotter; arquivos de imagem podem ficar com
   0 byte após atualizações. Se um container falhar com binário vazio (ex.: `node`), recrie a
   imagem local com `docker pull` antes de investigar o código.
-- O Supabase local está configurado com PostgreSQL `15` (`supabase/config.toml`) como workaround
-  de ambiente. Ajuste apenas com justificativa e atualize a documentação.
+- O PostgreSQL local roda na imagem `postgres:18-alpine` com volume nomeado. O schema é aplicado
+  por `bun run db:migrate`; os dados locais são descartáveis.
 - Em PowerShell, o Bun pode emitir `NativeCommandError` como ruído; confira o código de saída
   (`$LASTEXITCODE`) antes de concluir que o comando falhou.
 

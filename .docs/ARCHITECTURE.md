@@ -11,13 +11,13 @@ engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md).
 ## 1. Visão geral
 
 Monorepo **Turborepo** com **Bun**, contendo aplicações Next.js, uma API NestJS e pacotes
-compartilhados. A fundação já entrega web, API e Supabase local; o produto será uma plataforma
+compartilhados. A fundação já entrega web, API e PostgreSQL local; o produto será uma plataforma
 de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 
 - **Web app** para interação com Experts e gestão de conectores.
 - **API** dedicada para regras de negócio, ingestão e orquestração de agents.
-- **Supabase/Postgres** como banco PostgreSQL e storage; a **autenticação é própria da API**
-  (JWT emitido pela API; sem Supabase Auth).
+- **PostgreSQL 18** como banco relacional; a **autenticação é própria da API** (JWT emitido pela
+  API, sem provedor externo).
 - **Conectores externos** para trazer dados de Notion, Google Drive, Jira, PDF etc.
 
 ---
@@ -34,11 +34,12 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 │   ├── eslint-config/           # Configurações ESLint compartilhadas
 │   └── typescript-config/       # tsconfig base/nextjs/react-library
 ├── scripts/
-│   └── infra.mjs                # Orquestra Compose (LGTM) + Supabase CLI
-├── supabase/
-│   ├── config.toml
-│   └── migrations/
-├── docker-compose.yml           # LGTM: Grafana + OTel Collector + Loki/Tempo/Prometheus
+│   ├── infra.mjs                # Orquestra o Compose (PostgreSQL + LGTM)
+│   └── db.mjs                   # Executor de migrações e testes SQL
+├── db/
+│   ├── migrations/              # Migrações versionadas (.sql)
+│   └── tests/                   # Testes de schema em SQL
+├── docker-compose.yml           # PostgreSQL 18 + LGTM (Grafana, OTel Collector, Loki/Tempo/Prometheus)
 ├── .plans/                      # Planos de tarefas (<numero>-<slug>-plan.md)
 ├── .specs/                      # Specs de feature (<numero>-<slug>.md)
 ├── .docs/                       # Documentação do projeto
@@ -74,10 +75,10 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 | Design system               | shadcn/ui (configurado em `packages/ui`) | —                |
 | API                         | NestJS                                   | 12.3.3           |
 | JWT de sessão               | jose (HS256)                             | 6.2.17           |
-| Acesso ao banco (servidor)  | `@supabase/supabase-js` (PostgREST)      | 2.119.0          |
+| Acesso ao banco (servidor)  | `pg` (SQL parametrizado)                 | 8.23.1           |
 | E-mail transacional         | SDK `mailtrap` (API de envio)            | 6.2.0            |
 | Hash de senha               | `node:crypto` scrypt (ADR 0014)          | —                |
-| Banco local                 | Supabase CLI (PostgreSQL 15)             | 3.0.0            |
+| Banco local                 | PostgreSQL via Docker Compose            | 18               |
 | Testes unitários/integração | Vitest + Supertest                       | 5.1.0 / 7.3.1    |
 | Testes E2E                  | Playwright                               | 1.65.0           |
 | Observabilidade             | OpenTelemetry SDK + Grafana LGTM         | 0.301.0 / 0.39.0 |
@@ -88,14 +89,14 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 
 ### 3.2 Stack alvo (planejada ou em avaliação)
 
-| Camada                   | Tecnologia        | Estado          |
-| ------------------------ | ----------------- | --------------- |
-| Datas                    | date-fns          | 🧭              |
-| Tabelas                  | TanStack Table    | 🧭              |
-| Gráficos                 | TanStack Charts   | 🧭              |
-| Infra de produção        | Vercel + Supabase | 🧭              |
-| Lint/format alternativos | OXLint + OXFmt    | 🔍 em avaliação |
-| Contratos compartilhados | `packages/shared` | 🧭              |
+| Camada                   | Tecnologia                     | Estado          |
+| ------------------------ | ------------------------------ | --------------- |
+| Datas                    | date-fns                       | 🧭              |
+| Tabelas                  | TanStack Table                 | 🧭              |
+| Gráficos                 | TanStack Charts                | 🧭              |
+| Infra de produção        | Vercel + PostgreSQL gerenciado | 🧭              |
+| Lint/format alternativos | OXLint + OXFmt                 | 🔍 em avaliação |
+| Contratos compartilhados | `packages/shared`              | 🧭              |
 
 > **Atenção:** a stack alvo **não está instalada**. Não importe date-fns, TanStack ou
 > `packages/shared` sem antes adicioná-los ao `package.json` e atualizar esta tabela.
@@ -118,7 +119,7 @@ interface → application → domain
 | ---------------- | ------------------------------------------------------ | ----------------------- |
 | `domain`         | Entidades, value objects, serviços e regras de domínio | Nada externo            |
 | `application`    | Casos de uso, orquestração, portas/interfaces          | `domain`                |
-| `infrastructure` | Repositórios, Supabase, filas, eventos, clientes HTTP  | `application`, `domain` |
+| `infrastructure` | Repositórios (`pg`), filas, eventos, clientes HTTP     | `application`, `domain` |
 | `interface`      | Controllers, DTOs, presenters, validação de entrada    | `application`           |
 
 Regras:
@@ -138,14 +139,14 @@ apps/api/src/
 │   ├── auth/
 │   │   ├── domain/              # Session, SessionOrigin, AuthUser, SignUpInput, erros de auth
 │   │   ├── application/         # Casos de uso (inclui GetCurrentUserUseCase), templates, portas
-│   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios Supabase, Mailtrap
+│   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios `pg`, Mailtrap
 │   │   └── interface/           # request handlers (1 por endpoint), guard, rate limiter, testes de integração
 │   │       └── request-handlers/ # um handler por endpoint (sign-up, sign-in, sign-out, /me, confirm, forgot, reset)
 │   ├── hello/
 │   │   ├── domain/
 │   │   ├── application/
 │   │   └── interface/
-│   └── shared/                  # config, logging, observability, interface (contrato de erro)
+│   └── shared/                  # config, database (pool `pg`), logging, observability, interface
 ├── test/fakes/                  # repositórios, e-mail e token em memória
 ├── app.module.ts
 ├── app-setup.ts
@@ -185,9 +186,9 @@ Regras de dependência entre pacotes:
 
 ### 4.4 Modelo de dados de autenticação
 
-O schema de auth é criado em `supabase/migrations/` e é de uso **exclusivo da API**; o navegador
-não acessa essas tabelas (RLS habilitado, nenhuma policy para `anon`/`authenticated`). A API
-opera com a credencial de servidor (`service_role`).
+O schema de auth é criado em `db/migrations/` e é de uso **exclusivo da API**; o navegador não
+acessa essas tabelas (RLS habilitado, nenhuma policy pública). A API acessa o banco como o usuário
+`postgres` do Compose, via pool `pg` e SQL parametrizado (ADR 0016).
 
 | Tabela        | Papel                                                                                            |
 | ------------- | ------------------------------------------------------------------------------------------------ |
@@ -231,8 +232,8 @@ web (server)                         api
 | `CreateSessionUseCase`                                   | Cria a sessão, revoga as anteriores, assina o JWT e dispara o e-mail de nova sessão     |
 | `ValidateSessionUseCase`                                 | Valida o JWT e confirma sessão ativa + dono antes de liberar a requisição               |
 | `SessionTokenPort` / `jose`                              | Assina e valida HS256 com `JWT_SECRET`; claims `sub`, `sid`, `iat`, `exp`               |
-| `SessionsRepositoryPort` / Supabase                      | Persiste, consulta e revoga sessões via PostgREST com `service_role`                    |
-| `UsersRepositoryPort` / Supabase                         | Carrega os dados básicos da pessoa autenticada                                          |
+| `SessionsRepositoryPort` / `pg`                          | Persiste, consulta e revoga sessões com SQL parametrizado                               |
+| `UsersRepositoryPort` / `pg`                             | Carrega os dados básicos da pessoa autenticada                                          |
 | `EmailSenderPort` / Mailtrap                             | Envia o template en-US de nova sessão pela API do Mailtrap                              |
 | `SessionGuard` + `@CurrentUser()`                        | Extrai o Bearer, aplica o contrato de 401 e injeta a pessoa na rota                     |
 | `GetCurrentUserRequestHandler` + `GetCurrentUserUseCase` | Atende `GET /auth/me` com o `AuthUser` já resolvido pelo guard, sem reler o repositório |
@@ -266,23 +267,23 @@ pessoa. Juntas, as duas rotas fecham a jornada iniciada em `/auth/sign-up`.
 /auth/sign-up (web) ── Server Action ──► POST /api/v1/auth/sign-up
                                              │ SignUpInput + rate limit por IP
                                              └─► SignUpUseCase
-                                                   ├─ users (Postgres, service_role)
+                                                   ├─ users (PostgreSQL, `pg`)
                                                    ├─ auth_tokens (apenas token_hash)
                                                    ├─ scrypt (password_hash)
                                                    └─ API Mailtrap
 ```
 
-| Peça                                  | Responsabilidade                                                                                                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SignUpInput`                         | Valida/normaliza os cinco campos e devolve mensagens en-US por campo                                                                        |
-| `SignUpUseCase`                       | Cria conta não confirmada, reenvia confirmação ou sinaliza conflito                                                                         |
-| `PasswordHasherPort` / scrypt         | Hash forte da senha, sem dependência nativa (ADR 0014)                                                                                      |
-| `OpaqueTokenPort` / `node:crypto`     | 32 bytes aleatórios no link; SHA-256 em hex persistido em `token_hash`                                                                      |
-| `AuthTokensRepositoryPort` / Supabase | Cria o token e invalida os pendentes do mesmo usuário/purpose                                                                               |
-| `UsersRepositoryPort` / Supabase      | Busca por e-mail normalizado e cria a conta com `email_confirmed_at` nulo                                                                   |
-| `email-layout`                        | Layout HTML compartilhado dos e-mails: light-only, paleta e tokens de `DESIGN.md`, tabelas + estilos inline, botão único e link de fallback |
-| `confirmation-email`                  | Template en-US "Confirm your account" com expiração de 24 h                                                                                 |
-| `SignUpRateLimiter`                   | Janela deslizante em memória por IP, limites configuráveis por env                                                                          |
+| Peça                              | Responsabilidade                                                                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SignUpInput`                     | Valida/normaliza os cinco campos e devolve mensagens en-US por campo                                                                        |
+| `SignUpUseCase`                   | Cria conta não confirmada, reenvia confirmação ou sinaliza conflito                                                                         |
+| `PasswordHasherPort` / scrypt     | Hash forte da senha, sem dependência nativa (ADR 0014)                                                                                      |
+| `OpaqueTokenPort` / `node:crypto` | 32 bytes aleatórios no link; SHA-256 em hex persistido em `token_hash`                                                                      |
+| `AuthTokensRepositoryPort` / `pg` | Cria o token e invalida os pendentes do mesmo usuário/purpose                                                                               |
+| `UsersRepositoryPort` / `pg`      | Busca por e-mail normalizado e cria a conta com `email_confirmed_at` nulo                                                                   |
+| `email-layout`                    | Layout HTML compartilhado dos e-mails: light-only, paleta e tokens de `DESIGN.md`, tabelas + estilos inline, botão único e link de fallback |
+| `confirmation-email`              | Template en-US "Confirm your account" com expiração de 24 h                                                                                 |
+| `SignUpRateLimiter`               | Janela deslizante em memória por IP, limites configuráveis por env                                                                          |
 
 Regras:
 
@@ -558,43 +559,42 @@ Cada decisão abaixo possui um registro correspondente em [`.adrs/`](../.adrs/RE
 contexto, alternativas e consequências. Decisões ainda em aberto permanecem na §7 até serem
 tomadas.
 
-| Decisão                                     | Motivo                                                                            | Estado                                       |
-| ------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
-| Monorepo com Turborepo + Bun                | Compartilhar código, cache e execução paralela                                    | ✅                                           |
-| Next.js App Router no front-end             | Server Components, streaming e SEO                                                | ✅                                           |
-| API separada em NestJS                      | Isolar domínio, ingestão e orquestração do front                                  | ✅                                           |
-| Supabase local via CLI                      | Ambiente reproduzível sem instalação global                                       | ✅                                           |
-| Auth própria na API (sem Supabase Auth)     | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação           | ✅ (schema + sessão + sign-up + recuperação) |
-| Hash de senha com scrypt nativo             | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                | ✅                                           |
-| Sessão com JWT HS256 + registro server-side | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`         | ✅                                           |
-| Cookie `HttpOnly` com ponte `Bearer` no web | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API            | ✅                                           |
-| Sessão única com create-then-revoke         | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)          | ✅ (follow-up)                               |
-| Namespace `/api/v1`                         | Versionar a API e manter contrato estável desde a primeira rota                   | ✅                                           |
-| Grupos `/auth/*` público e `/app/*` privado | Separar fluxo de auth da área privada, com guard server-side e layouts próprios   | ✅                                           |
-| Contrato de erro global `{ code, message }` | Respostas previsíveis para o web sem stack, SQL ou detalhes internos              | ✅                                           |
-| Arquitetura em camadas + vertical slices    | Baixo acoplamento e evolução por domínio                                          | ✅ (auth, hello)                             |
-| Request handler 1:1 por endpoint            | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015) | ✅                                           |
-| Light theme único                           | Direção visual definida em `DESIGN.md`                                            | ✅                                           |
-| Tailwind CSS + shadcn/ui em `packages/ui`   | Base visual compartilhada e tokens únicos                                         | ✅                                           |
-| TypeScript `strict`                         | Segurança de tipos no monorepo                                                    | ✅                                           |
-| OpenTelemetry + Grafana LGTM desde o dia 0  | Diagnosticar ingestão e respostas de IA                                           | ✅                                           |
-| Vitest + Playwright + Supertest             | Unitário, E2E e API                                                               | ✅                                           |
-| LGTM all-in-one via Compose                 | Menos configuração e versões fixadas                                              | ✅                                           |
-| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`, indisponível por padrão no Docker Desktop    | ✅                                           |
-| PostgreSQL local em `15`                    | Workaround de ambiente; a versão alvo será decidida antes de produção             | ✅                                           |
+| Decisão                                      | Motivo                                                                            | Estado                                       |
+| -------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
+| Monorepo com Turborepo + Bun                 | Compartilhar código, cache e execução paralela                                    | ✅                                           |
+| Next.js App Router no front-end              | Server Components, streaming e SEO                                                | ✅                                           |
+| API separada em NestJS                       | Isolar domínio, ingestão e orquestração do front                                  | ✅                                           |
+| PostgreSQL 18 via Docker Compose             | Ambiente reproduzível sem instalação global nem stack proprietária                | ✅                                           |
+| Auth própria na API (sem provedor externo)   | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação           | ✅ (schema + sessão + sign-up + recuperação) |
+| Acesso ao banco com `pg` + SQL parametrizado | Sem ORM/query builder; SQL explícito e migrações versionadas (ADR 0016)           | ✅                                           |
+| Hash de senha com scrypt nativo              | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                | ✅                                           |
+| Sessão com JWT HS256 + registro server-side  | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`         | ✅                                           |
+| Cookie `HttpOnly` com ponte `Bearer` no web  | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API            | ✅                                           |
+| Sessão única com create-then-revoke          | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)          | ✅ (follow-up)                               |
+| Namespace `/api/v1`                          | Versionar a API e manter contrato estável desde a primeira rota                   | ✅                                           |
+| Grupos `/auth/*` público e `/app/*` privado  | Separar fluxo de auth da área privada, com guard server-side e layouts próprios   | ✅                                           |
+| Contrato de erro global `{ code, message }`  | Respostas previsíveis para o web sem stack, SQL ou detalhes internos              | ✅                                           |
+| Arquitetura em camadas + vertical slices     | Baixo acoplamento e evolução por domínio                                          | ✅ (auth, hello)                             |
+| Request handler 1:1 por endpoint             | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015) | ✅                                           |
+| Light theme único                            | Direção visual definida em `DESIGN.md`                                            | ✅                                           |
+| Tailwind CSS + shadcn/ui em `packages/ui`    | Base visual compartilhada e tokens únicos                                         | ✅                                           |
+| TypeScript `strict`                          | Segurança de tipos no monorepo                                                    | ✅                                           |
+| OpenTelemetry + Grafana LGTM desde o dia 0   | Diagnosticar ingestão e respostas de IA                                           | ✅                                           |
+| Vitest + Playwright + Supertest              | Unitário, E2E e API                                                               | ✅                                           |
+| LGTM all-in-one via Compose                  | Menos configuração e versões fixadas                                              | ✅                                           |
+| Migrações versionadas com executor próprio   | SQL versionado, transacional e concurrency-safe sem CLI de terceiros (ADR 0016)   | ✅                                           |
 
 ---
 
 ## 7. Decisões em aberto
 
-| Tema                 | Pergunta                                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| Deploy da API        | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render). |
-| OXLint/OXFmt         | Migrar do ESLint/Prettier atual ou manter?                                                     |
-| Multi-tenancy        | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                     |
-| `packages/shared`    | Quais contratos realmente serão compartilhados entre web e api?                                |
-| Versão do PostgreSQL | O ambiente local usa `15`; qual versão será adotada em produção?                               |
-| Supabase Analytics   | Reabilitar expondo a Docker API em `2375` ou manter a telemetria apenas no LGTM?               |
+| Tema                  | Pergunta                                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| Deploy da API         | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render). |
+| OXLint/OXFmt          | Migrar do ESLint/Prettier atual ou manter?                                                     |
+| Multi-tenancy         | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                     |
+| `packages/shared`     | Quais contratos realmente serão compartilhados entre web e api?                                |
+| PostgreSQL gerenciado | Qual provedor (Neon, RDS, Cloud SQL) será usado em produção?                                   |
 
 ---
 
