@@ -54,7 +54,7 @@ Em todos os eixos: confirme no código antes de afirmar; classifique severidade 
 - **Segurança:** authN/authZ em todo endpoint novo, injeção (SQL/NoSQL/comando), XSS
   (`dangerouslySetInnerHTML`), CSRF/cookies (`httpOnly`, `secure`, `sameSite`), segredos no
   código/logs/`.env` commitado, PII em logs, upload/URL (SSRF), rate limiting, hash de senha
-  conforme ADR 0014, RLS/policies do Supabase.
+  conforme ADR 0014, RLS habilitado sem policies públicas e SQL sempre parametrizado (`pg`).
 - Migrações: reversíveis/seguras, sem lock longo, sem perda de dados, RLS habilitado.
 
 ## 4. Legibilidade (`readability`)
@@ -103,7 +103,7 @@ Em todos os eixos: confirme no código antes de afirmar; classifique severidade 
 - Sem `.skip`, `.only`, snapshots gigantes sem revisão, asserts vazios, testes que passam sem
   executar o código novo.
 - Bug fix traz teste de regressão.
-- Testes de banco (`supabase test db`) para migrações/policies quando aplicável.
+- Testes de banco (`bun run db:test`) para migrações/schema quando aplicável.
 
 ## 8. A11y (`a11y`)
 

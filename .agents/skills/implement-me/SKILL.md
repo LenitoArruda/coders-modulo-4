@@ -149,7 +149,7 @@ Durante a implementação:
   - UI: `frontend-design` e `web-design-guidelines`.
   - Next.js/React: `next-best-practices` e `vercel-react-best-practices`.
   - Componentes: `shadcn`.
-  - Postgres/Supabase: `supabase-postgres-best-practices`.
+  - Postgres: `.docs/ARCHITECTURE.md` e os padrões de `db/migrations/` (SQL nativo com `pg`).
   - E2E: `playwright`.
 - Não faça refatoração fora do escopo.
 - Não adicione dependência sem justificar no plano e no relatório.

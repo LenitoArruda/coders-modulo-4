@@ -92,7 +92,7 @@ porque não há como provar preservação.
 - [ ] Cada handler injeta **exatamente um** `*UseCase`.
 - [ ] Rate limiter, guard, logger, presenter e mapper **não** contam como use case.
 - [ ] Prefixo `@Controller(...)` pode ser compartilhado entre handlers; não é violação.
-- [ ] Handler não importa `infrastructure/`, repositório, Supabase ou SDK.
+- [ ] Handler não importa `infrastructure/`, repositório, pool `pg` ou SDK.
 - [ ] Handler não contém regra de negócio além de orquestração/tradução de erro.
 - [ ] Tradução de erro de domínio → HTTP acontece na interface.
 - [ ] Decorators de contrato preservados (`@HttpCode`, cookies, headers, guards).
@@ -130,7 +130,7 @@ porque não há como provar preservação.
 - [ ] Adaptadores em `infrastructure/` implementam portas de `application`/`domain`.
 - [ ] Nenhuma regra de negócio na infraestrutura.
 - [ ] Adaptador não importa `interface/`.
-- [ ] Nome segue `supabase-<x>.repository.ts` / `<vendor>-<x>.adapter.ts`.
+- [ ] Nome segue `postgres-<x>.repository.ts` / `<vendor>-<x>.adapter.ts`.
 - [ ] Erros de infraestrutura são traduzidos para erros de domínio/aplicação antes de subir.
 - [ ] Módulo liga a porta ao adaptador (`{ provide: Port, useClass: Adapter }`).
 
