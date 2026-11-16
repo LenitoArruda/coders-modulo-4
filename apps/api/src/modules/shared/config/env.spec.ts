@@ -272,6 +272,48 @@ describe("loadEnv", () => {
     });
   });
 
+  it("deve desativar a sandbox do Mailtrap por padrão", () => {
+    expect(loadEnv(validEnv)).toMatchObject({
+      mailtrapSandbox: false,
+      mailtrapSandboxId: null,
+    });
+  });
+
+  it("deve ativar a sandbox do Mailtrap com o ID da inbox", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        MAILTRAP_SANDBOX: "true",
+        MAILTRAP_SANDBOX_ID: "5014471",
+      }),
+    ).toMatchObject({
+      mailtrapSandbox: true,
+      mailtrapSandboxId: 5_014_471,
+    });
+  });
+
+  it("deve falhar quando a sandbox do Mailtrap está ativa sem o ID da inbox", () => {
+    expect(() => loadEnv({ ...validEnv, MAILTRAP_SANDBOX: "true" })).toThrow(
+      /MAILTRAP_SANDBOX_ID/,
+    );
+  });
+
+  it("deve falhar quando o ID da sandbox do Mailtrap é inválido", () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        MAILTRAP_SANDBOX: "true",
+        MAILTRAP_SANDBOX_ID: "0",
+      }),
+    ).toThrow(/MAILTRAP_SANDBOX_ID/);
+  });
+
+  it("deve falhar quando a flag da sandbox do Mailtrap é inválida", () => {
+    expect(() => loadEnv({ ...validEnv, MAILTRAP_SANDBOX: "maybe" })).toThrow(
+      /MAILTRAP_SANDBOX/,
+    );
+  });
+
   it("deve falhar quando uma variável obrigatória está ausente", () => {
     const source = { ...validEnv, WEB_ORIGIN: undefined };
 

@@ -68,6 +68,10 @@ export type Env = {
   /** Sender address; its domain must be verified in Mailtrap Sending. */
   mailFromEmail: string;
   mailFromName: string;
+  /** When true, transactional email goes to the Mailtrap sandbox instead of the Sending API. */
+  mailtrapSandbox: boolean;
+  /** Mailtrap sandbox (inbox) ID; required when `mailtrapSandbox` is true. */
+  mailtrapSandboxId: number | null;
 };
 
 export class ConfigurationError extends Error {
@@ -94,6 +98,26 @@ export class ConfigurationError extends Error {
 
 function readString(value: string | undefined): string {
   return value?.trim() ?? "";
+}
+
+/** Returns `null` when the value is not a recognized boolean flag. */
+function readBooleanFlag(value: string): boolean | null {
+  const normalized = value.trim().toLowerCase();
+
+  if (
+    normalized === "" ||
+    normalized === "false" ||
+    normalized === "0" ||
+    normalized === "no"
+  ) {
+    return false;
+  }
+
+  if (normalized === "true" || normalized === "1" || normalized === "yes") {
+    return true;
+  }
+
+  return null;
 }
 
 function isValidHttpUrl(value: string): boolean {
@@ -323,10 +347,23 @@ export function loadEnv(source: EnvSource = process.env): Env {
   const mailFromEmail =
     readString(source.MAIL_FROM_EMAIL) || "hello@demomailtrap.co";
   const mailFromName = readString(source.MAIL_FROM_NAME) || "Experts";
+  const mailtrapSandbox = readBooleanFlag(readString(source.MAILTRAP_SANDBOX));
+  const mailtrapSandboxIdValue = readString(source.MAILTRAP_SANDBOX_ID);
+  const mailtrapSandboxId =
+    mailtrapSandboxIdValue === "" ? null : Number(mailtrapSandboxIdValue);
 
   if (!mailtrapApiToken) missing.push("MAILTRAP_API_TOKEN");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailFromEmail)) {
     invalid.push("MAIL_FROM_EMAIL");
+  }
+  if (mailtrapSandbox === null) invalid.push("MAILTRAP_SANDBOX");
+
+  if (mailtrapSandbox === true) {
+    if (mailtrapSandboxId === null) {
+      missing.push("MAILTRAP_SANDBOX_ID");
+    } else if (!Number.isInteger(mailtrapSandboxId) || mailtrapSandboxId < 1) {
+      invalid.push("MAILTRAP_SANDBOX_ID");
+    }
   }
 
   if (webOrigin && !isValidHttpUrl(webOrigin)) invalid.push("WEB_ORIGIN");
@@ -364,5 +401,7 @@ export function loadEnv(source: EnvSource = process.env): Env {
     mailtrapApiToken,
     mailFromEmail,
     mailFromName,
+    mailtrapSandbox: mailtrapSandbox === true,
+    mailtrapSandboxId: mailtrapSandbox === true ? mailtrapSandboxId : null,
   };
 }

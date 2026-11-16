@@ -66,6 +66,8 @@ quando alguma chave está ausente ou inválida.
 | `JWT_SECRET`                  | Segredo HS256 do JWT (obrigatório, ≥ 32 caracteres)                                |
 | `SESSION_TTL_SECONDS`         | Duração da sessão em segundos (padrão `604800`)                                    |
 | `MAILTRAP_API_TOKEN`          | Token da API do Mailtrap (obrigatório, segredo)                                    |
+| `MAILTRAP_SANDBOX`            | `true` envia para a sandbox do Mailtrap em vez da API de envio (padrão `false`)    |
+| `MAILTRAP_SANDBOX_ID`         | ID da inbox da sandbox; obrigatório quando `MAILTRAP_SANDBOX=true`                 |
 | `MAIL_FROM_EMAIL`             | Remetente; domínio verificado no Mailtrap Sending (padrão `hello@demomailtrap.co`) |
 | `MAIL_FROM_NAME`              | Nome do remetente (padrão `Experts`)                                               |
 | `API_BASE_URL`                | URL da API usada pelo servidor do web                                              |
