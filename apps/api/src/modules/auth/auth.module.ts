@@ -1,5 +1,4 @@
 import { Module } from "@nestjs/common";
-import { MailtrapClient } from "mailtrap";
 
 import { loadEnv } from "../shared/config/env";
 
@@ -34,14 +33,12 @@ import {
   SIGN_IN_RATE_LIMIT_WINDOW_SECONDS,
   SIGN_UP_RATE_LIMIT_MAX,
   SIGN_UP_RATE_LIMIT_WINDOW_SECONDS,
-  MAIL_FROM,
-  MAILTRAP_CLIENT,
   WEB_ORIGIN,
 } from "./auth.tokens";
+import { createEmailSender } from "./infrastructure/create-email-sender";
 import { CryptoOpaqueTokenAdapter } from "./infrastructure/crypto-opaque-token.adapter";
 import { JoseSessionTokenAdapter } from "./infrastructure/jose-session-token.adapter";
 import { ScryptPasswordHasherAdapter } from "./infrastructure/scrypt-password-hasher.adapter";
-import { MailtrapEmailSender } from "./infrastructure/mailtrap-email.sender";
 import { PostgresAuthTokensRepository } from "./infrastructure/postgres-auth-tokens.repository";
 import { PostgresSessionsRepository } from "./infrastructure/postgres-sessions.repository";
 import { PostgresUsersRepository } from "./infrastructure/postgres-users.repository";
@@ -129,32 +126,6 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
       useFactory: () => loadEnv().resetPasswordRateLimitWindowSeconds,
     },
     { provide: WEB_ORIGIN, useFactory: () => loadEnv().webOrigin },
-    {
-      provide: MAILTRAP_CLIENT,
-      useFactory: () => {
-        const env = loadEnv();
-
-        // Local development can route email to a Mailtrap sandbox, which is
-        // addressed by its sandbox (inbox) ID and accepts sandbox-scoped tokens.
-        if (env.mailtrapSandbox && env.mailtrapSandboxId !== null) {
-          return new MailtrapClient({
-            token: env.mailtrapApiToken,
-            sandbox: true,
-            sandboxId: env.mailtrapSandboxId,
-          });
-        }
-
-        return new MailtrapClient({ token: env.mailtrapApiToken });
-      },
-    },
-    {
-      provide: MAIL_FROM,
-      useFactory: () => {
-        const env = loadEnv();
-
-        return { email: env.mailFromEmail, name: env.mailFromName };
-      },
-    },
     JoseSessionTokenAdapter,
     { provide: SessionTokenPort, useExisting: JoseSessionTokenAdapter },
     { provide: SessionsRepositoryPort, useClass: PostgresSessionsRepository },
@@ -167,7 +138,10 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     { provide: PasswordHasherPort, useExisting: ScryptPasswordHasherAdapter },
     CryptoOpaqueTokenAdapter,
     { provide: OpaqueTokenPort, useExisting: CryptoOpaqueTokenAdapter },
-    { provide: EmailSenderPort, useClass: MailtrapEmailSender },
+    {
+      provide: EmailSenderPort,
+      useFactory: () => createEmailSender(loadEnv()),
+    },
     CreateSessionUseCase,
     RequestPasswordResetUseCase,
     SignUpUseCase,

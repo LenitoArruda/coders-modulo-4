@@ -35,6 +35,128 @@ describe("loadEnv", () => {
     });
   });
 
+  it("deve assumir dev e Mailtrap quando NODE_ENV está ausente", () => {
+    expect(loadEnv(validEnv)).toMatchObject({
+      nodeEnv: "dev",
+      emailProvider: "mailtrap",
+      resendApiKey: "",
+      mailtrapApiToken: "test-mailtrap-token",
+    });
+  });
+
+  it("deve assumir dev quando NODE_ENV está vazio", () => {
+    expect(loadEnv({ ...validEnv, NODE_ENV: "   " })).toMatchObject({
+      nodeEnv: "dev",
+      emailProvider: "mailtrap",
+    });
+  });
+
+  it("deve selecionar Mailtrap para valores não produtivos", () => {
+    for (const nodeEnv of ["dev", "development", "test", "staging", "prod"]) {
+      expect(loadEnv({ ...validEnv, NODE_ENV: nodeEnv })).toMatchObject({
+        nodeEnv,
+        emailProvider: "mailtrap",
+        resendApiKey: "",
+      });
+    }
+  });
+
+  it("deve selecionar Resend quando NODE_ENV=production", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: "production",
+        RESEND_API_KEY: "test-resend-key",
+      }),
+    ).toMatchObject({
+      nodeEnv: "production",
+      emailProvider: "resend",
+      resendApiKey: "test-resend-key",
+      mailtrapApiToken: "",
+      mailtrapSandbox: false,
+      mailtrapSandboxId: null,
+    });
+  });
+
+  it("deve normalizar NODE_ENV com espaços e capitalização", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: " Production ",
+        RESEND_API_KEY: "test-resend-key",
+      }),
+    ).toMatchObject({
+      nodeEnv: "production",
+      emailProvider: "resend",
+    });
+  });
+
+  it("deve exigir apenas RESEND_API_KEY quando Resend é o provedor ativo", () => {
+    const source = {
+      ...validEnv,
+      NODE_ENV: "production",
+      MAILTRAP_API_TOKEN: undefined,
+    };
+
+    expect(() => loadEnv(source)).toThrow(/RESEND_API_KEY/);
+
+    expect(
+      loadEnv({ ...source, RESEND_API_KEY: "test-resend-key" }),
+    ).toMatchObject({
+      emailProvider: "resend",
+      mailtrapApiToken: "",
+    });
+  });
+
+  it("deve exigir apenas MAILTRAP_API_TOKEN quando Mailtrap é o provedor ativo", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: "development",
+        RESEND_API_KEY: undefined,
+      }),
+    ).toMatchObject({
+      emailProvider: "mailtrap",
+      resendApiKey: "",
+    });
+
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: "development",
+        MAILTRAP_API_TOKEN: undefined,
+      }),
+    ).toThrow(/MAILTRAP_API_TOKEN/);
+  });
+
+  it("deve ignorar variáveis inválidas do provedor inativo", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: "production",
+        RESEND_API_KEY: "test-resend-key",
+        MAILTRAP_SANDBOX: "maybe",
+        MAILTRAP_SANDBOX_ID: "0",
+      }),
+    ).toMatchObject({
+      emailProvider: "resend",
+      mailtrapSandbox: false,
+      mailtrapSandboxId: null,
+    });
+
+    expect(
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: "development",
+        RESEND_API_KEY: "ignored",
+        MAILTRAP_SANDBOX: "false",
+      }),
+    ).toMatchObject({
+      emailProvider: "mailtrap",
+      mailtrapSandbox: false,
+    });
+  });
+
   it("deve falhar quando o segredo do JWT está ausente", () => {
     const source = { ...validEnv, JWT_SECRET: undefined };
 

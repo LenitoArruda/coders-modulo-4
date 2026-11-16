@@ -3,6 +3,15 @@ export type EnvSource = Record<string, string | undefined>;
 /** Minimum length (characters) required for the JWT signing secret (HS256, 256 bits). */
 export const JWT_SECRET_MIN_LENGTH = 32;
 
+/** Effective environment used when `NODE_ENV` is absent or empty. */
+export const DEFAULT_NODE_ENV = "dev";
+
+/** Only this exact normalized value selects the production email provider. */
+export const PRODUCTION_NODE_ENV = "production";
+
+/** Transactional email providers supported by the API. */
+export type EmailProvider = "mailtrap" | "resend";
+
 /** Default session duration in seconds (7 days), configurable via SESSION_TTL_SECONDS. */
 export const DEFAULT_SESSION_TTL_SECONDS = 604_800;
 
@@ -43,6 +52,10 @@ export const DEFAULT_RESET_PASSWORD_RATE_LIMIT_MAX = 5;
 export const DEFAULT_RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = 60;
 
 export type Env = {
+  /** Effective runtime environment (`NODE_ENV` normalized, defaulting to `dev`). */
+  nodeEnv: string;
+  /** Transactional email provider selected from `nodeEnv`. */
+  emailProvider: EmailProvider;
   port: number;
   webOrigin: string;
   /** PostgreSQL connection string; the only database configuration the API needs. */
@@ -63,9 +76,11 @@ export type Env = {
   signInRateLimitWindowSeconds: number;
   resetPasswordRateLimitMax: number;
   resetPasswordRateLimitWindowSeconds: number;
-  /** Mailtrap Email API token (secret). */
+  /** Resend API key (secret); empty when Resend is not the active provider. */
+  resendApiKey: string;
+  /** Mailtrap Email API token (secret); empty when Mailtrap is not the active provider. */
   mailtrapApiToken: string;
-  /** Sender address; its domain must be verified in Mailtrap Sending. */
+  /** Sender address shared by both providers; the domain must be verified there. */
   mailFromEmail: string;
   mailFromName: string;
   /** When true, transactional email goes to the Mailtrap sandbox instead of the Sending API. */
@@ -98,6 +113,21 @@ export class ConfigurationError extends Error {
 
 function readString(value: string | undefined): string {
   return value?.trim() ?? "";
+}
+
+/**
+ * Normalizes `NODE_ENV` so whitespace and capitalization cannot produce an
+ * ambiguous provider selection. Absent/empty values fall back to `dev`.
+ */
+function readNodeEnv(value: string | undefined): string {
+  const normalized = readString(value).toLowerCase();
+
+  return normalized || DEFAULT_NODE_ENV;
+}
+
+/** `production` selects Resend; every other effective value selects Mailtrap. */
+export function selectEmailProvider(nodeEnv: string): EmailProvider {
+  return nodeEnv === PRODUCTION_NODE_ENV ? "resend" : "mailtrap";
 }
 
 /** Returns `null` when the value is not a recognized boolean flag. */
@@ -343,6 +373,9 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS");
   }
 
+  const nodeEnv = readNodeEnv(source.NODE_ENV);
+  const emailProvider = selectEmailProvider(nodeEnv);
+  const resendApiKey = readString(source.RESEND_API_KEY);
   const mailtrapApiToken = readString(source.MAILTRAP_API_TOKEN);
   const mailFromEmail =
     readString(source.MAIL_FROM_EMAIL) || "hello@demomailtrap.co";
@@ -352,17 +385,29 @@ export function loadEnv(source: EnvSource = process.env): Env {
   const mailtrapSandboxId =
     mailtrapSandboxIdValue === "" ? null : Number(mailtrapSandboxIdValue);
 
-  if (!mailtrapApiToken) missing.push("MAILTRAP_API_TOKEN");
+  if (emailProvider === "resend") {
+    if (!resendApiKey) missing.push("RESEND_API_KEY");
+  } else if (!mailtrapApiToken) {
+    missing.push("MAILTRAP_API_TOKEN");
+  }
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailFromEmail)) {
     invalid.push("MAIL_FROM_EMAIL");
   }
-  if (mailtrapSandbox === null) invalid.push("MAILTRAP_SANDBOX");
 
-  if (mailtrapSandbox === true) {
-    if (mailtrapSandboxId === null) {
-      missing.push("MAILTRAP_SANDBOX_ID");
-    } else if (!Number.isInteger(mailtrapSandboxId) || mailtrapSandboxId < 1) {
-      invalid.push("MAILTRAP_SANDBOX_ID");
+  // Variables from the inactive provider are intentionally ignored.
+  if (emailProvider === "mailtrap") {
+    if (mailtrapSandbox === null) invalid.push("MAILTRAP_SANDBOX");
+
+    if (mailtrapSandbox === true) {
+      if (mailtrapSandboxId === null) {
+        missing.push("MAILTRAP_SANDBOX_ID");
+      } else if (
+        !Number.isInteger(mailtrapSandboxId) ||
+        mailtrapSandboxId < 1
+      ) {
+        invalid.push("MAILTRAP_SANDBOX_ID");
+      }
     }
   }
 
@@ -379,6 +424,8 @@ export function loadEnv(source: EnvSource = process.env): Env {
   }
 
   return {
+    nodeEnv,
+    emailProvider,
     port,
     webOrigin: new URL(webOrigin).origin,
     databaseUrl,
@@ -398,10 +445,14 @@ export function loadEnv(source: EnvSource = process.env): Env {
     signInRateLimitWindowSeconds,
     resetPasswordRateLimitMax,
     resetPasswordRateLimitWindowSeconds,
-    mailtrapApiToken,
+    resendApiKey: emailProvider === "resend" ? resendApiKey : "",
+    mailtrapApiToken: emailProvider === "mailtrap" ? mailtrapApiToken : "",
     mailFromEmail,
     mailFromName,
-    mailtrapSandbox: mailtrapSandbox === true,
-    mailtrapSandboxId: mailtrapSandbox === true ? mailtrapSandboxId : null,
+    mailtrapSandbox: emailProvider === "mailtrap" && mailtrapSandbox === true,
+    mailtrapSandboxId:
+      emailProvider === "mailtrap" && mailtrapSandbox === true
+        ? mailtrapSandboxId
+        : null,
   };
 }

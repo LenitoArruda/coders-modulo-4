@@ -50,10 +50,12 @@ Execute na raiz do monorepo:
 > executam os scripts do `package.json`.
 
 > A API exige `JWT_SECRET` com no mínimo 32 caracteres no boot (veja `.env.example`); sem ele, a
-> API não inicia. Os testes não dependem do `.env`: `apps/api/src/test/setup-env.ts` define as
-> variáveis mínimas (incluindo `JWT_SECRET`, `SESSION_TTL_SECONDS`,
-> `CONFIRMATION_TOKEN_TTL_SECONDS`, `RESET_TOKEN_TTL_SECONDS` e as dos rate limits de sign-up,
-> sign-in, forgot-password e reset-password).
+> API não inicia. O provedor de e-mail é escolhido por `NODE_ENV` (`production` → Resend; demais →
+> Mailtrap), e só as variáveis do provedor ativo são exigidas. Os testes não dependem do `.env`:
+> `apps/api/src/test/setup-env.ts` define `NODE_ENV=test` e as variáveis mínimas (incluindo
+> `JWT_SECRET`, `MAILTRAP_API_TOKEN`, `SESSION_TTL_SECONDS`, `CONFIRMATION_TOKEN_TTL_SECONDS`,
+> `RESET_TOKEN_TTL_SECONDS` e as dos rate limits de sign-up, sign-in, forgot-password e
+> reset-password).
 >
 > O E2E do web (`bun run test:e2e`) sobe uma **API fake** local em `127.0.0.1:3434`
 > (`apps/web/e2e/support/fake-api-server.ts`) e aponta `API_BASE_URL` do web para ela. Assim os
@@ -256,7 +258,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] E2E cobre sucesso/cookie/URL sem token, inválido, `409`, `429`, link sem token, sessão ativa,
       foco visível e 360/768/1280 px sem rolagem horizontal.
 - [ ] E-mails transacionais seguem `DESIGN.md` (light-only, paleta, texto grafite sobre o botão pastel, 1 ação primária, link de fallback) e não têm rolagem horizontal em 360 px.
-- [ ] Logs do Mailtrap (`https://mailtrap.io/sending/email_logs`): e-mails "Confirm your account" e "New session on your account" inspecionados
+- [ ] Em dev, logs do Mailtrap (`https://mailtrap.io/sending/email_logs`): e-mails "Confirm your account" e "New session on your account" inspecionados
       no QA manual, com data/hora e alerta de senha no segundo.
 - [ ] `CONFIRMATION_TOKEN_TTL_SECONDS` controla a expiração (padrão 86400) e os limites de rate
       limit vêm do env; logs incluem operação/`userId`, sem e-mail, senha ou token.
@@ -292,7 +294,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] `/auth/sign-in` substitui o placeholder, usa en-US, light-only, labels, `aria-describedby`
       e link "Forgot password?" para `/auth/forgot-password`.
 - [ ] Credenciais válidas → sessão `sign_in`, cookie `HttpOnly`/`SameSite=Lax`, redirect para `/app`
-      ou para o `returnTo` seguro e e-mail "New session on your account" no Mailtrap.
+      ou para o `returnTo` seguro e e-mail "New session on your account" no provedor ativo.
 - [ ] Senha errada, e-mail inexistente ou e-mail malformado → `401` com a mesma mensagem; corpo
       vazio/malformado → `400`; conta não confirmada com a senha certa → `403`.
 - [ ] Segundo dispositivo revoga o primeiro (JWT antigo → `401`, `/app` redireciona para sign-in).
@@ -307,7 +309,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
       `autocomplete="new-password"`, foco visível e erros com `aria-describedby` e `role="alert"`.
 - [ ] Token válido + senha e confirmação válidas → `200`, hash atualizado (nunca a senha em
       claro), token consumido, outros tokens `password_reset` invalidados, **todas** as sessões
-      revogadas e e-mail "Your password has been changed" en-US nos logs do Mailtrap
+      revogadas e e-mail "Your password has been changed" en-US nos logs do provedor ativo
       com orientação para solicitar novo reset.
 - [ ] Após o sucesso o web mostra a confirmação, redireciona para `/auth/sign-in?reset=success` e o
       sign-in exibe "Your password has been updated. Sign in with your new password."
@@ -328,6 +330,24 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] E2E cobre fluxo completo, URL limpa, `Referrer-Policy`, link inválido/ausente, segundo uso,
       sessão antiga invalidada, validação, `429`, foco visível, light-only e 360/768/1280 px sem
       rolagem horizontal.
+
+### 5.15 Provedor de e-mail por ambiente
+
+- [ ] `NODE_ENV` ausente ou vazio → `dev`, provedor Mailtrap e `NODE_ENV` não é obrigatório.
+- [ ] `NODE_ENV` diferente de `production` (ex.: `dev`, `development`, `test`, `staging`) → Mailtrap.
+- [ ] `NODE_ENV=production` → Resend, inclusive com espaços/capitalização normalizados.
+- [ ] Mailtrap ativo: `MAILTRAP_API_TOKEN` ausente falha no boot citando a variável; `RESEND_API_KEY`
+      não é exigida.
+- [ ] Resend ativo: `RESEND_API_KEY` ausente falha no boot citando a variável; `MAILTRAP_API_TOKEN`
+      não é exigida.
+- [ ] `MAIL_FROM_EMAIL`/`MAIL_FROM_NAME` são compartilhados e o remetente chega igual nos dois
+      provedores.
+- [ ] `MAILTRAP_SANDBOX`/`MAILTRAP_SANDBOX_ID` continuam válidos só com Mailtrap ativo; variáveis
+      inválidas do provedor inativo são ignoradas.
+- [ ] Os quatro e-mails (confirmação, nova sessão, recuperação e senha alterada) mantêm assunto,
+      conteúdo e destinatário no provedor ativo.
+- [ ] O boot loga `nodeEnv` e `emailProvider`, sem chaves, tokens ou conteúdo de e-mail.
+- [ ] `.env.example` separa os blocos de Mailtrap e Resend e não contém segredos reais.
 
 ---
 

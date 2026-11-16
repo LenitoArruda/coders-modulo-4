@@ -39,6 +39,8 @@ async function bootstrap(): Promise<void> {
   log("info", "API iniciada", {
     port: env.port,
     webOrigin: env.webOrigin,
+    nodeEnv: env.nodeEnv,
+    emailProvider: env.emailProvider,
   });
 
   const shutdown = async (): Promise<void> => {

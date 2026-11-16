@@ -91,8 +91,10 @@ mesma estrutura.
 - Erros de domínio/aplicação são traduzidos para HTTP **na interface**: cada handler mapeia o erro
   do seu caso de uso e o guard traduz `InvalidSessionError` em `401` com o contrato único da
   sessão; ausência, expiração, revogação e assinatura inválida são indistinguíveis na resposta.
-- Adaptadores convertem erros externos (jose, `pg`/SQLSTATE, Mailtrap) sem vazar detalhes; falha de
-  e-mail não derruba a sessão já criada.
+- Adaptadores convertem erros externos (jose, `pg`/SQLSTATE, Mailtrap/Resend) sem vazar detalhes;
+  falha de e-mail não derruba a sessão já criada.
+- O provedor de e-mail é escolhido por `NODE_ENV` (`production` → Resend; demais → Mailtrap) e a
+  composição do `EmailSenderPort` fica em `auth/infrastructure/create-email-sender.ts`.
 - Toda rota vive sob `/api/v1`; caminhos fora do prefixo respondem 404 com o mesmo contrato.
 - Testes de integração são nomeados pelo fluxo (`get-current-user.integration.spec.ts`,
   `confirm-account.integration.spec.ts`), usam os fakes de repositório/e-mail e o adaptador `jose`

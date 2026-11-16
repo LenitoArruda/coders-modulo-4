@@ -36,5 +36,3 @@ export const RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = Symbol(
   "RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS",
 );
 export const WEB_ORIGIN = Symbol("WEB_ORIGIN");
-export const MAILTRAP_CLIENT = Symbol("MAILTRAP_CLIENT");
-export const MAIL_FROM = Symbol("MAIL_FROM");

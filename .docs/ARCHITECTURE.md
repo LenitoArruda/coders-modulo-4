@@ -76,7 +76,7 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 | API                         | NestJS                                   | 12.3.3           |
 | JWT de sessão               | jose (HS256)                             | 6.2.17           |
 | Acesso ao banco (servidor)  | `pg` (SQL parametrizado)                 | 8.23.1           |
-| E-mail transacional         | SDK `mailtrap` (API de envio)            | 6.2.0            |
+| E-mail transacional         | Mailtrap SDK (dev) + Resend HTTP API     | 6.2.0 / —        |
 | Hash de senha               | `node:crypto` scrypt (ADR 0014)          | —                |
 | Banco local                 | PostgreSQL via Docker Compose            | 18               |
 | Testes unitários/integração | Vitest + Supertest                       | 5.1.0 / 7.3.1    |
@@ -139,7 +139,7 @@ apps/api/src/
 │   ├── auth/
 │   │   ├── domain/              # Session, SessionOrigin, AuthUser, SignUpInput, erros de auth
 │   │   ├── application/         # Casos de uso (inclui GetCurrentUserUseCase), templates, portas
-│   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios `pg`, Mailtrap
+│   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios `pg`, Mailtrap/Resend
 │   │   └── interface/           # request handlers (1 por endpoint), guard, rate limiter, testes de integração
 │   │       └── request-handlers/ # um handler por endpoint (sign-up, sign-in, sign-out, /me, confirm, forgot, reset)
 │   ├── hello/
@@ -234,7 +234,7 @@ web (server)                         api
 | `SessionTokenPort` / `jose`                              | Assina e valida HS256 com `JWT_SECRET`; claims `sub`, `sid`, `iat`, `exp`               |
 | `SessionsRepositoryPort` / `pg`                          | Persiste, consulta e revoga sessões com SQL parametrizado                               |
 | `UsersRepositoryPort` / `pg`                             | Carrega os dados básicos da pessoa autenticada                                          |
-| `EmailSenderPort` / Mailtrap                             | Envia o template en-US de nova sessão pela API do Mailtrap                              |
+| `EmailSenderPort` / Mailtrap ou Resend                   | Envia o template en-US de nova sessão pelo provedor ativo (`NODE_ENV`)                  |
 | `SessionGuard` + `@CurrentUser()`                        | Extrai o Bearer, aplica o contrato de 401 e injeta a pessoa na rota                     |
 | `GetCurrentUserRequestHandler` + `GetCurrentUserUseCase` | Atende `GET /auth/me` com o `AuthUser` já resolvido pelo guard, sem reler o repositório |
 | `ErrorContractFilter` (`APP_FILTER`)                     | Serializa `{ code, message, fieldErrors? }` sem stack/SQL/detalhes internos             |
@@ -270,7 +270,7 @@ pessoa. Juntas, as duas rotas fecham a jornada iniciada em `/auth/sign-up`.
                                                    ├─ users (PostgreSQL, `pg`)
                                                    ├─ auth_tokens (apenas token_hash)
                                                    ├─ scrypt (password_hash)
-                                                   └─ API Mailtrap
+                                                   └─ provedor de e-mail ativo
 ```
 
 | Peça                              | Responsabilidade                                                                                                                            |
@@ -310,7 +310,7 @@ Regras:
                                                              └─ CreateSessionUseCase (sign_up_confirmation)
                                                                   ├─ sessions (revoga as anteriores)
                                                                   ├─ JWT HS256
-                                                                  └─ API Mailtrap (e-mail de nova sessão)
+                                                                  └─ provedor de e-mail ativo (e-mail de nova sessão)
 ```
 
 | Peça                                  | Responsabilidade                                                                  |
@@ -368,7 +368,7 @@ dummy real quando a conta não existe. Só depois de senha correta checa a confi
                                                └─ CreateSessionUseCase (sign_in)
                                                     ├─ sessions (nova + revoga as anteriores)
                                                     ├─ JWT HS256
-                                                    └─ API Mailtrap (e-mail de nova sessão)
+                                                    └─ provedor de e-mail ativo (e-mail de nova sessão)
 ◄── { accessToken, tokenType, expiresIn, user } ── Server Action grava cookie HttpOnly
     e redireciona para o returnTo sanitizado (ou /app)
 ```
@@ -398,7 +398,7 @@ com o link `/auth/reset-password?token=...` (a troca de senha é descrita na se�
                                                            ├─ users (busca por e-mail normalizado)
                                                            ├─ auth_tokens (purpose password_reset, apenas token_hash)
                                                            ├─ create-then-revoke (invalidateUnusedExcept)
-                                                           └─ API Mailtrap
+                                                           └─ provedor de e-mail ativo
 ```
 
 | Peça                          | Responsabilidade                                                              |
@@ -509,6 +509,26 @@ Regras:
   toda rota protegida.
 - Textos de UI e metadados são **en-US** (`html lang="en-US"`); a documentação interna é PT-BR.
 
+### 4.10 Provedor de e-mail transacional
+
+O provedor é escolhido por `NODE_ENV` na configuração (`loadEnv`) e a composição do
+`EmailSenderPort` fica centralizada em `auth/infrastructure/create-email-sender.ts`:
+
+| `NODE_ENV` efetivo      | Provedor | Variáveis exigidas                                     |
+| ----------------------- | -------- | ------------------------------------------------------ |
+| `production`            | Resend   | `RESEND_API_KEY` + `MAIL_FROM_EMAIL`/`MAIL_FROM_NAME`  |
+| ausente, vazio ou outro | Mailtrap | `MAILTRAP_API_TOKEN` + `MAIL_FROM_*`; sandbox opcional |
+
+Regras:
+
+- `NODE_ENV` é opcional; ausente/vazio assume `dev`. A comparação normaliza espaços e
+  capitalização, então `Production` seleciona Resend.
+- A validação exige apenas as variáveis do provedor ativo; variáveis do provedor inativo são
+  ignoradas.
+- Resend usa a API HTTP oficial (`https://api.resend.com/emails`) via `fetch` nativo; Mailtrap usa
+  o SDK `mailtrap`, com sandbox opcional em não produção.
+- O boot registra `nodeEnv` e `emailProvider`, nunca chaves ou conteúdo de e-mail.
+
 ---
 
 ## 5. Fluxo de dados alvo
@@ -522,7 +542,7 @@ apps/web (Next.js)
   ▼
 apps/api (NestJS)
   ├── AuthN/AuthZ ──────────────► Postgres (auth própria: users, auth_tokens, sessions)
-  │                               └─► SMTP Mailtrap (e-mail de nova sessão)
+  │                               └─► Mailtrap/Resend (e-mail de nova sessão)
   ├── Casos de uso
   │     ├── Conectores ─────────► Notion / Google / Jira / ...
   │     ├── Ingestão ───────────► Postgres + Storage (documentos e chunks)

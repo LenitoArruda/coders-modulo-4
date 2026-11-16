@@ -17,7 +17,7 @@ infraestrutura de sessão de auth — e **não** implementa ainda funcionalidade
 | Web / Docs      | Next.js 16 (App Router) + React 19                          |
 | UI              | Tailwind CSS 4 + shadcn/ui (`packages/ui`)                  |
 | API             | NestJS 12 + TypeScript (CommonJS)                           |
-| Sessão / e-mail | jose (JWT HS256) + SDK Mailtrap (API de envio)              |
+| Sessão / e-mail | jose (JWT HS256) + Mailtrap (dev) / Resend (produção)       |
 | Banco           | PostgreSQL 18 via Docker Compose (`pg` + SQL parametrizado) |
 | Testes          | Vitest + Supertest (API), Vitest (web) e Playwright         |
 | Observabilidade | OpenTelemetry → Grafana LGTM (métricas, logs e traces)      |
@@ -65,10 +65,12 @@ quando alguma chave está ausente ou inválida.
 | `OTEL_SERVICE_NAME`           | Nome do serviço na telemetria                                                      |
 | `JWT_SECRET`                  | Segredo HS256 do JWT (obrigatório, ≥ 32 caracteres)                                |
 | `SESSION_TTL_SECONDS`         | Duração da sessão em segundos (padrão `604800`)                                    |
-| `MAILTRAP_API_TOKEN`          | Token da API do Mailtrap (obrigatório, segredo)                                    |
+| `NODE_ENV`                    | Ambiente efetivo (padrão `dev`); `production` usa Resend, demais usam Mailtrap     |
+| `MAILTRAP_API_TOKEN`          | Token da API do Mailtrap; obrigatório quando Mailtrap é o provedor ativo (segredo) |
 | `MAILTRAP_SANDBOX`            | `true` envia para a sandbox do Mailtrap em vez da API de envio (padrão `false`)    |
 | `MAILTRAP_SANDBOX_ID`         | ID da inbox da sandbox; obrigatório quando `MAILTRAP_SANDBOX=true`                 |
-| `MAIL_FROM_EMAIL`             | Remetente; domínio verificado no Mailtrap Sending (padrão `hello@demomailtrap.co`) |
+| `RESEND_API_KEY`              | Chave da API do Resend; obrigatória quando `NODE_ENV=production` (segredo)         |
+| `MAIL_FROM_EMAIL`             | Remetente compartilhado; domínio verificado no provedor ativo                      |
 | `MAIL_FROM_NAME`              | Nome do remetente (padrão `Experts`)                                               |
 | `API_BASE_URL`                | URL da API usada pelo servidor do web                                              |
 
@@ -229,9 +231,10 @@ A autenticação é própria da API (sem provedor externo) e a API é versionada
 - O web guarda o token no cookie `session_token` (`HttpOnly`, `SameSite=Lax`, `Secure` em
   produção); o servidor do Next lê o cookie e envia `Authorization: Bearer` (`apps/web/lib/auth`).
   O token nunca vai para o JavaScript do navegador.
-- O e-mail de nova sessão é enviado pela API do Mailtrap; consulte os envios nos logs
-  (<https://mailtrap.io/sending/email_logs>). A fatia entrega a infraestrutura; páginas públicas de confirmação,
-  sign-in, sign-out e recuperação de senha entram nas fatias 004–008.
+- O e-mail de nova sessão é enviado pelo provedor selecionado por `NODE_ENV`: Mailtrap em
+  desenvolvimento/teste e Resend em produção. Em dev, consulte os envios nos logs
+  (<https://mailtrap.io/sending/email_logs>). A fatia entrega a infraestrutura; páginas públicas de
+  confirmação, sign-in, sign-out e recuperação de senha entram nas fatias 004–008.
 - Erros seguem `{ code, message, fieldErrors? }`, sem stack, SQL ou detalhes internos.
 
 ### Navegação e idioma
