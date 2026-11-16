@@ -10,7 +10,7 @@ import { AuthLink } from "../_components/auth-card";
 import { forgotPasswordAction } from "./actions";
 
 const INPUT_CLASS_NAME =
-  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
 export function ForgotPasswordForm() {
   const [state, formAction, isPending] = useActionState(
@@ -30,14 +30,14 @@ export function ForgotPasswordForm() {
       <div
         role="status"
         aria-live="polite"
-        className="rounded-md border border-border bg-secondary p-4 text-secondary-foreground"
+        className="rounded-lg border border-success-border bg-success p-4 text-success-foreground"
       >
         <p className="text-base font-medium">{state.message}</p>
-        <p className="mt-2 leading-relaxed">
+        <p className="mt-2 text-sm leading-relaxed">
           If the account exists, open the link in the email to choose a new
           password. The link expires in 1 hour.
         </p>
-        <p className="mt-4">
+        <p className="mt-4 text-sm text-muted-foreground">
           Remembered your password?{" "}
           <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink>.
         </p>
@@ -64,7 +64,7 @@ export function ForgotPasswordForm() {
           ref={summaryRef}
           role="alert"
           tabIndex={-1}
-          className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800"
+          className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
         >
           {state.message}
         </div>
@@ -90,13 +90,13 @@ export function ForgotPasswordForm() {
           aria-describedby={describedBy}
           defaultValue={state.values.email}
           className={`${INPUT_CLASS_NAME} ${
-            error ? "border-red-600" : "border-input"
+            error ? "border-destructive-foreground/50" : "border-input"
           }`}
         />
         {error ? (
           <p
             id="forgot-password-email-error"
-            className="mt-1 text-sm font-medium text-red-700"
+            className="mt-1 text-sm font-medium text-destructive-foreground"
           >
             {error}
           </p>

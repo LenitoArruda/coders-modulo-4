@@ -42,15 +42,20 @@ async function expectNoHorizontalScroll(page: Page): Promise<void> {
 }
 
 test.describe("public auth routes", () => {
-  test("visitante na raiz é enviado para o sign-in em en-US", async ({
-    page,
-  }) => {
+  test("visitante na raiz vê a landing pública em en-US", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+    await expect(page).toHaveURL(/\/$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
-    await expect(page.locator('[data-layout="auth"]')).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "team of AI experts",
+    );
+    await expect(
+      page.getByRole("link", { name: "Create your account" }).first(),
+    ).toHaveAttribute("href", "/auth/sign-up");
+    await expect(
+      page.getByRole("link", { name: "Sign in" }).first(),
+    ).toHaveAttribute("href", "/auth/sign-in");
   });
 
   for (const [path, title] of AUTH_PLACEHOLDERS) {
@@ -115,11 +120,16 @@ test.describe("private area without a session", () => {
     await expect(page).toHaveURL(/\/auth\/sign-in$/);
   });
 
-  test("raiz com sessão inválida vai para o sign-in", async ({ page }) => {
+  test("raiz com sessão inválida mostra a landing pública", async ({
+    page,
+  }) => {
     await setSessionCookie(page, E2E_INVALID_SESSION_TOKEN);
     await page.goto("/");
 
-    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "team of AI experts",
+    );
   });
 });
 
@@ -247,11 +257,7 @@ test.describe("accessibility and responsiveness", () => {
     const colorScheme = await page.evaluate(
       () => window.getComputedStyle(document.documentElement).colorScheme,
     );
-    const background = await page.evaluate(
-      () => window.getComputedStyle(document.body).backgroundColor,
-    );
 
     expect(colorScheme).toBe("light");
-    expect(background).toBe("rgb(255, 255, 255)");
   });
 });

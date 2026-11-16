@@ -10,18 +10,24 @@
   --card-foreground: #171717;
   --popover: #ffffff;
   --popover-foreground: #171717;
-  --primary: #a0c4e2;
+  --primary: #9fc2e4;
   --primary-foreground: #171717;
-  --secondary: #cfe8ef;
+  --secondary: #e8f3f7;
   --secondary-foreground: #171717;
-  --muted: #c6dbf0;
-  --muted-foreground: #52525b;
-  --accent: #85c7de;
+  --muted: #edf4f8;
+  --muted-foreground: #4b5563;
+  --accent: #dceef6;
   --accent-foreground: #171717;
-  --border: #aed1e6;
-  --input: #aed1e6;
-  --ring: #85c7de;
-  --radius: 0.5rem;
+  --border: #bfd4e5;
+  --input: #bfd4e5;
+  --ring: #5b9bd5;
+  --destructive: #fdf2f2;
+  --destructive-foreground: #991b1b;
+  --destructive-border: #f3b4b4;
+  --success: #eef8f3;
+  --success-foreground: #166534;
+  --success-border: #9fd8b8;
+  --radius: 0.625rem;
 }
 
 @theme inline {
@@ -42,6 +48,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-border: var(--destructive-border);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-border: var(--success-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius-sm: calc(var(--radius) - 4px);
@@ -72,5 +84,16 @@
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

@@ -63,10 +63,10 @@ export function ConfirmForm({ token }: ConfirmFormProps) {
       <div
         role="status"
         aria-live="polite"
-        className="rounded-md border border-border bg-secondary p-4 text-secondary-foreground"
+        className="rounded-lg border border-success-border bg-success p-4 text-success-foreground"
       >
         <p className="text-base font-medium">Your email is confirmed.</p>
-        <p className="mt-2 leading-relaxed">
+        <p className="mt-2 text-sm leading-relaxed">
           Taking you to your account.{" "}
           <AuthLink href={APP_HOME_PATH}>Go to your account</AuthLink>.
         </p>
@@ -89,7 +89,7 @@ export function ConfirmForm({ token }: ConfirmFormProps) {
             ref={summaryRef}
             role="alert"
             tabIndex={-1}
-            className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800"
+            className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
           >
             {state.message}
           </div>

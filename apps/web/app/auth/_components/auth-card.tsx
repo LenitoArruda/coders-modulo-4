@@ -10,14 +10,14 @@ type AuthCardProps = {
 };
 
 /**
- * Card shared by the public auth placeholders. It only renders content; the
- * auth layout owns the page chrome and the accessibility landmarks.
+ * Card shared by the public auth screens. It only renders content; the auth
+ * layout owns the page chrome and the accessibility landmarks.
  */
 export function AuthCard({ title, description, children }: AuthCardProps) {
   return (
     <section
       aria-labelledby="auth-title"
-      className="w-full rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8"
+      className="w-full rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
     >
       <h1
         id="auth-title"
@@ -29,9 +29,7 @@ export function AuthCard({ title, description, children }: AuthCardProps) {
         {description}
       </p>
       {children ? (
-        <div className="mt-6 space-y-2 text-sm text-muted-foreground">
-          {children}
-        </div>
+        <div className="mt-6 space-y-3 text-sm">{children}</div>
       ) : null}
     </section>
   );

@@ -17,7 +17,7 @@ import { AuthLink } from "../_components/auth-card";
 import { signInAction } from "./actions";
 
 const INPUT_CLASS_NAME =
-  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
 type SignInFormProps = {
   /** Already validated by the page; the action validates it again. */
@@ -61,11 +61,11 @@ export function SignInForm({ returnTo }: SignInFormProps) {
           ref={summaryRef}
           role="alert"
           tabIndex={-1}
-          className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800"
+          className="rounded-lg border border-destructive-border bg-destructive p-3 text-destructive-foreground outline-none"
         >
-          <p>{state.message}</p>
+          <p className="font-medium">{state.message}</p>
           {needsConfirmation ? (
-            <p className="mt-1">
+            <p className="mt-1 text-sm">
               Open the confirmation link we emailed you, then sign in again.
             </p>
           ) : null}
@@ -92,13 +92,13 @@ export function SignInForm({ returnTo }: SignInFormProps) {
           aria-describedby={emailError ? "sign-in-email-error" : undefined}
           defaultValue={state.values.email}
           className={`${INPUT_CLASS_NAME} ${
-            emailError ? "border-red-600" : "border-input"
+            emailError ? "border-destructive-foreground/50" : "border-input"
           }`}
         />
         {emailError ? (
           <p
             id="sign-in-email-error"
-            className="mt-1 text-sm font-medium text-red-700"
+            className="mt-1 text-sm font-medium text-destructive-foreground"
           >
             {emailError}
           </p>
@@ -126,13 +126,13 @@ export function SignInForm({ returnTo }: SignInFormProps) {
             passwordError ? "sign-in-password-error" : undefined
           }
           className={`${INPUT_CLASS_NAME} ${
-            passwordError ? "border-red-600" : "border-input"
+            passwordError ? "border-destructive-foreground/50" : "border-input"
           }`}
         />
         {passwordError ? (
           <p
             id="sign-in-password-error"
-            className="mt-1 text-sm font-medium text-red-700"
+            className="mt-1 text-sm font-medium text-destructive-foreground"
           >
             {passwordError}
           </p>

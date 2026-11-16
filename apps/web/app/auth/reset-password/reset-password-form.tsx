@@ -22,7 +22,7 @@ import { AuthLink } from "../_components/auth-card";
 import { resetPasswordAction } from "./actions";
 
 const INPUT_CLASS_NAME =
-  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
 const SUCCESS_REDIRECT_PATH = `${AUTH_SIGN_IN_PATH}?${RESET_SUCCESS_PARAM}=${RESET_SUCCESS_VALUE}`;
 
@@ -97,10 +97,10 @@ export function ResetPasswordForm({
       <div
         role="status"
         aria-live="polite"
-        className="rounded-md border border-border bg-secondary p-4 text-secondary-foreground"
+        className="rounded-lg border border-success-border bg-success p-4 text-success-foreground"
       >
         <p className="text-base font-medium">Your password has been updated.</p>
-        <p className="mt-2 leading-relaxed">
+        <p className="mt-2 text-sm leading-relaxed">
           Taking you to sign in.{" "}
           <AuthLink href={SUCCESS_REDIRECT_PATH}>Go to sign in</AuthLink>.
         </p>
@@ -115,7 +115,7 @@ export function ResetPasswordForm({
           ref={summaryRef}
           role="alert"
           tabIndex={-1}
-          className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800"
+          className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
         >
           {state.message}
         </div>
@@ -147,7 +147,7 @@ export function ResetPasswordForm({
           ref={summaryRef}
           role="alert"
           tabIndex={-1}
-          className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800"
+          className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
         >
           {state.message}
         </div>
@@ -179,7 +179,7 @@ export function ResetPasswordForm({
               aria-invalid={error ? true : undefined}
               aria-describedby={describedBy}
               className={`${INPUT_CLASS_NAME} ${
-                error ? "border-red-600" : "border-input"
+                error ? "border-destructive-foreground/50" : "border-input"
               }`}
             />
             {field.hint ? (
@@ -188,7 +188,10 @@ export function ResetPasswordForm({
               </p>
             ) : null}
             {error ? (
-              <p id={errorId} className="mt-1 text-sm font-medium text-red-700">
+              <p
+                id={errorId}
+                className="mt-1 text-sm font-medium text-destructive-foreground"
+              >
                 {error}
               </p>
             ) : null}

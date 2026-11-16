@@ -43,7 +43,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         <div
           role="status"
           aria-live="polite"
-          className="rounded-md border border-border bg-secondary p-3 text-secondary-foreground"
+          className="rounded-lg border border-success-border bg-success p-3 text-sm leading-relaxed text-success-foreground"
         >
           {RESET_PASSWORD_SUCCESS_MESSAGE}
         </div>

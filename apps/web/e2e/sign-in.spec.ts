@@ -334,14 +334,17 @@ test.describe("single session", () => {
 });
 
 test.describe("root and auth pages with a session", () => {
-  test("raiz com sessão vai para /app e sem sessão para o sign-in", async ({
+  test("raiz com sessão vai para /app e sem sessão mostra a landing", async ({
     browser,
   }) => {
     const signedOut = await browser.newContext({ baseURL: BASE_URL });
     const signedOutPage = await signedOut.newPage();
 
     await signedOutPage.goto("/");
-    await expect(signedOutPage).toHaveURL(/\/auth\/sign-in$/);
+    await expect(signedOutPage).toHaveURL(/\/$/);
+    await expect(
+      signedOutPage.getByRole("heading", { level: 1 }),
+    ).toContainText("team of AI experts");
     await signedOut.close();
 
     const { context, page } = await newSignedInContext(

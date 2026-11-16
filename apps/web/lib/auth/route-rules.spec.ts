@@ -7,6 +7,7 @@ import {
   AUTH_RESET_PASSWORD_PATH,
   AUTH_SIGN_IN_PATH,
   AUTH_SIGN_UP_PATH,
+  LANDING_PATH,
   SIGNED_OUT_REDIRECT_PATH,
   buildSignInPath,
   getPrivateAreaRedirectPath,
@@ -21,9 +22,13 @@ describe("getRootRedirectPath", () => {
     expect(getRootRedirectPath(true)).toBe("/app");
   });
 
-  it("deve enviar para /auth/sign-in quando não há sessão", () => {
-    expect(getRootRedirectPath(false)).toBe(SIGNED_OUT_REDIRECT_PATH);
-    expect(getRootRedirectPath(false)).toBe("/auth/sign-in");
+  it("deve manter visitante não autenticado na landing pública", () => {
+    expect(getRootRedirectPath(false)).toBe(LANDING_PATH);
+    expect(getRootRedirectPath(false)).toBe("/");
+  });
+
+  it("deve manter sign out e área privada direcionando para o sign-in", () => {
+    expect(SIGNED_OUT_REDIRECT_PATH).toBe(AUTH_SIGN_IN_PATH);
   });
 });
 

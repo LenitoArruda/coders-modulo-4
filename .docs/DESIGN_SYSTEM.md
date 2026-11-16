@@ -1,6 +1,6 @@
 # DESIGN_SYSTEM.md — Design system
 
-> **Status:** implementado (base) · **Atualizado em:** 2026-11-09
+> **Status:** implementado (base evoluída) · **Atualizado em:** 2026-11-16
 > **Base:** shadcn/ui sobre Tailwind CSS · **Direção visual:** [DESIGN.md](./DESIGN.md)
 
 Este documento define **como** a UI é construída. O `DESIGN.md` define **como ela parece**.
@@ -54,37 +54,44 @@ Tokens são **variáveis CSS semânticas** definidas em `:root` em
 `packages/ui/src/styles/globals.css`, expostas ao Tailwind via `@theme inline`. Componentes nunca
 usam hex diretamente.
 
-| Token                    | Valor     | Uso                             |
-| ------------------------ | --------- | ------------------------------- |
-| `--background`           | `#FFFFFF` | Fundo da aplicação              |
-| `--foreground`           | `#171717` | Texto principal                 |
-| `--card`                 | `#FFFFFF` | Fundo de cards                  |
-| `--card-foreground`      | `#171717` | Texto em cards                  |
-| `--popover`              | `#FFFFFF` | Fundo de popovers               |
-| `--popover-foreground`   | `#171717` | Texto em popovers               |
-| `--primary`              | `#A0C4E2` | Ação primária                   |
-| `--primary-foreground`   | `#171717` | Texto sobre a ação primária     |
-| `--secondary`            | `#CFE8EF` | Ação secundária e fundos suaves |
-| `--secondary-foreground` | `#171717` | Texto sobre secundário          |
-| `--muted`                | `#C6DBF0` | Superfícies discretas           |
-| `--muted-foreground`     | `#52525B` | Texto secundário                |
-| `--accent`               | `#85C7DE` | Hover, active e destaque        |
-| `--accent-foreground`    | `#171717` | Texto sobre accent              |
-| `--border`               | `#AED1E6` | Bordas e divisores              |
-| `--input`                | `#AED1E6` | Borda de inputs                 |
-| `--ring`                 | `#85C7DE` | Anel de foco                    |
-| `--radius`               | `0.5rem`  | Raio padrão                     |
+| Token                      | Valor      | Uso                             |
+| -------------------------- | ---------- | ------------------------------- |
+| `--background`             | `#FFFFFF`  | Fundo da aplicação              |
+| `--foreground`             | `#171717`  | Texto principal                 |
+| `--card`                   | `#FFFFFF`  | Fundo de cards                  |
+| `--card-foreground`        | `#171717`  | Texto em cards                  |
+| `--popover`                | `#FFFFFF`  | Fundo de popovers               |
+| `--popover-foreground`     | `#171717`  | Texto em popovers               |
+| `--primary`                | `#9FC2E4`  | Ação primária                   |
+| `--primary-foreground`     | `#171717`  | Texto sobre a ação primária     |
+| `--secondary`              | `#E8F3F7`  | Ação secundária e fundos suaves |
+| `--secondary-foreground`   | `#171717`  | Texto sobre secundário          |
+| `--muted`                  | `#EDF4F8`  | Superfícies discretas           |
+| `--muted-foreground`       | `#4B5563`  | Texto secundário                |
+| `--accent`                 | `#DCEEF6`  | Hover, active e destaque suave  |
+| `--accent-foreground`      | `#171717`  | Texto sobre accent              |
+| `--border`                 | `#BFD4E5`  | Bordas e divisores              |
+| `--input`                  | `#BFD4E5`  | Borda de inputs                 |
+| `--ring`                   | `#5B9BD5`  | Anel de foco                    |
+| `--destructive`            | `#FDF2F2`  | Fundo de erro/alerta            |
+| `--destructive-foreground` | `#991B1B`  | Texto/ícone de erro             |
+| `--destructive-border`     | `#F3B4B4`  | Borda de erro                   |
+| `--success`                | `#EEF8F3`  | Fundo de sucesso                |
+| `--success-foreground`     | `#166534`  | Texto/ícone de sucesso          |
+| `--success-border`         | `#9FD8B8`  | Borda de sucesso                |
+| `--radius`                 | `0.625rem` | Raio padrão                     |
 
 Regras:
 
-- **Nunca** use texto branco sobre `--primary`, `--secondary` ou `--accent`; use
-  `--primary-foreground`/`#171717`.
-- Cores semânticas (`success`, `warning`, `destructive`) ainda não existem. Ao criá-las, garanta
-  contraste AA e documente nesta tabela.
+- **Nunca** use texto branco sobre superfícies pastéis claras (`--primary`, `--secondary`, `--accent`,
+  `--muted`, `--success`, `--destructive`); use o `*-foreground` correspondente (escuro e legível).
+- Estados semânticos existem para erro/sucesso; `warning` pode ser adicionado quando houver uso real
+  (garantir contraste AA e documentar).
 - Não use `dark:` nem variantes de tema escuro.
-- Ao adicionar um primitivo shadcn, complete os tokens exigidos pelo componente (`popover`,
-  `destructive`, `chart`, `sidebar`) mantendo a paleta definida em
-  [DESIGN.md](./DESIGN.md).
+- `:focus-visible` global e tokens de `ring` garantem foco visível; respeitar `prefers-reduced-motion: reduce`
+  está implementado em `globals.css`.
+- Ao adicionar um primitivo shadcn, complete os tokens exigidos pelo componente mantendo a paleta
+  definida em [DESIGN.md](./DESIGN.md). Evite hex solto em páginas.
 
 ---
 
@@ -208,7 +215,7 @@ Quando forem adicionados:
 
 ## 12. Próximos passos (ordem sugerida)
 
-1. Definir tokens semânticos de sucesso/alerta/erro.
+1. Adicionar token semântico de alerta/warning quando houver uso real.
 2. Instalar `lucide-react` quando o primeiro ícone real for necessário.
 3. Configurar Vitest + Testing Library para o pacote `ui`.
 4. Adicionar novos primitivos apenas com uso real, cobrindo estados e acessibilidade.

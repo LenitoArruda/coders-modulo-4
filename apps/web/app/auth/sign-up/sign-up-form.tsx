@@ -55,7 +55,7 @@ const FIELDS: readonly FieldDefinition[] = [
 ];
 
 const INPUT_CLASS_NAME =
-  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
 function fieldId(name: SignUpFieldName): string {
   return `sign-up-${name}`;
@@ -87,15 +87,17 @@ export function SignUpForm() {
       <div
         role="status"
         aria-live="polite"
-        className="rounded-md border border-border bg-secondary p-4 text-secondary-foreground"
+        className="rounded-lg border border-success-border bg-success p-4 text-success-foreground"
       >
         <p className="text-base font-medium">{state.message}</p>
-        <p className="mt-2 leading-relaxed">
+        <p className="mt-2 text-sm leading-relaxed">
           We sent a confirmation link to{" "}
-          <strong className="font-semibold">{state.values.email}</strong>. Open
-          it to activate your account. The link expires in 24 hours.
+          <strong className="font-semibold text-foreground">
+            {state.values.email}
+          </strong>
+          . Open it to activate your account. The link expires in 24 hours.
         </p>
-        <p className="mt-4">
+        <p className="mt-4 text-sm text-muted-foreground">
           Already confirmed?{" "}
           <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink>.
         </p>
@@ -119,7 +121,7 @@ export function SignUpForm() {
           ref={summaryRef}
           role="alert"
           tabIndex={-1}
-          className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800"
+          className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
         >
           {state.message}
         </div>
@@ -157,7 +159,7 @@ export function SignUpForm() {
               }
               defaultValue={state.values[field.name]}
               className={`${INPUT_CLASS_NAME} ${
-                error ? "border-red-600" : "border-input"
+                error ? "border-destructive-foreground/50" : "border-input"
               }`}
             />
             {field.hint ? (
@@ -171,7 +173,7 @@ export function SignUpForm() {
             {error ? (
               <p
                 id={errorId(field.name)}
-                className="mt-1 text-sm font-medium text-red-700"
+                className="mt-1 text-sm font-medium text-destructive-foreground"
               >
                 {error}
               </p>
