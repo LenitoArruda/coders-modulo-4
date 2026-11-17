@@ -10,6 +10,7 @@ import {
   RESET_SUCCESS_PARAM,
   RESET_SUCCESS_VALUE,
 } from "../../../lib/auth/reset-password";
+import { StatusNotice } from "../../_components/form-parts";
 import { AuthCard } from "../_components/auth-card";
 
 import { SignInForm } from "./sign-in-form";
@@ -40,13 +41,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
       description="Enter your email and password to open your Experts account."
     >
       {resetSucceeded ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-lg border border-success-border bg-success p-3 text-sm leading-relaxed text-success-foreground"
-        >
-          {RESET_PASSWORD_SUCCESS_MESSAGE}
-        </div>
+        <StatusNotice title={RESET_PASSWORD_SUCCESS_MESSAGE} />
       ) : null}
       <SignInForm returnTo={returnTo} />
     </AuthCard>

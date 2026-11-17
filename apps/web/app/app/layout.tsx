@@ -1,16 +1,22 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { Button } from "@repo/ui/components/ui/button";
-
 import { signOutAction } from "./actions";
 import { requireSessionUser } from "../../lib/auth/guards";
 import { APP_HOME_PATH } from "../../lib/auth/route-rules";
-import { skipLinkClassName } from "../_components/shared-styles";
+import { BrandLink } from "../_components/brand";
+import {
+  navLinkClassName,
+  skipLinkClassName,
+} from "../_components/shared-styles";
 
 type AppLayoutProps = {
   children: ReactNode;
 };
+
+function initials(firstName: string, lastName: string): string {
+  return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
+}
 
 /**
  * Private shell. The guard runs on the server before rendering anything: an
@@ -19,35 +25,26 @@ type AppLayoutProps = {
  */
 export default async function AppLayout({ children }: AppLayoutProps) {
   const user = await requireSessionUser();
-  const displayName = [user.firstName, user.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-  const identity = displayName.length > 0 ? displayName : user.email;
 
   return (
     <div
       data-layout="app"
-      className="flex min-h-dvh flex-col bg-muted/20 text-foreground"
+      className="flex min-h-dvh flex-col bg-surface text-foreground"
     >
       <a href="#main" className={skipLinkClassName}>
         Skip to content
       </a>
-      <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
-          <div className="flex items-center gap-4">
-            <Link
-              href={APP_HOME_PATH}
-              className="inline-flex h-11 items-center rounded-md text-base font-semibold tracking-tight text-foreground"
-            >
-              Experts
-            </Link>
+      <header className="border-b border-border bg-background">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-2">
+          <div className="flex items-center gap-4 sm:gap-8">
+            <BrandLink href={APP_HOME_PATH} />
             <nav aria-label="Main">
               <ul className="flex items-center gap-1">
                 <li>
                   <Link
                     href={APP_HOME_PATH}
-                    className="inline-flex h-11 items-center rounded-md px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    aria-current="page"
+                    className={`${navLinkClassName} bg-surface-strong`}
                   >
                     Home
                   </Link>
@@ -56,34 +53,32 @@ export default async function AppLayout({ children }: AppLayoutProps) {
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="max-w-[14rem] truncate text-sm font-medium text-foreground">
-                {identity}
-              </p>
-              <p className="max-w-[14rem] truncate text-xs text-muted-foreground">
-                {user.email}
-              </p>
-            </div>
+            <span
+              aria-hidden="true"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground"
+            >
+              {initials(user.firstName, user.lastName)}
+            </span>
+            <p className="hidden text-sm leading-tight sm:block">
+              <span className="block font-medium">
+                {user.firstName} {user.lastName}
+              </span>
+              <span className="block text-muted-foreground">{user.email}</span>
+            </p>
             <form action={signOutAction}>
-              <Button type="submit" variant="outline" size="sm">
+              <button
+                type="submit"
+                className="inline-flex h-11 items-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-surface-strong"
+              >
                 Sign out
-              </Button>
+              </button>
             </form>
           </div>
         </div>
       </header>
-      <main
-        id="main"
-        className="mx-auto w-full max-w-6xl flex-1 px-6 py-10 sm:py-12"
-      >
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-12">
         {children}
       </main>
-      <footer className="border-t border-border bg-card/80">
-        <div className="mx-auto flex min-h-16 w-full max-w-6xl items-center justify-between gap-4 px-6 py-3 text-sm text-muted-foreground">
-          <p>Experts · Private area</p>
-          <p className="hidden sm:block">Signed in workspace</p>
-        </div>
-      </footer>
     </div>
   );
 }

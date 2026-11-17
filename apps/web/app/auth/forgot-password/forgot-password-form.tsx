@@ -6,11 +6,17 @@ import { useActionState, useEffect, useRef } from "react";
 import { createInitialForgotPasswordState } from "../../../lib/auth/forgot-password";
 import { AUTH_SIGN_IN_PATH } from "../../../lib/auth/route-rules";
 import { AuthLink } from "../_components/auth-card";
+import {
+  FieldError,
+  FieldLabel,
+  FormAlert,
+  FormFooter,
+  RequiredNote,
+  StatusNotice,
+} from "../../_components/form-parts";
+import { inputClassName } from "../../_components/shared-styles";
 
 import { forgotPasswordAction } from "./actions";
-
-const INPUT_CLASS_NAME =
-  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
 export function ForgotPasswordForm() {
   const [state, formAction, isPending] = useActionState(
@@ -27,21 +33,16 @@ export function ForgotPasswordForm() {
 
   if (state.status === "success") {
     return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="rounded-lg border border-success-border bg-success p-4 text-success-foreground"
-      >
-        <p className="text-base font-medium">{state.message}</p>
-        <p className="mt-2 text-sm leading-relaxed">
+      <StatusNotice title={state.message}>
+        <p className="leading-relaxed">
           If the account exists, open the link in the email to choose a new
           password. The link expires in 1 hour.
         </p>
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p>
           Remembered your password?{" "}
           <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink>.
         </p>
-      </div>
+      </StatusNotice>
     );
   }
 
@@ -53,33 +54,16 @@ export function ForgotPasswordForm() {
       action={formAction}
       noValidate
       aria-busy={isPending}
-      className="space-y-5 text-sm text-foreground"
+      className="space-y-6"
     >
-      <p className="text-xs text-muted-foreground">
-        Required fields are marked with an asterisk (*).
-      </p>
+      <RequiredNote />
 
       {state.status === "error" ? (
-        <div
-          ref={summaryRef}
-          role="alert"
-          tabIndex={-1}
-          className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
-        >
-          {state.message}
-        </div>
+        <FormAlert ref={summaryRef}>{state.message}</FormAlert>
       ) : null}
 
       <div>
-        <label
-          htmlFor="forgot-password-email"
-          className="block font-medium text-foreground"
-        >
-          Email{" "}
-          <span aria-hidden="true" className="text-muted-foreground">
-            *
-          </span>
-        </label>
+        <FieldLabel htmlFor="forgot-password-email">Email</FieldLabel>
         <input
           id="forgot-password-email"
           name="email"
@@ -89,28 +73,23 @@ export function ForgotPasswordForm() {
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           defaultValue={state.values.email}
-          className={`${INPUT_CLASS_NAME} ${
-            error ? "border-destructive-foreground/50" : "border-input"
-          }`}
+          className={inputClassName(Boolean(error))}
         />
         {error ? (
-          <p
-            id="forgot-password-email-error"
-            className="mt-1 text-sm font-medium text-destructive-foreground"
-          >
-            {error}
-          </p>
+          <FieldError id="forgot-password-email-error">{error}</FieldError>
         ) : null}
       </div>
 
-      <Button type="submit" disabled={isPending} className="w-full">
+      <Button type="submit" size="lg" disabled={isPending} className="w-full">
         {isPending ? "Sending link…" : "Send reset link"}
       </Button>
 
-      <p className="text-muted-foreground">
-        Remembered your password?{" "}
-        <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink>.
-      </p>
+      <FormFooter>
+        <p>
+          Remembered your password?{" "}
+          <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink>.
+        </p>
+      </FormFooter>
     </form>
   );
 }

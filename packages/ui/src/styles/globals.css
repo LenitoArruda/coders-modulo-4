@@ -3,57 +3,85 @@
 @source "../../src";
 @source "../../../../apps/web/app";
 
+/*
+ * Design tokens (light only). Every colour used by the apps comes from here;
+ * pages never hardcode hex values. See .docs/DESIGN_SYSTEM.md.
+ */
 :root {
+  /* Surfaces */
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #f3f8fb;
+  --surface-strong: #e4eff6;
   --card: #ffffff;
   --card-foreground: #171717;
   --popover: #ffffff;
   --popover-foreground: #171717;
-  --primary: #9fc2e4;
-  --primary-foreground: #171717;
-  --secondary: #e8f3f7;
+
+  /* Brand: deep marine for action, pale sky for tiles and tints */
+  --primary: #1d4f7a;
+  --primary-hover: #163f62;
+  --primary-foreground: #ffffff;
+  --secondary: #cfe8ef;
   --secondary-foreground: #171717;
-  --muted: #edf4f8;
-  --muted-foreground: #4b5563;
-  --accent: #dceef6;
+  --accent: #85c7de;
   --accent-foreground: #171717;
-  --border: #bfd4e5;
-  --input: #bfd4e5;
-  --ring: #5b9bd5;
-  --destructive: #fdf2f2;
-  --destructive-foreground: #991b1b;
-  --destructive-border: #f3b4b4;
-  --success: #eef8f3;
-  --success-foreground: #166534;
-  --success-border: #9fd8b8;
-  --radius: 0.625rem;
+  --tint: #c6dbf0;
+
+  /* Text and lines */
+  --muted: #eef4f8;
+  --muted-foreground: #52525b;
+  --border: #d3e2ec;
+  --border-strong: #aed1e6;
+  --input: #6f94ad;
+  --ring: #1d4f7a;
+
+  /* Semantic states (always paired with an icon and text) */
+  --success: #14532d;
+  --success-surface: #e8f5ec;
+  --success-border: #86c79a;
+  --warning: #7a4a00;
+  --warning-surface: #fff4dc;
+  --warning-border: #e6b85c;
+  --destructive: #b42318;
+  --destructive-surface: #fef3f2;
+  --destructive-border: #f1a9a2;
+
+  --radius: 0.5rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-tint: var(--tint);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-destructive-border: var(--destructive-border);
   --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
+  --color-success-surface: var(--success-surface);
   --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-border: var(--warning-border);
+  --color-destructive: var(--destructive);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-destructive-border: var(--destructive-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius-sm: calc(var(--radius) - 4px);
@@ -69,6 +97,7 @@
 
   html {
     color-scheme: light;
+    scroll-padding-top: 5rem;
   }
 
   html,
@@ -93,7 +122,6 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
     }
   }
 }

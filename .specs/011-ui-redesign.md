@@ -1,6 +1,6 @@
 # Redesign de UI e landing pública — Spec
 
-> **Status:** approved
+> **Status:** done
 > **Atualizado em:** 2026-11-16
 > **Autor:** OpenCode Agent
 > **Depende de:** `.specs/003-auth-routes.md`, `.specs/004-auth-sign-up.md`, `.specs/005-auth-confirm-account.md`, `.specs/006-auth-sign-in.md`, `.specs/007-auth-forgot-password.md`, `.specs/008-auth-reset-password.md`
@@ -254,46 +254,46 @@ Não há analytics nesta fase. O sucesso é medido por evidências verificáveis
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um visitante não autenticado, quando abre `/`, então vê a landing com proposta de
+- [x] Dado um visitante não autenticado, quando abre `/`, então vê a landing com proposta de
       valor, Experts (CEO, CMO, CTO), conectores do MVP, como funciona e CTAs para criar conta e
       entrar.
-- [ ] Dado um usuário autenticado, quando abre `/`, então é redirecionado para `/app` sem ver a
+- [x] Dado um usuário autenticado, quando abre `/`, então é redirecionado para `/app` sem ver a
       landing.
-- [ ] Dado um visitante na landing, quando aciona o CTA primário ou o secundário, então chega a
+- [x] Dado um visitante na landing, quando aciona o CTA primário ou o secundário, então chega a
       `/auth/sign-up` ou `/auth/sign-in` respectivamente.
-- [ ] Dado qualquer página da tabela da seção 3, quando é aberta, então usa a mesma direção
+- [x] Dado qualquer página da tabela da seção 3, quando é aberta, então usa a mesma direção
       visual, tokens, tipografia e padrões de foco e espaçamento.
-- [ ] Dado um formulário de auth com erro, quando é enviado inválido, então o resumo e o erro de
+- [x] Dado um formulário de auth com erro, quando é enviado inválido, então o resumo e o erro de
       campo aparecem com a nova apresentação, `role="alert"`, `aria-invalid` e
       `aria-describedby` preservados.
-- [ ] Dado um formulário em envio, quando está pendente, então o botão indica loading, bloqueia
+- [x] Dado um formulário em envio, quando está pendente, então o botão indica loading, bloqueia
       duplo envio e mantém a largura.
-- [ ] Dado o estado de sucesso de sign-up, confirmação, recuperação e reset, quando ocorre, então
+- [x] Dado o estado de sucesso de sign-up, confirmação, recuperação e reset, quando ocorre, então
       é anunciado com `role="status"` e mostra o próximo passo com estilo consistente.
-- [ ] Dado um usuário autenticado em `/app`, quando vê o shell, então reconhece sua identidade e
+- [x] Dado um usuário autenticado em `/app`, quando vê o shell, então reconhece sua identidade e
       consegue sair pelo controle de sign out.
-- [ ] Dado uma rota inexistente em `/auth/*`, `/app/*` ou na raiz, quando é aberta, então vê uma
+- [x] Dado uma rota inexistente em `/auth/*`, `/app/*` ou na raiz, quando é aberta, então vê uma
       404 com identidade do produto e um caminho claro de volta.
-- [ ] Dado cada página coberta, quando capturada com Playwright MCP, então existem
+- [x] Dado cada página coberta, quando capturada com Playwright MCP, então existem
       `.screenshots/desktop/<pagina>_before.png`, `_after.png`,
       `.screenshots/mobile/<pagina>_before.png` e `_after.png`.
-- [ ] Dado before e after da mesma página, quando comparados, então usam a mesma conta, os mesmos
+- [x] Dado before e after da mesma página, quando comparados, então usam a mesma conta, os mesmos
       dados, o mesmo viewport e não contêm informações sensíveis.
-- [ ] Dado o redesign, quando inspecionado em 360px, 768px e 1440px, então não há rolagem
+- [x] Dado o redesign, quando inspecionado em 360px, 768px e 1440px, então não há rolagem
       horizontal nem conteúdo cortado.
-- [ ] Dado o uso apenas de teclado, quando se percorre cada página, então o foco é sempre visível,
+- [x] Dado o uso apenas de teclado, quando se percorre cada página, então o foco é sempre visível,
       a ordem é lógica e o skip link funciona.
-- [ ] Dado qualquer texto e elemento de UI, quando verificado, então o contraste atende AA e
+- [x] Dado qualquer texto e elemento de UI, quando verificado, então o contraste atende AA e
       nenhum estado depende exclusivamente de cor.
-- [ ] Dado `prefers-reduced-motion: reduce`, quando ativado, então animações não essenciais são
+- [x] Dado `prefers-reduced-motion: reduce`, quando ativado, então animações não essenciais são
       reduzidas.
-- [ ] Dado o conjunto de tokens, quando consultado em `globals.css`, então nenhuma página usa hex
+- [x] Dado o conjunto de tokens, quando consultado em `globals.css`, então nenhuma página usa hex
       solto e todos os tokens novos estão documentados em `DESIGN.md`/`DESIGN_SYSTEM.md`.
-- [ ] Dado o conteúdo da landing, quando revisado, então só usa informações de `BUSINESS.md`, sem
+- [x] Dado o conteúdo da landing, quando revisado, então só usa informações de `BUSINESS.md`, sem
       métricas, clientes, depoimentos, preços ou promessas inventadas.
-- [ ] Dado a suíte E2E, quando executada, então todos os fluxos passam e as asserções de
+- [x] Dado a suíte E2E, quando executada, então todos os fluxos passam e as asserções de
       comportamento foram preservadas.
-- [ ] Dado o repositório, quando os gates rodam, então `lint`, `types:check`, `test`, `test:e2e`
+- [x] Dado o repositório, quando os gates rodam, então `lint`, `types:check`, `test`, `test:e2e`
       e `build` passam.
 
 ## 15. Decisões e questões abertas

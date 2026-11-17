@@ -3,8 +3,8 @@
 > **Status:** ativo · **Atualizado em:** 2026-11-16
 > **Implementação:** consulte [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) para tokens e componentes.
 
-Define a identidade visual do produto. Vale para **toda** interface pública e privada, incluindo
-landing, autenticação, área do produto, estados vazios, erros e e-mails transacionais.
+Define a identidade visual do produto. Vale para **toda** interface, incluindo telas
+administrativas, estados vazios, erros e e-mails transacionais.
 
 ---
 
@@ -31,71 +31,71 @@ landing, autenticação, área do produto, estados vazios, erros e e-mails trans
 
 ## 3. Paleta
 
-### 3.1 Cores de marca (reconhecível, evoluída)
+### 3.1 Cores de marca
 
-| Token/família                      | Referência        | Uso                                                     |
-| ---------------------------------- | ----------------- | ------------------------------------------------------- |
-| `primary` / `powder-blue` refinado | `#9FC2E4` (token) | Ação primária, destaques de marca e foco de identidade  |
-| `secondary` / `pale-sky` refinado  | `#E8F3F7`         | Superfícies suaves, estados informativos e apoio visual |
-| `muted`                            | `#EDF4F8`         | Fundos discretos e agrupamento de conteúdo              |
-| `accent`                           | `#DCEEF6`         | Hover/active suaves e ênfase secundária                 |
-| `border` / `input`                 | `#BFD4E5`         | Bordas, divisores e contornos de campos                 |
-| `ring`                             | `#5B9BD5`         | Indicador de foco visível (teclado)                     |
+A paleta pastel-azul continua sendo a base reconhecível; a ação primária passou a usar um azul
+profundo com contraste AA para suportar texto branco. Os pastéis ficam para superfícies, tiles
+e apoio visual (sempre com texto grafite).
 
-### 3.2 Neutros e semânticos
+| Token           | Hex       | Uso                                                           |
+| --------------- | --------- | ------------------------------------------------------------- |
+| `primary`       | `#1D4F7A` | Ação primária, links e foco (texto branco: contraste ≈ 8,6:1) |
+| `secondary`     | `#CFE8EF` | Tiles, monogramas e avatares (texto grafite)                  |
+| `tint`          | `#C6DBF0` | Detalhes decorativos de marca (ex.: numeral do 404)           |
+| `accent`        | `#85C7DE` | Detalhe do logotipo e indicadores                             |
+| `surface`       | `#F3F8FB` | Faixas de seção, painel de marca e fundo da área privada      |
+| `border`        | `#D3E2EC` | Divisores e contornos de superfícies                          |
+| `border-strong` | `#AED1E6` | Contornos de itens interativos/cartões em destaque            |
+| `input`         | `#6F94AD` | Borda de campos (contraste ≥ 3:1 sobre branco)                |
 
-| Token                                                           | Referência                           | Uso                                       |
-| --------------------------------------------------------------- | ------------------------------------ | ----------------------------------------- |
-| `background`                                                    | `#FFFFFF`                            | Fundo base                                |
-| `foreground`                                                    | `#171717`                            | Texto principal                           |
-| `muted-foreground`                                              | `#4B5563`                            | Texto secundário (com contraste adequado) |
-| `destructive` / `destructive-foreground` / `destructive-border` | tons de erro suaves + texto forte    | Erros e alertas de formulário/ação        |
-| `success` / `success-foreground` / `success-border`             | tons de sucesso suaves + texto forte | Confirmações e estados concluídos         |
+### 3.2 Neutros e estados
 
-> Valores exatos e contrato de uso vivem em `packages/ui/src/styles/globals.css` e em
-> [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).
+| Token              | Hex       | Uso                                      |
+| ------------------ | --------- | ---------------------------------------- |
+| `background`       | `#FFFFFF` | Fundo principal                          |
+| `foreground`       | `#171717` | Texto principal                          |
+| `muted-foreground` | `#52525B` | Texto secundário                         |
+| `success`          | `#14532D` | Texto/ícone de sucesso (fundo `#E8F5EC`) |
+| `warning`          | `#7A4A00` | Texto/ícone de alerta (fundo `#FFF4DC`)  |
+| `destructive`      | `#B42318` | Texto/ícone de erro (fundo `#FEF3F2`)    |
 
 ### 3.3 Regras de uso
 
-- **Texto sobre pastel é sempre grafite/escuro legível, nunca branco.** Pastéis claros não têm
-  contraste suficiente com branco.
-- Use **uma** cor de destaque principal por contexto. O restante deve ser neutro ou de apoio.
-- Não crie gradientes chamativos, neon ou cores fora da paleta/tokens sem aprovação.
-- Estados semânticos (sucesso, erro, alerta) usam tokens dedicados e **nunca dependem só de cor**:
-  sempre acompanhe com ícone e/ou texto.
-- Contraste mínimo: **4.5:1** para texto e **3:1** para elementos de UI (WCAG AA). Valide ações
-  primárias, links, foco e mensagens de estado.
-- Evite hex solto em páginas/componentes de app; prefira variáveis/tokens semânticos.
+- **Texto sobre pastel é sempre grafite, nunca branco.** Texto branco só sobre `primary`.
+- Use **uma** cor de destaque por tela: o azul `primary` na ação principal. O restante é neutro.
+- Não crie gradientes, neon ou cores fora dos tokens sem aprovação.
+- Estados semânticos usam os tokens acima **sempre com ícone + texto**, nunca só cor.
+- Contraste mínimo: **4.5:1** para texto e **3:1** para elementos de UI (WCAG AA).
+- Nenhum hex solto em páginas e componentes; use as variáveis de `globals.css`.
 
 ---
 
 ## 4. Tipografia
 
-| Uso       | Fonte      | Observação                                                                                |
-| --------- | ---------- | ----------------------------------------------------------------------------------------- |
-| Interface | Geist Sans | Carregada via `next/font/local` (refinada em escala/peso/espaçamento, sem trocar família) |
-| Código    | Geist Mono | Apenas para código e dados técnicos                                                       |
+| Uso       | Fonte      | Observação                          |
+| --------- | ---------- | ----------------------------------- |
+| Interface | Geist Sans | Carregada via `next/font/local`     |
+| Código    | Geist Mono | Apenas para código e dados técnicos |
 
-Escala (referência prática, pode ser ajustada com intenção e consistência):
+Escala sugerida (baseline):
 
-| Token       | Tamanho  | Line-height | Uso                     |
-| ----------- | -------- | ----------- | ----------------------- |
-| `text-xs`   | 12px     | 16px        | Legendas e metadados    |
-| `text-sm`   | 14px     | 20px        | Texto auxiliar e labels |
-| `text-base` | 16px     | 24px        | Corpo padrão            |
-| `text-lg`   | 18px     | 28px        | Destaque de corpo       |
-| `text-xl`   | 20px     | 28px        | Título de seção pequeno |
-| `text-2xl`  | 24px     | 32px        | Título de seção         |
-| `text-3xl`  | 30–32px  | 36–40px     | Título de página        |
-| `text-4xl+` | 36–48px+ | 1.1–1.2     | Hero/landing            |
+| Token       | Tamanho | Line-height | Uso                     |
+| ----------- | ------- | ----------- | ----------------------- |
+| `text-xs`   | 12px    | 16px        | Legendas e metadados    |
+| `text-sm`   | 14px    | 20px        | Texto auxiliar e labels |
+| `text-base` | 16px    | 24px        | Corpo padrão            |
+| `text-lg`   | 18px    | 28px        | Destaque de corpo       |
+| `text-xl`   | 20px    | 28px        | Título de seção pequeno |
+| `text-2xl`  | 24px    | 32px        | Título de seção         |
+| `text-3xl`  | 32px    | 40px        | Título de página        |
+| `text-4xl`  | 40px    | 48px        | Hero                    |
 
 Regras:
 
-- Largura de linha confortável para leitura (aprox. **65–75 caracteres** em blocos longos).
-- Não use mais de **3 pesos** por tela sem necessidade clara.
+- Largura de linha entre **65 e 75 caracteres**.
+- Não use mais de **3 pesos** por tela.
 - Títulos em **sentence case**; evitar CAIXA ALTA.
 - Não use fonte menor que 12px.
-- A hierarquia deve ser evidente sem depender de cor.
 
 ---
 
@@ -103,7 +103,7 @@ Regras:
 
 - **Grid base:** 4px.
 - **Escala:** 4, 8, 12, 16, 24, 32, 48, 64, 96.
-- **Raios:** 8px para controles, 12px para cards, `full` para pills e avatares.
+- **Raios:** 8px para controles, 12px para cards, `full` para avatares e marcadores.
 - **Sombras:** discretas e poucas. Prefira **borda** a sombra para separar superfícies.
 - **Densidade:** generosa. Espaço em branco é parte do design.
 
@@ -140,16 +140,23 @@ Regras:
 
 ## 8. Conteúdo e tom
 
-- Textos de interface, landing, telas de autenticação e e-mails transacionais em **en-US**; claros e diretos.
+- **Landing pública (`/`):** conteúdo estático em en-US vindo apenas de `BUSINESS.md` (proposta,
+  Experts, fontes do MVP, como funciona). Sem métricas, clientes, preços ou promessas inventadas.
+  CTAs são links reais para `/auth/sign-up` e `/auth/sign-in`.
+- **Telas de auth:** painel de marca ao lado do formulário no desktop; no mobile só a barra de
+  marca, com o formulário primeiro.
+- **Área privada:** identidade da conta (avatar com iniciais, nome, e-mail) e sign out sempre
+  visíveis; próximos passos aparecem como "Coming soon", sem inventar features.
+- **Identidade:** logotipo de três barras (um time de Experts lendo os mesmos dados) + nome.
+
+- Textos de interface, telas de autenticação e e-mails transacionais em **en-US**; claros e diretos.
   A documentação interna continua em PT-BR.
 - Preferir voz ativa e sentence case.
-- Botões descrevem a ação: "Create account", "Send reset link", "Sign in".
-- Erros explicam **o que aconteceu** e **como resolver**, com mensagem associada ao campo quando aplicável.
+- Botões descrevem a ação: "Connect source", não "OK".
+- Erros explicam **o que aconteceu** e **como resolver**.
 - Evitar jargão técnico para o usuário final.
-- Landing pública (`/`) comunica proposta de valor, Experts iniciais, fontes suportadas e próximos passos
-  com base em `.docs/BUSINESS.md` (sem inventar funcionalidades/integrações). CTAs levam a rotas reais.
-- Telas de auth (`/auth/*`), área privada (`/app/*`) e 404s (raiz/grupos) seguem as mesmas regras visuais:
-  light-only, tokens do design system, contraste AA, foco visível e responsividade.
+- As telas de auth (`/auth/*`) e a área privada (`/app/*`) seguem as mesmas regras visuais desta
+  direção: light-only, tokens do design system, contraste AA e responsividade.
 
 ---
 

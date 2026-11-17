@@ -9,6 +9,16 @@ import {
 } from "../../../lib/auth/sign-up";
 import { AUTH_SIGN_IN_PATH } from "../../../lib/auth/route-rules";
 import { AuthLink } from "../_components/auth-card";
+import {
+  FieldError,
+  FieldHint,
+  FieldLabel,
+  FormAlert,
+  FormFooter,
+  RequiredNote,
+  StatusNotice,
+} from "../../_components/form-parts";
+import { inputClassName } from "../../_components/shared-styles";
 
 import { signUpAction } from "./actions";
 
@@ -54,9 +64,6 @@ const FIELDS: readonly FieldDefinition[] = [
   },
 ];
 
-const INPUT_CLASS_NAME =
-  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
-
 function fieldId(name: SignUpFieldName): string {
   return `sign-up-${name}`;
 }
@@ -84,24 +91,17 @@ export function SignUpForm() {
 
   if (state.status === "success") {
     return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="rounded-lg border border-success-border bg-success p-4 text-success-foreground"
-      >
-        <p className="text-base font-medium">{state.message}</p>
-        <p className="mt-2 text-sm leading-relaxed">
+      <StatusNotice title={state.message}>
+        <p className="leading-relaxed">
           We sent a confirmation link to{" "}
-          <strong className="font-semibold text-foreground">
-            {state.values.email}
-          </strong>
-          . Open it to activate your account. The link expires in 24 hours.
+          <strong className="font-semibold">{state.values.email}</strong>. Open
+          it to activate your account. The link expires in 24 hours.
         </p>
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p>
           Already confirmed?{" "}
           <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink>.
         </p>
-      </div>
+      </StatusNotice>
     );
   }
 
@@ -110,21 +110,12 @@ export function SignUpForm() {
       action={formAction}
       noValidate
       aria-busy={isPending}
-      className="space-y-5 text-sm text-foreground"
+      className="space-y-6"
     >
-      <p className="text-xs text-muted-foreground">
-        Required fields are marked with an asterisk (*).
-      </p>
+      <RequiredNote />
 
       {state.status === "error" ? (
-        <div
-          ref={summaryRef}
-          role="alert"
-          tabIndex={-1}
-          className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
-        >
-          {state.message}
-        </div>
+        <FormAlert ref={summaryRef}>{state.message}</FormAlert>
       ) : null}
 
       {FIELDS.map((field) => {
@@ -138,15 +129,7 @@ export function SignUpForm() {
 
         return (
           <div key={field.name}>
-            <label
-              htmlFor={fieldId(field.name)}
-              className="block font-medium text-foreground"
-            >
-              {field.label}{" "}
-              <span aria-hidden="true" className="text-muted-foreground">
-                *
-              </span>
-            </label>
+            <FieldLabel htmlFor={fieldId(field.name)}>{field.label}</FieldLabel>
             <input
               id={fieldId(field.name)}
               name={field.name}
@@ -158,38 +141,28 @@ export function SignUpForm() {
                 describedBy.length > 0 ? describedBy : undefined
               }
               defaultValue={state.values[field.name]}
-              className={`${INPUT_CLASS_NAME} ${
-                error ? "border-destructive-foreground/50" : "border-input"
-              }`}
+              className={inputClassName(Boolean(error))}
             />
             {field.hint ? (
-              <p
-                id={hintId(field.name)}
-                className="mt-1 text-xs text-muted-foreground"
-              >
-                {field.hint}
-              </p>
+              <FieldHint id={hintId(field.name)}>{field.hint}</FieldHint>
             ) : null}
             {error ? (
-              <p
-                id={errorId(field.name)}
-                className="mt-1 text-sm font-medium text-destructive-foreground"
-              >
-                {error}
-              </p>
+              <FieldError id={errorId(field.name)}>{error}</FieldError>
             ) : null}
           </div>
         );
       })}
 
-      <Button type="submit" disabled={isPending} className="w-full">
+      <Button type="submit" size="lg" disabled={isPending} className="w-full">
         {isPending ? "Creating account…" : "Create account"}
       </Button>
 
-      <p className="text-muted-foreground">
-        Already have an account?{" "}
-        <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink>.
-      </p>
+      <FormFooter>
+        <p>
+          Already have an account?{" "}
+          <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink>.
+        </p>
+      </FormFooter>
     </form>
   );
 }

@@ -1,7 +1,7 @@
 # Plano — Redesign de UI e landing pública
 
 > Spec: `.specs/011-ui-redesign.md`
-> Status: implemented
+> Status: done (refação v2 — v1 preservada em `backup/011-ui-redesign-v1`)
 
 ## 1. Contexto
 

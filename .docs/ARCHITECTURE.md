@@ -501,8 +501,9 @@ Regras:
   `/auth/confirm` processa o token mesmo com sessão ativa e, sem token, envia pessoa autenticada
   para `/app` e visitante para `/auth/sign-in`; `/auth/forgot-password` e
   `/auth/reset-password` permanecem acessíveis.
-- A raiz `/` não renderiza produto: redireciona para `/app` com sessão e para `/auth/sign-in`
-  sem sessão.
+- A raiz `/` redireciona para `/app` com sessão e, sem sessão, renderiza a landing pública
+  (estática, em `app/_components/landing.tsx`). Rotas desconhecidas fora de `/auth` e `/app` caem
+  em `app/not-found.tsx`.
 - 404 de rotas inexistentes é resolvido dentro do layout do grupo (catch-all + `not-found.tsx`),
   para manter o shell público ou privado.
 - O guard é uma camada de experiência; a autorização real continua na API, que valida o Bearer em

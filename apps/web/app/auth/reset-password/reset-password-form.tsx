@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@repo/ui/components/ui/button";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
@@ -18,11 +19,18 @@ import {
   type ResetPasswordFieldName,
 } from "../../../lib/auth/reset-password";
 import { AuthLink } from "../_components/auth-card";
+import {
+  FieldError,
+  FieldHint,
+  FieldLabel,
+  FormAlert,
+  FormFooter,
+  RequiredNote,
+  StatusNotice,
+} from "../../_components/form-parts";
+import { inputClassName } from "../../_components/shared-styles";
 
 import { resetPasswordAction } from "./actions";
-
-const INPUT_CLASS_NAME =
-  "mt-2 h-11 w-full rounded-md border bg-background px-3 text-base text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
 const SUCCESS_REDIRECT_PATH = `${AUTH_SIGN_IN_PATH}?${RESET_SUCCESS_PARAM}=${RESET_SUCCESS_VALUE}`;
 
@@ -94,36 +102,24 @@ export function ResetPasswordForm({
 
   if (state.status === "success") {
     return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="rounded-lg border border-success-border bg-success p-4 text-success-foreground"
-      >
-        <p className="text-base font-medium">Your password has been updated.</p>
-        <p className="mt-2 text-sm leading-relaxed">
+      <StatusNotice title="Your password has been updated.">
+        <p className="leading-relaxed">
           Taking you to sign in.{" "}
           <AuthLink href={SUCCESS_REDIRECT_PATH}>Go to sign in</AuthLink>.
         </p>
-      </div>
+      </StatusNotice>
     );
   }
 
   if (state.invalidToken) {
     return (
-      <div className="space-y-4 text-sm text-foreground">
-        <div
-          ref={summaryRef}
-          role="alert"
-          tabIndex={-1}
-          className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
-        >
-          {state.message}
-        </div>
-        <p className="text-muted-foreground">
-          <AuthLink href={AUTH_FORGOT_PASSWORD_PATH}>
-            Request a new reset link
-          </AuthLink>{" "}
-          or <AuthLink href={AUTH_SIGN_IN_PATH}>go back to sign in</AuthLink>.
+      <div className="space-y-6">
+        <FormAlert ref={summaryRef}>{state.message}</FormAlert>
+        <Button asChild size="lg" className="w-full">
+          <Link href={AUTH_FORGOT_PASSWORD_PATH}>Request a new reset link</Link>
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          Or <AuthLink href={AUTH_SIGN_IN_PATH}>go back to sign in</AuthLink>.
         </p>
       </div>
     );
@@ -134,23 +130,14 @@ export function ResetPasswordForm({
       action={formAction}
       noValidate
       aria-busy={isPending}
-      className="space-y-5 text-sm text-foreground"
+      className="space-y-6"
     >
       <input type="hidden" name={RESET_TOKEN_FIELD} value={token} />
 
-      <p className="text-xs text-muted-foreground">
-        Required fields are marked with an asterisk (*).
-      </p>
+      <RequiredNote />
 
       {state.status === "error" ? (
-        <div
-          ref={summaryRef}
-          role="alert"
-          tabIndex={-1}
-          className="rounded-lg border border-destructive-border bg-destructive p-3 font-medium text-destructive-foreground outline-none"
-        >
-          {state.message}
-        </div>
+        <FormAlert ref={summaryRef}>{state.message}</FormAlert>
       ) : null}
 
       {FIELDS.map((field) => {
@@ -164,12 +151,7 @@ export function ResetPasswordForm({
 
         return (
           <div key={field.name}>
-            <label htmlFor={field.id} className="block font-medium">
-              {field.label}{" "}
-              <span aria-hidden="true" className="text-muted-foreground">
-                *
-              </span>
-            </label>
+            <FieldLabel htmlFor={field.id}>{field.label}</FieldLabel>
             <input
               id={field.id}
               name={field.name}
@@ -178,34 +160,25 @@ export function ResetPasswordForm({
               required
               aria-invalid={error ? true : undefined}
               aria-describedby={describedBy}
-              className={`${INPUT_CLASS_NAME} ${
-                error ? "border-destructive-foreground/50" : "border-input"
-              }`}
+              className={inputClassName(Boolean(error))}
             />
             {field.hint ? (
-              <p id={hintId} className="mt-1 text-xs text-muted-foreground">
-                {field.hint}
-              </p>
+              <FieldHint id={hintId}>{field.hint}</FieldHint>
             ) : null}
-            {error ? (
-              <p
-                id={errorId}
-                className="mt-1 text-sm font-medium text-destructive-foreground"
-              >
-                {error}
-              </p>
-            ) : null}
+            {error ? <FieldError id={errorId}>{error}</FieldError> : null}
           </div>
         );
       })}
 
-      <Button type="submit" disabled={isPending} className="w-full">
+      <Button type="submit" size="lg" disabled={isPending} className="w-full">
         {isPending ? "Updating password…" : "Update password"}
       </Button>
 
-      <p className="text-muted-foreground">
-        <AuthLink href={AUTH_SIGN_IN_PATH}>Back to sign in</AuthLink>
-      </p>
+      <FormFooter>
+        <p>
+          <AuthLink href={AUTH_SIGN_IN_PATH}>Back to sign in</AuthLink>
+        </p>
+      </FormFooter>
     </form>
   );
 }
