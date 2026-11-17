@@ -1,32 +1,81 @@
 import type { Metadata } from "next";
 
+import { fetchApiWithSession } from "../../lib/auth/api-client";
 import { requireSessionUser } from "../../lib/auth/guards";
-import { ClockIcon } from "../_components/icons";
+import {
+  LOAD_FAILED_MESSAGE,
+  type ChatMessage,
+  type ConversationResponse,
+  type Expert,
+  type ExpertsResponse,
+} from "../../lib/expert-chat/types";
+import { ExpertChat } from "./_components/expert-chat";
 
 export const metadata: Metadata = {
-  title: "Home",
+  title: "Experts",
 };
 
-const NEXT_STEPS = [
-  {
-    title: "Connect a source",
-    text: "Bring in a PDF, Markdown notes, Google Drive files or Notion pages.",
-  },
-  {
-    title: "Choose an Expert",
-    text: "Start with the CEO, CMO or CTO Expert.",
-  },
-  {
-    title: "Ask your first question",
-    text: "Get an answer that points back to the sources it used.",
-  },
-] as const;
+async function readJson<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
 
+/**
+ * Private home. The catalog and the first Expert's transcript are read on the
+ * server with the session cookie; the token never reaches the rendered HTML or
+ * the client bundle.
+ */
 export default async function AppHomePage() {
   const user = await requireSessionUser();
 
+  let experts: Expert[] = [];
+  let initialMessages: ChatMessage[] = [];
+  let loadError: string | null = null;
+
+  try {
+    const catalogResponse = await fetchApiWithSession("/api/v1/experts", {
+      cache: "no-store",
+    });
+
+    if (!catalogResponse.ok) {
+      throw new Error("expert catalog unavailable");
+    }
+
+    const catalog = await readJson<ExpertsResponse>(catalogResponse);
+
+    if (catalog === null) {
+      throw new Error("invalid expert catalog");
+    }
+
+    experts = catalog.experts;
+
+    const initialExpertId = experts[0]?.id;
+
+    if (initialExpertId !== undefined) {
+      const query = new URLSearchParams({ expertId: initialExpertId });
+      const conversationResponse = await fetchApiWithSession(
+        `/api/v1/conversations?${query}`,
+        { cache: "no-store" },
+      );
+
+      if (conversationResponse.ok) {
+        const conversation =
+          await readJson<ConversationResponse>(conversationResponse);
+
+        if (conversation !== null) {
+          initialMessages = conversation.messages;
+        }
+      }
+    }
+  } catch {
+    loadError = LOAD_FAILED_MESSAGE;
+  }
+
   return (
-    <section aria-labelledby="app-home-title" className="space-y-10">
+    <section aria-labelledby="app-home-title" className="space-y-8">
       <div className="max-w-2xl">
         <h1
           id="app-home-title"
@@ -34,40 +83,18 @@ export default async function AppHomePage() {
         >
           Welcome, {user.firstName}
         </h1>
-        <p className="mt-4 max-w-prose text-base leading-relaxed text-muted-foreground">
-          Your email is confirmed and your session is active. This is the
-          beginning of your Experts account.
+        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground">
+          Choose an Expert and ask a question. Every conversation stays in your
+          account.
         </p>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-6 sm:p-8">
-        <h2 className="text-xl font-semibold text-foreground">
-          What happens next
-        </h2>
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">
-          These steps are not available yet. They are the path this account will
-          follow once the features arrive.
-        </p>
-        <ol className="mt-6 grid gap-4 md:grid-cols-3">
-          {NEXT_STEPS.map((step, index) => (
-            <li
-              key={step.title}
-              className="rounded-lg border border-border bg-surface p-4"
-            >
-              <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <ClockIcon width={16} height={16} />
-                Step {index + 1} · Coming soon
-              </p>
-              <h3 className="mt-3 text-base font-semibold text-foreground">
-                {step.title}
-              </h3>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                {step.text}
-              </p>
-            </li>
-          ))}
-        </ol>
-      </div>
+      <ExpertChat
+        experts={experts}
+        initialExpertId={experts[0]?.id ?? ""}
+        initialMessages={initialMessages}
+        initialError={loadError}
+      />
     </section>
   );
 }

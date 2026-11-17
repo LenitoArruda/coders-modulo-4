@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha implementados — produto não implementado · **Atualizado em:** 2026-11-11
+> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha + catálogo de Experts e chat implementados · **Atualizado em:** 2026-11-17
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
@@ -11,8 +11,9 @@ engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md).
 ## 1. Visão geral
 
 Monorepo **Turborepo** com **Bun**, contendo aplicações Next.js, uma API NestJS e pacotes
-compartilhados. A fundação já entrega web, API e PostgreSQL local; o produto será uma plataforma
-de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
+compartilhados. A fundação entrega web, API e PostgreSQL local, e a primeira feature de produto —
+o catálogo de Experts e o chat em persona (spec 012) — já está implementada. O produto é uma
+plataforma de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 
 - **Web app** para interação com Experts e gestão de conectores.
 - **API** dedicada para regras de negócio, ingestão e orquestração de agents.
@@ -49,14 +50,14 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 └── bun.lock
 ```
 
-| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                              |
-| ---------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação e troca de senha na porta 3000 |
-| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, contrato de erro, env, CORS, logs e OTel na porta 3333     |
-| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                        |
-| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                      |
-| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                |
-| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                |
+| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                                                                        |
+| ---------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação, troca de senha e chat com Experts na porta 3000                         |
+| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, catálogo de Experts, conversas com LangGraph, contrato de erro, env, CORS, logs e OTel na porta 3333 |
+| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                                                                  |
+| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                                                                |
+| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                                                          |
+| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                                                          |
 
 ---
 
@@ -76,6 +77,8 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 | API                         | NestJS                                   | 12.3.3           |
 | JWT de sessão               | jose (HS256)                             | 6.2.17           |
 | Acesso ao banco (servidor)  | `pg` (SQL parametrizado)                 | 8.23.1           |
+| Orquestração de LLM         | LangChain.js + LangGraph                 | 1.4.1 / 1.7.5    |
+| Modelo (fatia 012)          | ChatOpenAI `gpt-4o-mini`                 | 1.8.4            |
 | E-mail transacional         | Mailtrap SDK (dev) + Resend HTTP API     | 6.2.0 / —        |
 | Hash de senha               | `node:crypto` scrypt (ADR 0014)          | —                |
 | Banco local                 | PostgreSQL via Docker Compose            | 18               |
@@ -142,6 +145,15 @@ apps/api/src/
 │   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios `pg`, Mailtrap/Resend
 │   │   └── interface/           # request handlers (1 por endpoint), guard, rate limiter, testes de integração
 │   │       └── request-handlers/ # um handler por endpoint (sign-up, sign-in, sign-out, /me, confirm, forgot, reset)
+│   ├── experts/
+│   │   ├── domain/              # catálogo imutável de 9 Experts (identidade, papel, escopo, tom, sugestões)
+│   │   ├── application/         # ListExpertsUseCase
+│   │   └── interface/           # GET /api/v1/experts (autenticado)
+│   ├── conversations/
+│   │   ├── domain/              # Conversation, ConversationMessage, PromptSource, erros de domínio
+│   │   ├── application/         # GetConversationUseCase, SendMessageUseCase, portas de repositório e responder
+│   │   ├── infrastructure/      # repositório `pg`, adapter LangGraph/ChatOpenAI
+│   │   └── interface/           # GET /conversations, POST /conversations/messages + integração
 │   ├── hello/
 │   │   ├── domain/
 │   │   ├── application/
@@ -153,9 +165,10 @@ apps/api/src/
 └── main.ts
 ```
 
-Novos domínios (`experts`, `connectors`, `documents`, `conversations`) seguem o mesmo formato,
-criando `infrastructure/` quando houver implementação concreta. `auth` é a referência de um slice
-completo com as quatro camadas.
+Os domínios `experts` e `conversations` (spec 012) seguem o mesmo formato; novos domínios
+(`connectors`, `documents`, `knowledge`) devem segui-lo, criando `infrastructure/` quando houver
+implementação concreta. `auth` e `conversations` são as referências de slices completos com as
+quatro camadas.
 
 Regras:
 
@@ -190,11 +203,13 @@ O schema de auth é criado em `db/migrations/` e é de uso **exclusivo da API**;
 acessa essas tabelas (RLS habilitado, nenhuma policy pública). A API acessa o banco como o usuário
 `postgres` do Compose, via pool `pg` e SQL parametrizado (ADR 0016).
 
-| Tabela        | Papel                                                                                            |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `users`       | Conta da pessoa: nome, e-mail normalizado e único, hash de senha e confirmação de e-mail         |
-| `auth_tokens` | Tokens opacos de uso único para confirmação de e-mail e reset de senha, persistidos só como hash |
-| `sessions`    | Registro server-side das sessões emitidas pela API, com expiração e revogação                    |
+| Tabela          | Papel                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| `users`         | Conta da pessoa: nome, e-mail normalizado e único, hash de senha e confirmação de e-mail         |
+| `auth_tokens`   | Tokens opacos de uso único para confirmação de e-mail e reset de senha, persistidos só como hash |
+| `sessions`      | Registro server-side das sessões emitidas pela API, com expiração e revogação                    |
+| `conversations` | Uma conversa por `(user_id, expert_id)`; dono e Expert da troca (spec 012)                       |
+| `messages`      | Mensagens `user`/`expert` de uma conversa, com conteúdo e data/hora                              |
 
 Regras centrais:
 
@@ -205,7 +220,9 @@ Regras centrais:
   `used_at`; apenas `token_hash` é persistido.
 - `sessions` usa `origin` (`sign_up_confirmation` ou `sign_in`), `expires_at` e `revoked_at`;
   sessão ativa é a que tem `revoked_at` nulo e `expires_at` no futuro.
-- `users`, `auth_tokens` e `sessions` usam UUID e `ON DELETE CASCADE` a partir do usuário.
+- `users`, `auth_tokens`, `sessions` e `conversations` usam UUID e `ON DELETE CASCADE` a partir do usuário; `messages` cascateia a partir de `conversations`.
+- `conversations` tem `unique (user_id, expert_id)` e `expert_id` restrito aos nove IDs do catálogo; toda leitura filtra por `user_id`.
+- `messages` tem `role check ('user','expert')`, conteúdo de 1 a 16000 caracteres e índice `(conversation_id, created_at, id)`. RLS habilitado sem policies, como nas tabelas de auth.
 
 O detalhamento de campos e constraints está em `.specs/001-auth-schema.md`. A fatia 002 entrega a
 infraestrutura de sessão descrita na §4.5, a fatia 004 o sign-up e a fatia 005 a confirmação
@@ -530,6 +547,39 @@ Regras:
   o SDK `mailtrap`, com sandbox opcional em não produção.
 - O boot registra `nodeEnv` e `emailProvider`, nunca chaves ou conteúdo de e-mail.
 
+### 4.11 Catálogo de Experts e chat (fatia 012)
+
+A primeira feature de produto entrega nove Experts selecionáveis e um chat em persona, com histórico
+isolado por usuário autenticado (sem workspace). O catálogo é **conteúdo versionado na API** e a
+web o consome no servidor; não há duplicação em `packages/ui` nem no bundle do cliente.
+
+```text
+/app (web, server) ──► GET /api/v1/experts ────────► ListExpertsUseCase (catálogo em EXPERT_CATALOG)
+       │              GET /api/v1/conversations ──► GetConversationUseCase ─► conversations/messages
+       │              POST /conversations/messages ► SendMessageUseCase ────► ExpertResponderPort
+       ▼                                                                        │
+  ExpertChat (client) ◄──── Server Actions ◄──────── { userMessage, expertMessage } (LangGraph/ChatOpenAI)
+```
+
+| Peça                                      | Responsabilidade                                                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `EXPERT_CATALOG`                          | Fonte única de identidade, papel, escopo, tom e sugestões, na ordem CTO, CMO, Sales, CS, Customer Hero, CEO, CFO, COO, CPO |
+| `ListExpertsUseCase`                      | Devolve o catálogo imutável em `GET /api/v1/experts`                                                                       |
+| `GetConversationUseCase`                  | Devolve o transcript de um Expert para o usuário autenticado ou estado vazio                                               |
+| `SendMessageUseCase`                      | Valida o Expert, chama o modelo e persiste a troca; falha do modelo não grava mensagem parcial                             |
+| `ConversationsRepositoryPort` / `pg`      | CRUD de `conversations`/`messages`, sempre filtrado por `user_id`, com `withDbSpan`                                        |
+| `ExpertResponderPort` / LangGraph         | `StateGraph` com um nó `respond`; `SystemMessage` imutável por Expert e prompt do usuário como dado                        |
+| `SessionGuard` + `@CurrentUser()`         | Reutilizados de `auth`; nenhum token chega ao cliente                                                                      |
+| `chat-actions.ts` / `fetchApiWithSession` | Server Actions web que repassam o cookie `HttpOnly` como Bearer e mapeiam erros para texto en-US                           |
+
+Regras:
+
+- Um prompt vazio ou acima de `EXPERT_PROMPT_MAX_LENGTH` (padrão 4000) é rejeitado antes de chamar o modelo; o textarea valida localmente para feedback imediato.
+- `OPENAI_API_KEY` é opcional no boot; sem chave, o envio responde `503 MODEL_UNAVAILABLE` com mensagem acionável, sem detalhes técnicos. O retry preserva o prompt.
+- Sugestões clicáveis enviam exatamente o texto exibido (`source: "suggestion"`); telemetria registra só o identificador do Expert.
+- Telemetria `expert.chat` registra identificadores, duração e desfecho — nunca conteúdo de prompt ou resposta.
+- A UI é en-US, light-only, responsiva em 360/768/1280 px, com `aria-live` no transcript e `role="alert"` nos erros; header/perfil/logout permanecem intactos.
+
 ---
 
 ## 5. Fluxo de dados alvo
@@ -570,7 +620,9 @@ Fluxo resumido:
 > (`POST /api/v1/auth/sign-in`, `/auth/sign-in`, `returnTo` seguro), o sign-out
 > (`POST /api/v1/auth/sign-out`, `204`, revoga a sessão atual e invalida o JWT imediatamente) e o
 > esqueleto de navegação (`/auth/*` público, `/app/*` privado com shell e guard, raiz
-> redirecionando por sessão). O schema de auth veio na fatia 001.
+> redirecionando por sessão), o catálogo de Experts (`GET /api/v1/experts`), o chat em persona com
+> LangGraph/`gpt-4o-mini` (`GET /api/v1/conversations` e `POST /api/v1/conversations/messages`) e
+> o histórico isolado por usuário. O schema de auth veio na fatia 001 e o de conversas na fatia 012.
 
 ---
 
@@ -580,30 +632,34 @@ Cada decisão abaixo possui um registro correspondente em [`.adrs/`](../.adrs/RE
 contexto, alternativas e consequências. Decisões ainda em aberto permanecem na §7 até serem
 tomadas.
 
-| Decisão                                      | Motivo                                                                            | Estado                                       |
-| -------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
-| Monorepo com Turborepo + Bun                 | Compartilhar código, cache e execução paralela                                    | ✅                                           |
-| Next.js App Router no front-end              | Server Components, streaming e SEO                                                | ✅                                           |
-| API separada em NestJS                       | Isolar domínio, ingestão e orquestração do front                                  | ✅                                           |
-| PostgreSQL 18 via Docker Compose             | Ambiente reproduzível sem instalação global nem stack proprietária                | ✅                                           |
-| Auth própria na API (sem provedor externo)   | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação           | ✅ (schema + sessão + sign-up + recuperação) |
-| Acesso ao banco com `pg` + SQL parametrizado | Sem ORM/query builder; SQL explícito e migrações versionadas (ADR 0016)           | ✅                                           |
-| Hash de senha com scrypt nativo              | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                | ✅                                           |
-| Sessão com JWT HS256 + registro server-side  | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`         | ✅                                           |
-| Cookie `HttpOnly` com ponte `Bearer` no web  | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API            | ✅                                           |
-| Sessão única com create-then-revoke          | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)          | ✅ (follow-up)                               |
-| Namespace `/api/v1`                          | Versionar a API e manter contrato estável desde a primeira rota                   | ✅                                           |
-| Grupos `/auth/*` público e `/app/*` privado  | Separar fluxo de auth da área privada, com guard server-side e layouts próprios   | ✅                                           |
-| Contrato de erro global `{ code, message }`  | Respostas previsíveis para o web sem stack, SQL ou detalhes internos              | ✅                                           |
-| Arquitetura em camadas + vertical slices     | Baixo acoplamento e evolução por domínio                                          | ✅ (auth, hello)                             |
-| Request handler 1:1 por endpoint             | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015) | ✅                                           |
-| Light theme único                            | Direção visual definida em `DESIGN.md`                                            | ✅                                           |
-| Tailwind CSS + shadcn/ui em `packages/ui`    | Base visual compartilhada e tokens únicos                                         | ✅                                           |
-| TypeScript `strict`                          | Segurança de tipos no monorepo                                                    | ✅                                           |
-| OpenTelemetry + Grafana LGTM desde o dia 0   | Diagnosticar ingestão e respostas de IA                                           | ✅                                           |
-| Vitest + Playwright + Supertest              | Unitário, E2E e API                                                               | ✅                                           |
-| LGTM all-in-one via Compose                  | Menos configuração e versões fixadas                                              | ✅                                           |
-| Migrações versionadas com executor próprio   | SQL versionado, transacional e concurrency-safe sem CLI de terceiros (ADR 0016)   | ✅                                           |
+| Decisão                                      | Motivo                                                                                  | Estado                                       |
+| -------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Monorepo com Turborepo + Bun                 | Compartilhar código, cache e execução paralela                                          | ✅                                           |
+| Next.js App Router no front-end              | Server Components, streaming e SEO                                                      | ✅                                           |
+| API separada em NestJS                       | Isolar domínio, ingestão e orquestração do front                                        | ✅                                           |
+| PostgreSQL 18 via Docker Compose             | Ambiente reproduzível sem instalação global nem stack proprietária                      | ✅                                           |
+| Auth própria na API (sem provedor externo)   | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação                 | ✅ (schema + sessão + sign-up + recuperação) |
+| Acesso ao banco com `pg` + SQL parametrizado | Sem ORM/query builder; SQL explícito e migrações versionadas (ADR 0016)                 | ✅                                           |
+| Hash de senha com scrypt nativo              | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                      | ✅                                           |
+| Sessão com JWT HS256 + registro server-side  | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`               | ✅                                           |
+| Cookie `HttpOnly` com ponte `Bearer` no web  | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API                  | ✅                                           |
+| Sessão única com create-then-revoke          | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)                | ✅ (follow-up)                               |
+| Namespace `/api/v1`                          | Versionar a API e manter contrato estável desde a primeira rota                         | ✅                                           |
+| Grupos `/auth/*` público e `/app/*` privado  | Separar fluxo de auth da área privada, com guard server-side e layouts próprios         | ✅                                           |
+| Contrato de erro global `{ code, message }`  | Respostas previsíveis para o web sem stack, SQL ou detalhes internos                    | ✅                                           |
+| Arquitetura em camadas + vertical slices     | Baixo acoplamento e evolução por domínio                                                | ✅ (auth, hello)                             |
+| Request handler 1:1 por endpoint             | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015)       | ✅                                           |
+| Light theme único                            | Direção visual definida em `DESIGN.md`                                                  | ✅                                           |
+| Tailwind CSS + shadcn/ui em `packages/ui`    | Base visual compartilhada e tokens únicos                                               | ✅                                           |
+| TypeScript `strict`                          | Segurança de tipos no monorepo                                                          | ✅                                           |
+| OpenTelemetry + Grafana LGTM desde o dia 0   | Diagnosticar ingestão e respostas de IA                                                 | ✅                                           |
+| Vitest + Playwright + Supertest              | Unitário, E2E e API                                                                     | ✅                                           |
+| LGTM all-in-one via Compose                  | Menos configuração e versões fixadas                                                    | ✅                                           |
+| Migrações versionadas com executor próprio   | SQL versionado, transacional e concurrency-safe sem CLI de terceiros (ADR 0016)         | ✅                                           |
+| Catálogo de Experts na API (fonte única)     | Web consome o catálogo no servidor; sem duplicação no cliente ou em `packages/ui`       | ✅                                           |
+| Histórico por `(user_id, expert_id)`         | Isolamento por usuário autenticado, sem workspace, com `unique` e RLS                   | ✅                                           |
+| LangChain.js + LangGraph para responder      | Orquestração do modelo atrás de `ExpertResponderPort`, isolada da aplicação             | ✅                                           |
+| `OPENAI_API_KEY` opcional no boot            | Ausência gera `503 MODEL_UNAVAILABLE` só no envio; boot e testes seguem determinísticos | ✅                                           |
 
 ---
 

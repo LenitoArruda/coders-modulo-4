@@ -51,6 +51,12 @@ export const DEFAULT_RESET_PASSWORD_RATE_LIMIT_MAX = 5;
 /** Default reset-password rate limit window (60 seconds). */
 export const DEFAULT_RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = 60;
 
+/** Default maximum length (characters) accepted for an Expert prompt. */
+export const DEFAULT_EXPERT_PROMPT_MAX_LENGTH = 4_000;
+
+/** Upper bound accepted for the configurable prompt length limit. */
+export const MAX_EXPERT_PROMPT_MAX_LENGTH = 100_000;
+
 export type Env = {
   /** Effective runtime environment (`NODE_ENV` normalized, defaulting to `dev`). */
   nodeEnv: string;
@@ -87,6 +93,10 @@ export type Env = {
   mailtrapSandbox: boolean;
   /** Mailtrap sandbox (inbox) ID; required when `mailtrapSandbox` is true. */
   mailtrapSandboxId: number | null;
+  /** OpenAI API key (secret); empty when the model provider is not configured. */
+  openaiApiKey: string;
+  /** Maximum number of characters accepted in a single Expert prompt. */
+  expertPromptMaxLength: number;
 };
 
 export class ConfigurationError extends Error {
@@ -385,6 +395,22 @@ export function loadEnv(source: EnvSource = process.env): Env {
   const mailtrapSandboxId =
     mailtrapSandboxIdValue === "" ? null : Number(mailtrapSandboxIdValue);
 
+  // Optional at boot: a missing key produces an actionable 503 only when a
+  // prompt is actually sent, keeping local development and tests hermetic.
+  const openaiApiKey = readString(source.OPENAI_API_KEY);
+  const expertPromptMaxLengthValue =
+    readString(source.EXPERT_PROMPT_MAX_LENGTH) ||
+    String(DEFAULT_EXPERT_PROMPT_MAX_LENGTH);
+  const expertPromptMaxLength = Number(expertPromptMaxLengthValue);
+
+  if (
+    !Number.isInteger(expertPromptMaxLength) ||
+    expertPromptMaxLength < 1 ||
+    expertPromptMaxLength > MAX_EXPERT_PROMPT_MAX_LENGTH
+  ) {
+    invalid.push("EXPERT_PROMPT_MAX_LENGTH");
+  }
+
   if (emailProvider === "resend") {
     if (!resendApiKey) missing.push("RESEND_API_KEY");
   } else if (!mailtrapApiToken) {
@@ -454,5 +480,7 @@ export function loadEnv(source: EnvSource = process.env): Env {
       emailProvider === "mailtrap" && mailtrapSandbox === true
         ? mailtrapSandboxId
         : null,
+    openaiApiKey,
+    expertPromptMaxLength,
   };
 }

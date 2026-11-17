@@ -15,9 +15,11 @@ o fluxo obrigatório de trabalho e o que nunca pode ser feito.
 - **Como funciona:** Experts consomem dados de **conectores externos** (Notion, Google Drive,
   Jira, PDF etc.) para responder perguntas e produzir análises.
 - **Repositório:** monorepo **Turborepo** gerenciado com **Bun**.
-- **Estado atual:** **fundação implementada** — `apps/web`, `apps/api`,
-  `packages/ui` com Tailwind/shadcn, PostgreSQL 18 local, migrações, testes e observabilidade
-  (LGTM). O produto e as features de negócio ainda **não estão implementados**. Veja
+- **Estado atual:** **fundação + primeira feature de produto implementadas** — `apps/web`,
+  `apps/api`, `packages/ui` com Tailwind/shadcn, PostgreSQL 18 local, migrações, testes e
+  observabilidade (LGTM), além do catálogo de nove Experts e do chat em persona com histórico
+  isolado por usuário (fatia 012). As demais features de negócio (fontes, RAG, citações e
+  entregáveis) ainda **não estão implementadas**. Veja
   [ARCHITECTURE.md](./ARCHITECTURE.md#2-estrutura-atual).
 
 > **Regra de ouro:** não presuma que uma biblioteca, app, script ou pasta existe. Confirme no

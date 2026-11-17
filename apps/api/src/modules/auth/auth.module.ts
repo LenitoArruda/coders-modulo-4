@@ -158,8 +158,9 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     ValidateSessionUseCase,
     SessionGuard,
   ],
-  // Exported so integration specs can sign JWTs through
-  // `moduleRef.get(SessionTokenPort)`; it is the module's only public provider.
-  exports: [SessionTokenPort],
+  // `SessionTokenPort` lets integration specs sign JWTs. `SessionGuard` and its
+  // dependency are exported so other slices can protect endpoints with the same
+  // session without re-wiring the auth infrastructure.
+  exports: [SessionTokenPort, SessionGuard, ValidateSessionUseCase],
 })
 export class AuthModule {}

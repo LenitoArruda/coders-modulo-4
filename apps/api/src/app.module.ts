@@ -2,12 +2,20 @@ import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 
 import { AuthModule } from "./modules/auth/auth.module";
+import { ConversationsModule } from "./modules/conversations/conversations.module";
+import { ExpertsModule } from "./modules/experts/experts.module";
 import { HelloModule } from "./modules/hello/hello.module";
 import { DatabaseModule } from "./modules/shared/database/database.module";
 import { ErrorContractFilter } from "./modules/shared/interface/error-contract.filter";
 
 @Module({
-  imports: [DatabaseModule, AuthModule, HelloModule],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    HelloModule,
+    ExpertsModule,
+    ConversationsModule,
+  ],
   providers: [{ provide: APP_FILTER, useClass: ErrorContractFilter }],
 })
 export class AppModule {}

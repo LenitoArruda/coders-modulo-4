@@ -14,6 +14,7 @@ import {
   E2E_SIGN_IN_PASSWORD,
   E2E_VALID_SESSION_TOKEN,
 } from "./fake-session";
+import { FAKE_EXPERTS } from "./fake-experts";
 
 /**
  * Minimal API used only by Playwright. Session validation happens on the Next
@@ -107,6 +108,59 @@ function readJsonBody(request: IncomingMessage): Promise<unknown> {
     });
     request.on("error", () => resolve(null));
   });
+}
+
+type ChatMessage = {
+  id: string;
+  role: "user" | "expert";
+  content: string;
+  createdAt: string;
+};
+
+type StoredConversation = {
+  conversationId: string;
+  messages: ChatMessage[];
+};
+
+/**
+ * Transcripts are keyed by session token and Expert, so every E2E test (which
+ * signs in with a unique account) sees only its own history. State lives only
+ * for the lifetime of the fake API process.
+ */
+const storedConversations = new Map<string, StoredConversation>();
+let chatSequence = 0;
+
+function bearerToken(request: IncomingMessage): string {
+  return (request.headers.authorization ?? "").replace(/^Bearer /, "");
+}
+
+function isAuthenticated(request: IncomingMessage): boolean {
+  const token = bearerToken(request);
+
+  if (token === E2E_VALID_SESSION_TOKEN) {
+    return true;
+  }
+
+  const owner = signInTokenOwner(token);
+
+  return owner !== null && latestSignInSession.get(owner.local) === owner.n;
+}
+
+function unauthorized(response: ServerResponse): void {
+  sendJson(response, 401, {
+    code: "UNAUTHORIZED",
+    message: "Your session is invalid or has expired. Sign in again.",
+  });
+}
+
+function conversationKey(token: string, expertId: string): string {
+  return `${token}|${expertId}`;
+}
+
+function nextChatId(prefix: string): string {
+  chatSequence += 1;
+
+  return `${prefix}-${chatSequence}`;
 }
 
 function signUpFieldErrors(body: Body): Body {
@@ -411,6 +465,125 @@ async function handleResetPassword(
   sendJson(response, 200, { message: RESET_PASSWORD_SUCCESS_MESSAGE });
 }
 
+function handleListExperts(
+  request: IncomingMessage,
+  response: ServerResponse,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  sendJson(response, 200, { experts: FAKE_EXPERTS });
+}
+
+/** GET /api/v1/conversations?expertId=... — empty until the first prompt. */
+function handleGetConversation(
+  request: IncomingMessage,
+  response: ServerResponse,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const url = new URL(request.url ?? "/", `http://${host}:${port}`);
+  const expertId = url.searchParams.get("expertId") ?? "";
+
+  if (FAKE_EXPERTS.every((expert) => expert.id !== expertId)) {
+    sendJson(response, 404, {
+      code: "UNKNOWN_EXPERT",
+      message: "That Expert is not available.",
+    });
+    return;
+  }
+
+  const stored = storedConversations.get(
+    conversationKey(bearerToken(request), expertId),
+  );
+
+  sendJson(response, 200, {
+    conversationId: stored?.conversationId ?? null,
+    messages: stored?.messages ?? [],
+  });
+}
+
+/** POST /api/v1/conversations/messages — a prompt containing "fail" returns 503. */
+async function handleSendMessage(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const body = asRecord(await readJsonBody(request));
+  const expertId = readString(body, "expertId").trim();
+  const prompt = readString(body, "prompt").trim();
+  const expert = FAKE_EXPERTS.find((candidate) => candidate.id === expertId);
+
+  if (expert === undefined) {
+    sendJson(response, 404, {
+      code: "UNKNOWN_EXPERT",
+      message: "That Expert is not available.",
+    });
+    return;
+  }
+
+  if (prompt === "") {
+    sendJson(response, 400, {
+      code: "VALIDATION_ERROR",
+      message: "Check your message and try again.",
+      fieldErrors: { prompt: "Enter a message before sending." },
+    });
+    return;
+  }
+
+  if (prompt.toLowerCase().includes("fail")) {
+    sendJson(response, 503, {
+      code: "MODEL_UNAVAILABLE",
+      message: "The Expert could not respond right now. Try again in a moment.",
+    });
+    return;
+  }
+
+  const key = conversationKey(bearerToken(request), expertId);
+  const existing = storedConversations.get(key);
+  const stored =
+    existing ??
+    (() => {
+      const created: StoredConversation = {
+        conversationId: nextChatId("conv"),
+        messages: [],
+      };
+
+      storedConversations.set(key, created);
+
+      return created;
+    })();
+
+  const userMessage: ChatMessage = {
+    id: nextChatId("msg"),
+    role: "user",
+    content: prompt,
+    createdAt: new Date().toISOString(),
+  };
+  const expertMessage: ChatMessage = {
+    id: nextChatId("msg"),
+    role: "expert",
+    content: `As the ${expert.name}, here is a focused answer.`,
+    createdAt: new Date().toISOString(),
+  };
+
+  stored.messages.push(userMessage, expertMessage);
+  sendJson(response, 201, {
+    conversationId: stored.conversationId,
+    userMessage,
+    expertMessage,
+  });
+}
+
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${host}:${port}`)
     .pathname;
@@ -492,6 +665,24 @@ const server = createServer(async (request, response) => {
       code: "UNAUTHORIZED",
       message: "Your session is invalid or has expired. Sign in again.",
     });
+    return;
+  }
+
+  if (pathname === "/api/v1/experts" && request.method === "GET") {
+    handleListExperts(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/conversations" && request.method === "GET") {
+    handleGetConversation(request, response);
+    return;
+  }
+
+  if (
+    pathname === "/api/v1/conversations/messages" &&
+    request.method === "POST"
+  ) {
+    await handleSendMessage(request, response);
     return;
   }
 

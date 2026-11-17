@@ -1,6 +1,6 @@
 # BUSINESS.md — Negócio e produto
 
-> **Status:** hipóteses iniciais · **Atualizado em:** 2026-11-04
+> **Status:** hipóteses iniciais + catálogo de Experts e chat implementados (fatia 012) · **Atualizado em:** 2026-11-17
 > **Público:** produto, engenharia e agentes que precisam entender **o que** estamos construindo.
 
 Este documento descreve o problema, a proposta de valor e o escopo do produto. Decisões ainda
@@ -45,28 +45,39 @@ responde a pedidos assumindo o papel daquela posição.
 
 ## 5. Conceitos
 
-| Termo                    | Definição                                                                                 |
-| ------------------------ | ----------------------------------------------------------------------------------------- |
-| **Expert**               | Agente de IA com papel, escopo, instruções e fontes de dados definidos (ex.: CEO Expert). |
-| **Conector**             | Integração que autentica e sincroniza dados de uma ferramenta externa.                    |
-| **Fonte de dados**       | Origem concreta de conteúdo: um documento, uma pasta, um projeto, um board etc.           |
-| **Base de conhecimento** | Conteúdo ingerido, normalizado e indexado a partir das fontes conectadas.                 |
-| **Pedido**               | Pergunta ou tarefa enviada a um Expert.                                                   |
-| **Entregável**           | Resposta, análise, resumo ou documento produzido pelo Expert.                             |
-| **Workspace**            | Espaço isolado de uma empresa/conta, com seus Experts, fontes e dados. **Hipótese.**      |
+| Termo                    | Definição                                                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Expert**               | Agente de IA com papel, escopo, instruções e fontes de dados definidos (ex.: CEO Expert).                                              |
+| **Conector**             | Integração que autentica e sincroniza dados de uma ferramenta externa.                                                                 |
+| **Fonte de dados**       | Origem concreta de conteúdo: um documento, uma pasta, um projeto, um board etc.                                                        |
+| **Base de conhecimento** | Conteúdo ingerido, normalizado e indexado a partir das fontes conectadas.                                                              |
+| **Pedido**               | Pergunta ou tarefa enviada a um Expert.                                                                                                |
+| **Conversa**             | Transcript de pedidos e respostas com um Expert, isolado por usuário autenticado.                                                      |
+| **Entregável**           | Resposta, análise, resumo ou documento produzido pelo Expert.                                                                          |
+| **Workspace**            | Espaço isolado de uma empresa/conta, com seus Experts, fontes e dados. **Hipótese — não implementado; a fatia 012 isola por usuário.** |
 
 ---
 
 ## 6. Experts iniciais
 
-| Expert         | Foco                                       | Exemplos de entregável                                                             |
-| -------------- | ------------------------------------------ | ---------------------------------------------------------------------------------- |
-| **CEO Expert** | Estratégia, negócio, finanças, priorização | Diagnóstico de mercado, plano estratégico, análise de cenário, resumo executivo    |
-| **CMO Expert** | Marketing, marca, aquisição, conteúdo      | Plano de campanha, análise de concorrência, calendário editorial, análise de funil |
-| **CTO Expert** | Tecnologia, arquitetura, segurança, time   | Avaliação de arquitetura, roadmap técnico, análise de riscos, plano de contratação |
+A fatia 012 implementa os nove Experts abaixo, nesta ordem de exibição. O catálogo (identidade,
+papel, escopo, tom e sugestões) vive na API (`EXPERT_CATALOG`) e é a fonte única consumida pela web.
+
+| Expert                               | Foco                                                    | Exemplos de entregável                                                    |
+| ------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **CTO Expert**                       | Tecnologia, arquitetura, segurança, engenharia          | Avaliação de arquitetura, roadmap técnico, análise de riscos de segurança |
+| **CMO Expert**                       | Marketing, marca, aquisição, conteúdo                   | Plano de campanha, análise de concorrência, calendário editorial          |
+| **Sales Director Expert**            | Pipeline, previsão de receita, contas-chave, negociação | Análise de deals em risco, plano de follow-up, previsão do trimestre      |
+| **Customer Success Director Expert** | Adoção, health score, retenção, expansão                | Sinais de churn, plano de recuperação, bloqueios de adoção                |
+| **Customer Hero Director Expert**    | Voz do cliente, experiência, escalonamento, histórias   | Resposta a reclamação, plano de escalonamento, histórias de sucesso       |
+| **CEO Expert**                       | Estratégia, negócio, finanças, priorização              | Diagnóstico, plano estratégico de 90 dias, resumo executivo               |
+| **CFO Expert**                       | Fluxo de caixa, orçamento, margem, captação             | Cálculo de runway, redução de custo, leitura de margem por linha          |
+| **COO Expert**                       | Operações, processos, SLAs, execução                    | Gargalos de processo, plano de ação de SLA, prioridades operacionais      |
+| **CPO Expert**                       | Descoberta, roadmap, priorização, métricas de produto   | Priorização de problemas, roadmap trimestral, temas de entrevistas        |
 
 > Novos Experts devem ser compostos por **template + instruções + fontes permitidas**, não por
-> código específico por Expert.
+> código específico por Expert. Na fatia 012 as sugestões não dependem de fontes conectadas; versões
+> que consultam fontes entram nas fatias seguintes.
 
 ---
 
@@ -113,6 +124,11 @@ Requisitos por conector:
 4. Expert responde com análise e referências.
 5. Usuário refina o pedido ou solicita um entregável.
 
+> **Estado atual (fatia 012):** seleção do Expert, sugestões clicáveis, envio de prompt, resposta no
+> papel do Expert e histórico isolado por usuário já funcionam. A recuperação de contexto das fontes
+> e as citações (passos 3–4) entram nas fatias seguintes; hoje a resposta vem do modelo com a persona
+> do Expert, sem fontes conectadas.
+
 ### 8.3 Gestão
 
 - Administrador gerencia membros, fontes e permissões do workspace.
@@ -125,11 +141,11 @@ Requisitos por conector:
 
 **Dentro do MVP**
 
-- Autenticação e workspace (hipótese).
-- Criação de Expert a partir de templates (CEO, CMO, CTO).
+- Autenticação (implementada); workspace segue como hipótese.
+- Catálogo de nove Experts com chat em persona (implementado na fatia 012).
 - Conexão de 2 a 3 fontes (PDF, Markdown, Google Drive ou Notion).
-- Pergunta e resposta com citações das fontes.
-- Histórico de conversas.
+- Pergunta e resposta com citações das fontes (citações nas fatias seguintes).
+- Histórico de conversas isolado por usuário (implementado na fatia 012).
 - Controle básico de acesso por workspace.
 
 **Fora do MVP**
