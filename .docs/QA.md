@@ -757,6 +757,29 @@ foi registrado em logs ou documentação.
 
 ---
 
+## 17. Evidências de integração da spec 018 (2026-11-18)
+
+Merge `ae91965` na principal, a partir do commit `5e2ad77` da branch `spec/018`. Sem conflitos.
+A slice `observability` é local-first: flag desligada por padrão, coletor fake/no-op, emissão
+assíncrona que nunca quebra chat/RAG, pseudonimização HMAC e sanitização recursiva de PII. Nenhuma
+migração e nenhuma dependência nova.
+
+| Comando               | Resultado                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| `bun run lint`        | ok — 3 tarefas                                                  |
+| `bun run types:check` | ok — 3 tarefas                                                  |
+| `bun run test`        | ok — API 87 arquivos / 593 testes; web 12 arquivos / 156 testes |
+| `bun run build`       | ok — `api` + `web`                                              |
+| `bun run obs:eval`    | ok — 4/4 datasets, limiar 0,8                                   |
+| `bun run test:e2e`    | ok — 163/163 testes em 6,0 min, portas padrão 3000/3434         |
+
+Não validado: Studio, traces ao vivo e evaluation contra LangSmith real, bind de rede do override
+e alertas do painel. Motivo: daemon Docker indisponível e imagem self-hosted do LangSmith é
+Enterprise/licenciada; o compose opcional exige `LANGSMITH_IMAGE` e `LANGSMITH_API_KEY` externos.
+Critérios correspondentes permanecem marcados como não validados na spec/plan da 018.
+
+---
+
 ## 17. Evidências da fatia 018 — observabilidade local (worktree `spec/018`)
 
 Executado em 2026-11-18 na worktree isolada, com PATH explícito para Bun/Node. Nenhuma migration

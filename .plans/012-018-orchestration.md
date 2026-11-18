@@ -15,7 +15,7 @@
 | 015  | Fontes de conhecimento por mídia   | done     | `../spec-015` | `spec/015` | mesclada   | commit `3d29102`; merge `b9b4d89`; QA verde                  |
 | 016  | Respostas com RAG e citações       | done     | `../spec-016` | `spec/016` | mesclada   | commit `c84aa5f`; merge `eee1cd5`; QA verde                  |
 | 017  | Entregáveis multimídia             | approved | `../spec-017` | `spec/017` | executando | onda 3; HEAD `dd33577`; risco Gemini/Veo billing             |
-| 018  | LangSmith local                    | approved | `../spec-018` | `spec/018` | executando | onda 3; HEAD `dd33577`; `.env` copiado                       |
+| 018  | LangSmith local                    | done     | `../spec-018` | `spec/018` | mesclada   | commit `5e2ad77`; merge `ae91965`; QA verde                  |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
@@ -25,7 +25,7 @@ Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 | ---- | ------------- | ---------- | ------------ | ------------------------------------------------------ |
 | 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push `b1d10c7`                        |
 | 2    | 014, 015, 016 | 2026-11-18 | 2026-11-18   | merges `b16f183`, `b9b4d89`, `eee1cd5`; push `dd33577` |
-| 3    | 017, 018      | 2026-11-18 | —            | —                                                      |
+| 3    | 017, 018      | 2026-11-18 | —            | merge `ae91965` (018); push pendente                   |
 
 Ondas confirmadas pelo usuário em 2026-11-17. A onda 1 foi concluída e publicada com QA verde.
 A onda 2 foi lançada em paralelo com worktrees independentes; a onda 3 segue após sua integração.
@@ -111,6 +111,12 @@ Detalhamento:
   com `.env` copiado; subagentes `ses_e10b14beeffeAMP0vDnQLKMDTp` (017) e
   `ses_e10b14bedffet87IcR6BiNC2B9` (018) em background, com portas E2E isoladas 3017/3437 e
   3018/3438.
+- 2026-11-18 — [018] `RESULTADO: ok`; commit `5e2ad77`, merge `ae91965` sem conflitos. Nova slice
+  `observability` local-first, flag desligada por default, evaluation offline e 4 datasets; sem
+  migration e sem nova dependência.
+- 2026-11-18 — [018] QA na principal: `lint` 3/3, `types:check` 3/3, `test` API 87/593 + web
+  12/156, `build` 2/2, `obs:eval` 4/4, `test:e2e` 163/163. Studio/traces ao vivo não validados:
+  imagem LangSmith self-hosted é Enterprise/licenciada e o Docker não está disponível.
 
 ## 5. Resultado consolidado
 
@@ -122,12 +128,11 @@ Detalhamento:
 | 015  | ok         | `3d29102`      | `b9b4d89` | verde | —                  |
 | 016  | ok         | `c84aa5f`      | `eee1cd5` | verde | —                  |
 | 017  | executando | —              | —         | —     | onda 3; Gemini/Veo |
-| 018  | executando | —              | —         | —     | onda 3             |
+| 018  | ok         | `5e2ad77`      | `ae91965` | verde | —                  |
 
 ## 6. Retomada
 
-Onda 2 publicada e worktrees limpos. Para retomar: aguardar o `RESULTADO` de 017 e 018, integrar
-cada spec com `merge --no-ff`, rodar QA completo na principal, publicar e remover os worktrees.
-Riscos: geração de vídeo da 017 via Gemini/Veo pode exigir billing ativado; o `db:migrate` da
-principal depende de Docker, indisponível no momento; se ambas criarem migrations, conferir a
-numeração (017 pode usar 0006 e 018, 0007).
+018 integrada com QA verde; falta 017. Para retomar: aguardar o `RESULTADO` de 017, integrá-la com
+`merge --no-ff`, rodar QA completo na principal, publicar a onda e remover os worktrees `spec-017`
+e `spec-018`. Riscos: geração de vídeo da 017 via Gemini/Veo pode exigir billing ativado; o
+`db:migrate` da principal depende de Docker, indisponível no momento.
