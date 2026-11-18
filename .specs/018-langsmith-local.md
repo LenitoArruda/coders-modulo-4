@@ -1,7 +1,7 @@
 # Observabilidade e avaliação com LangSmith local — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-17
+> **Status:** done (fatia local-first; validações dependentes da stack licenciada registradas como bloqueio)
+> **Atualizado em:** 2026-11-18
 > **Autor:** OpenCode Agent
 > **Épico:** `.plans/012-expert-platform-breakdown.md` (fatia 7)
 > **Depende de:** `.specs/012-expert-chat.md`, `.specs/016-rag-citations.md`
@@ -236,37 +236,48 @@ decisão aberta. Nenhum dado de trace é enviado para a nuvem da LangChain.
 
 ## 14. Critérios de aceite
 
-- [ ] Dada a stack subida com `bun run infra:up`, quando a aplicação envia um prompt, então um trace
-      completo aparece no LangSmith local com expert, conversa, modelo e latência.
-- [ ] Dado um fluxo com recuperação, quando a resposta é gerada, então o trace inclui
-      `topK`, `threshold`, `scores[]` e `sourceIds[]`.
-- [ ] Dado um fluxo de geração de mídia, quando o job termina, então o trace registra
-      `mediaKind`, modelo, parâmetros e custo estimado.
-- [ ] Dado um prompt com e-mail ou token, quando o span é emitido, então o dado é mascarado
+- [ ] **BLOQUEADO** — Dada a stack subida com `bun run infra:up`, quando a aplicação envia um
+      prompt, então um trace completo aparece no LangSmith local com expert, conversa, modelo e
+      latência. Exige daemon Docker e imagem Enterprise licenciada; validado apenas contra coletor
+      fake.
+- [x] Dado um fluxo com recuperação, quando a resposta é gerada, então o trace inclui
+      `topK`, `threshold`, `scores[]` e `sourceIds[]` — verificado com sink em memória.
+- [ ] **PARCIAL** — Dado um fluxo de geração de mídia, quando o job termina, então o trace registra
+      `mediaKind`, modelo, parâmetros e custo estimado. Contrato de metadados testado; nenhum fluxo
+      da fatia 017 foi integrado ou alterado.
+- [x] Dado um prompt com e-mail ou token, quando o span é emitido, então o dado é mascarado
       e apenas o evento de sanitização é registrado.
-- [ ] Dado o coletor LangSmith indisponível, quando o usuário envia um prompt, então o chat
-      funciona normalmente e o aviso de span descartado aparece em log.
-- [ ] Dado um dataset versionado, quando a CLI de evaluation é executada, então o relatório
-      mostra resultados por métrica e compara com a versão anterior.
-- [ ] Dado um trace no Studio, quando o time o abre, então é possível inspecionar o grafo,
-      os prompts e as etapas de recuperação/geração.
-- [ ] Dado um alerta de latência ou erro no painel local, quando ele dispara, então é
-      possível navegar até os traces relacionados.
-- [ ] Dado a configuração padrão, quando a aplicação sobe, então o SDK aponta para o
-      LangSmith local e não para a nuvem.
-- [ ] Dado um usuário sem acesso à rede interna, quando ele tenta abrir o painel, então o
-      acesso é negado.
+- [x] Dado o coletor LangSmith indisponível, quando o usuário envia um prompt, então o chat
+      funciona normalmente e o aviso de span descartado aparece em log — verificado contra
+      servidor HTTP local com falha induzida.
+- [x] Dado um dataset versionado, quando a CLI de evaluation é executada, então o relatório
+      mostra resultados por métrica e compara com a versão anterior (`--baseline`).
+- [ ] **BLOQUEADO** — Dado um trace no Studio, quando o time o abre, então é possível inspecionar
+      o grafo, os prompts e as etapas de recuperação/geração. Depende da stack licenciada.
+- [ ] **FORA DESTA FATIA** — Dado um alerta de latência ou erro no painel local, quando ele
+      dispara, então é possível navegar até os traces relacionados. Eventos de log emitidos;
+      integração de alertas não implementada.
+- [x] Dada a configuração padrão, quando a aplicação sobe, então o endpoint é local e endpoints
+      cloud são rejeitados na configuração quando a flag está ligada.
+- [ ] **BLOQUEADO** — Dado um usuário sem acesso à rede interna, quando ele tenta abrir o painel,
+      então o acesso é negado. Bind em `127.0.0.1` declarado no override opcional; não validado em
+      runtime sem a stack licenciada.
 
 ## 15. Decisões e questões abertas
 
-| Tema                       | Decisão ou pergunta                                                                                                      | Impacto                                        | Dono                 | Status   |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------------------- | -------- |
-| Arquitetura do LangSmith   | Modo híbrido local: Studio/CLI e LGTM agora; Evaluation/Deployment em infraestrutura dedicada/Kubernetes após validação. | Define o escopo de infraestrutura desta fatia. | Solicitante          | decidida |
-| Painel de métricas         | Usar LGTM completo (Grafana + Loki + Tempo) ou apenas Grafana com Tempo?                                                 | Define recursos e complexidade do Compose.     | Usuário + Infra      | aberta   |
-| Armazenamento do LangSmith | Qual backend (SQLite/Postgres) e volume persistente usar?                                                                | Define confiabilidade e migração futura.       | Infra                | aberta   |
-| Retenção de traces         | Por quanto tempo guardar prompts/respostas completas?                                                                    | Impacta privacidade, storage e custo.          | Usuário + Time de IA | aberta   |
-| Conteúdo em spans          | Registrar prompt/resposta completos ou apenas resumo?                                                                    | Equilibra depuração e privacidade.             | Usuário + Time de IA | aberta   |
-| Evaluations                | Quais métricas e limiares mínimos por suite?                                                                             | Define gate de qualidade.                      | Time de IA + Usuário | aberta   |
-| Gate de deploy             | Evaluation ruim deve bloquear deploy automaticamente?                                                                    | Define o rigor do processo.                    | Usuário              | aberta   |
-| Kubernetes                 | Quando e como migrar LangSmith self-hosted para Kubernetes?                                                              | Define esforço futuro e ambiente de produção.  | Infra                | aberta   |
-| Versão do LangSmith        | Fixar qual versão self-hosted e cadência de atualização?                                                                 | Evita quebras de esquema/API.                  | Infra                | aberta   |
+| Tema                       | Decisão ou pergunta                                                                                                            | Impacto                                                           | Dono                 | Status    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | -------------------- | --------- |
+| Arquitetura do LangSmith   | Modo híbrido local: Studio/CLI e LGTM agora; Evaluation/Deployment em infraestrutura dedicada/Kubernetes após validação.       | Define o escopo de infraestrutura desta fatia.                    | Solicitante          | decidida  |
+| Painel de métricas         | Usar LGTM completo (Grafana + Loki + Tempo) ou apenas Grafana com Tempo?                                                       | Define recursos e complexidade do Compose.                        | Usuário + Infra      | aberta    |
+| Armazenamento do LangSmith | Qual backend (SQLite/Postgres) e volume persistente usar?                                                                      | Define confiabilidade e migração futura.                          | Infra                | aberta    |
+| Retenção de traces         | Por quanto tempo guardar prompts/respostas completas?                                                                          | Impacta privacidade, storage e custo.                             | Usuário + Time de IA | aberta    |
+| Conteúdo em spans          | Registrar prompt/resposta completos ou apenas resumo?                                                                          | Equilibra depuração e privacidade.                                | Usuário + Time de IA | aberta    |
+| Evaluations                | Quais métricas e limiares mínimos por suite?                                                                                   | Define gate de qualidade.                                         | Time de IA + Usuário | aberta    |
+| Gate de deploy             | Evaluation ruim deve bloquear deploy automaticamente?                                                                          | Define o rigor do processo.                                       | Usuário              | aberta    |
+| Kubernetes                 | Quando e como migrar LangSmith self-hosted para Kubernetes?                                                                    | Define esforço futuro e ambiente de produção.                     | Infra                | aberta    |
+| Versão do LangSmith        | Fixar qual versão self-hosted e cadência de atualização?                                                                       | Evita quebras de esquema/API.                                     | Infra                | aberta    |
+| Estratégia desta fatia     | Entregar fatia local-first com flag desligada, sink HTTP local, pseudonimização e degradação graciosa, sem novas dependências. | Entrega utilizável mesmo sem stack licenciada.                    | Usuário + OpenCode   | decidida  |
+| Stack self-hosted real     | Não validada: daemon Docker indisponível e imagem Enterprise licenciada ausente; Compose opcional com profile `langsmith`.     | Studio, traces ao vivo e evaluation ao vivo ficam como follow-up. | Infra                | bloqueada |
+| Evaluation offline         | 4 datasets sintéticos versionados, scorer puro determinístico e CLI local; limiar default `0.8`, configurável por dataset.     | Gate reproduzível sem chamada a modelo externo.                   | Time de IA + Usuário | decidida  |
+| Persistência               | Traces não são persistidos em PostgreSQL; nenhuma migration adicionada.                                                        | Evita down-migration e dado de usuário nesta fatia.               | OpenCode             | decidida  |
+| Contrato da fatia 017      | Apenas metadados de mídia declarados e testados; nenhum fluxo 017 alterado.                                                    | Preserva isolamento entre specs.                                  | OpenCode             | decidida  |

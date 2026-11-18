@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { ObservabilityModule } from "../observability/observability.module";
 import { loadEnv } from "../shared/config/env";
 
 import {
@@ -27,6 +28,7 @@ const DEFAULT_EMBEDDING_DIMENSIONS = 1536;
 
 /** Retrieval slice. It has no endpoints; the conversations slice consumes it. */
 @Module({
+  imports: [ObservabilityModule],
   providers: [
     {
       provide: CITATION_WEAVIATE_URL,

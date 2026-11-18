@@ -2,6 +2,7 @@ import type { Expert } from "../../modules/experts/domain/expert";
 import { ExpertResponderPort } from "../../modules/conversations/application/ports/expert-responder.port";
 import type { ConversationMessage } from "../../modules/conversations/domain/conversation";
 import type { GroundingContext } from "../../modules/citations/domain/citation";
+import type { TraceCorrelation } from "../../modules/observability/domain/trace-span";
 
 /** Deterministic responder: no external model call in tests. */
 export class FakeExpertResponder extends ExpertResponderPort {
@@ -10,6 +11,7 @@ export class FakeExpertResponder extends ExpertResponderPort {
     prompt: string;
     grounding: GroundingContext | null;
     history: ConversationMessage[];
+    trace: TraceCorrelation | null;
   }> = [];
   failWith: Error | null = null;
 
@@ -18,12 +20,14 @@ export class FakeExpertResponder extends ExpertResponderPort {
     prompt: string,
     grounding: GroundingContext | null = null,
     history: ConversationMessage[] = [],
+    trace: TraceCorrelation | null = null,
   ): Promise<string> {
     this.calls.push({
       expertId: expert.id,
       prompt,
       grounding,
       history,
+      trace,
     });
 
     if (this.failWith !== null) {

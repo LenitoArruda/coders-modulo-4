@@ -1,4 +1,5 @@
 import type { GroundingContext } from "../../../citations/domain/citation";
+import type { TraceCorrelation } from "../../../observability/domain/trace-span";
 import type { ConversationMessage } from "../../domain/conversation";
 import type { Expert } from "../../../experts/domain/expert";
 
@@ -13,5 +14,6 @@ export abstract class ExpertResponderPort {
     prompt: string,
     grounding?: GroundingContext | null,
     history?: ConversationMessage[],
+    trace?: TraceCorrelation | null,
   ): Promise<string>;
 }

@@ -303,3 +303,19 @@ Consulte o checklist completo em [QA.md](./QA.md#8-definition-of-done-dod).
 
 Resumo: plano atualizado, lint/tipos/build verdes, testes quando houver infraestrutura, UI
 acessível e responsiva, documentação sincronizada e relatório final entregue.
+
+---
+
+## 15. Observabilidade local (spec 018)
+
+- A instrumentação está desligada por default (`LANGSMITH_TRACING_ENABLED=false`). Para
+  experimentar localmente, use apenas as variáveis documentadas em `.env.example` e o coletor
+  fake dos testes; nunca aponte para um endpoint cloud.
+- Rode `bun run obs:eval` antes de alterar prompts/modelos. O relatório por métrica e o `--baseline`
+  são o gate determinístico disponível nesta fatia; códigos de saída `0`/`1`/`2` são descritos em
+  [OBSERVABILITY.md](./OBSERVABILITY.md#4-evaluation-offline).
+- Para rodar os testes de instrumentação, use `bunx vitest run` dentro de `apps/api`. O runner
+  `bun test` não lida bem com os decorators do Nest e com `vi.hoisted` destes testes.
+- `docker-compose.langsmith.yml` é opcional e depende de imagem licenciada; não altere o Compose
+  padrão nem tente "simular" LangSmith com imagens inventadas.
+- Nenhuma migration foi necessária: traces não são persistidos em PostgreSQL.

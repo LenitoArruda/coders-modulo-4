@@ -10,9 +10,10 @@ import {
   E2E_SIGN_IN_DOMAIN,
   E2E_SIGN_IN_PASSWORD,
 } from "./support/fake-session";
+import { WEB_URL } from "./support/ports";
 
 const SIGN_IN_PATH = "/auth/sign-in";
-const BASE_URL = "http://127.0.0.1:3000";
+const BASE_URL = WEB_URL;
 
 const INVALID_MESSAGE = "Invalid email or password.";
 const NOT_CONFIRMED_MESSAGE = "Please confirm your email before signing in.";

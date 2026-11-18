@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { AuthModule } from "../auth/auth.module";
 import { CitationsModule } from "../citations/citations.module";
+import { ObservabilityModule } from "../observability/observability.module";
 import { loadEnv } from "../shared/config/env";
 
 import {
@@ -22,7 +23,7 @@ import { SendMessageRequestHandler } from "./interface/request-handlers/send-mes
  * never requires the optional OpenAI key to be present.
  */
 @Module({
-  imports: [AuthModule, CitationsModule],
+  imports: [AuthModule, CitationsModule, ObservabilityModule],
   controllers: [GetConversationRequestHandler, SendMessageRequestHandler],
   providers: [
     { provide: OPENAI_API_KEY, useFactory: () => loadEnv().openaiApiKey },

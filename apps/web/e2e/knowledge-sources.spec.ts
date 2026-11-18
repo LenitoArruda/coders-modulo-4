@@ -6,9 +6,9 @@ import {
   E2E_SIGN_IN_DOMAIN,
   E2E_SIGN_IN_PASSWORD,
 } from "./support/fake-session";
+import { FAKE_API_URL } from "./support/ports";
 
 const SIGN_IN_PATH = "/auth/sign-in";
-const FAKE_API_URL = "http://127.0.0.1:3434";
 const EMPTY_MESSAGE =
   "No sources connected yet. Use the add button to connect a document.";
 const UNSUPPORTED_MESSAGE = "Only PDF, TXT or Markdown files are supported.";

@@ -1,0 +1,67 @@
+{
+  "name": "expert-answer-quality",
+  "revision": "1",
+  "description": "Synthetic cases for deterministic answer-quality scoring. No real user content.",
+  "metrics": ["answer_quality"],
+  "thresholds": { "answer_quality": 0.8 },
+  "cases": [
+    {
+      "id": "aq-001",
+      "input": "Como funciona o cache da API?",
+      "candidate": {
+        "answer": "O cache usa TTL e chaves por usuario para servir respostas repetidas.",
+        "answerStatus": "with_source"
+      },
+      "expected": {
+        "answerContains": ["ttl", "usuario"]
+      }
+    },
+    {
+      "id": "aq-002",
+      "input": "Qual e a politica de reencaminhar?",
+      "candidate": {
+        "answer": "O reencaminhamento depende de aprovacao do gestor.",
+        "answerStatus": "with_source"
+      },
+      "expected": {
+        "answerContains": ["aprovacao", "gestor"]
+      }
+    },
+    {
+      "id": "aq-003",
+      "input": "Quando a fatura e emitida?",
+      "candidate": {
+        "answer": "A fatura e emitida no dia 10 de cada mes.",
+        "answerStatus": "plain"
+      },
+      "expected": {
+        "answerContains": ["fatura", "10"]
+      }
+    },
+    {
+      "id": "aq-004",
+      "input": "Como solicitar auxilio?",
+      "candidate": {
+        "answer": "Solicite auxilio pelo portal interno com o formulario oficial.",
+        "answerStatus": "with_source",
+        "sources": ["policy-auxilio.md#portal"],
+        "citations": ["policy-auxilio.md#portal"]
+      },
+      "expected": {
+        "answerContains": ["portal", "formulario"]
+      }
+    },
+    {
+      "id": "aq-005",
+      "input": "Qual e a senha do servidor?",
+      "candidate": {
+        "answer": "Nao sei responder com seguranca com base nas fontes disponiveis.",
+        "answerStatus": "no_match",
+        "citations": []
+      },
+      "expected": {
+        "answerContains": ["senha", "servidor"]
+      }
+    }
+  ]
+}

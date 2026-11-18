@@ -1,5 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 
+import { TraceEmitter } from "../../observability/application/trace-emitter";
+import { createRetrievalSpanMetadata } from "../../observability/domain/span-metadata";
+import type { TraceCorrelation } from "../../observability/domain/trace-span";
 import { log } from "../../shared/observability/app-logger";
 import {
   QUERY_EMBEDDING_MODEL,
@@ -20,6 +24,7 @@ export type RetrieveContextInput = {
   topK: number;
   threshold: number;
   maxContextChars: number;
+  trace?: TraceCorrelation | null;
 };
 
 function unavailableResult(
@@ -49,7 +54,48 @@ export class RetrieveContextUseCase {
     private readonly embeddings: QueryEmbeddingPort,
     private readonly retrieval: KnowledgeRetrievalPort,
     private readonly sources: CitationSourceMetadataPort,
+    @Optional()
+    @Inject(TraceEmitter)
+    private readonly traceEmitter: TraceEmitter | null = null,
   ) {}
+
+  private emitTrace(
+    input: RetrieveContextInput,
+    result: RetrievalResult,
+    startedAt: number,
+  ): void {
+    const status =
+      result.metadata.status === "unavailable"
+        ? "unavailable"
+        : result.status === "no_match"
+          ? "no_match"
+          : "ok";
+
+    this.traceEmitter?.emit({
+      id: randomUUID(),
+      traceId: input.trace?.traceId ?? randomUUID(),
+      parentSpanId: input.trace?.parentSpanId ?? null,
+      name: "expert.retrieval",
+      kind: "retrieval",
+      startedAt,
+      endedAt: Date.now(),
+      status,
+      userId: input.userId,
+      conversationId: input.trace?.conversationId,
+      messageId: input.trace?.messageId,
+      expertId: input.trace?.expertId,
+      modelId: result.metadata.queryEmbeddingModel,
+      metadata: createRetrievalSpanMetadata({
+        topK: result.metadata.topK,
+        threshold: result.metadata.threshold,
+        scores: result.metadata.scores,
+        sourceIds: [...new Set(result.chunks.map((chunk) => chunk.sourceId))],
+        chunksConsidered: result.metadata.chunksConsidered,
+        queryEmbeddingModel: result.metadata.queryEmbeddingModel,
+        vectorIndex: result.metadata.vectorIndex,
+      }),
+    });
+  }
 
   async execute(input: RetrieveContextInput): Promise<GroundingContext> {
     const startedAt = Date.now();
@@ -117,6 +163,7 @@ export class RetrieveContextUseCase {
         durationMs: result.metadata.latencyMs,
         outcome: status,
       });
+      this.emitTrace(input, result, startedAt);
 
       return buildGroundingContext(result, input.maxContextChars);
     } catch (error) {
@@ -129,6 +176,7 @@ export class RetrieveContextUseCase {
         outcome: "unavailable",
         error: error instanceof Error ? error.name : "unknown",
       });
+      this.emitTrace(input, result, startedAt);
 
       return buildGroundingContext(result, input.maxContextChars);
     }
