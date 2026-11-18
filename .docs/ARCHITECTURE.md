@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha + catálogo de Experts e chat implementados · **Atualizado em:** 2026-11-17
+> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha + catálogo de Experts, chat e fontes de conhecimento por arquivo implementados · **Atualizado em:** 2026-11-18
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
@@ -11,14 +11,16 @@ engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md).
 ## 1. Visão geral
 
 Monorepo **Turborepo** com **Bun**, contendo aplicações Next.js, uma API NestJS e pacotes
-compartilhados. A fundação entrega web, API e PostgreSQL local, e a primeira feature de produto —
-o catálogo de Experts e o chat em persona (spec 012) — já está implementada. O produto é uma
-plataforma de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
+compartilhados. A fundação entrega web, API e PostgreSQL local; a primeira feature de produto —
+o catálogo de Experts e o chat em persona (spec 012) — e a ingestão de fontes de conhecimento por
+arquivo (spec 013) já estão implementadas. O produto é uma plataforma de Experts
+(ver [BUSINESS.md](./BUSINESS.md)), com:
 
-- **Web app** para interação com Experts e gestão de conectores.
+- **Web app** para interação com Experts, conexão de arquivos locais e gestão de conectores.
 - **API** dedicada para regras de negócio, ingestão e orquestração de agents.
 - **PostgreSQL 18** como banco relacional; a **autenticação é própria da API** (JWT emitido pela
   API, sem provedor externo).
+- **Weaviate local** como banco de vetores da base de conhecimento, na porta HTTP 8080.
 - **Conectores externos** para trazer dados de Notion, Google Drive, Jira, PDF etc.
 
 ---
@@ -50,14 +52,14 @@ plataforma de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 └── bun.lock
 ```
 
-| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                                                                        |
-| ---------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação, troca de senha e chat com Experts na porta 3000                         |
-| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, catálogo de Experts, conversas com LangGraph, contrato de erro, env, CORS, logs e OTel na porta 3333 |
-| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                                                                  |
-| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                                                                |
-| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                                                          |
-| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                                                          |
+| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                                                                                                                                |
+| ---------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação, troca de senha, chat com Experts e painel de fontes de arquivo na porta 3000                                                    |
+| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, catálogo de Experts, conversas com LangGraph, fontes de arquivo com dedup/chunks/embeddings/Weaviate, contrato de erro, env, CORS, logs e OTel na porta 3333 |
+| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                                                                                                                          |
+| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                                                                                                                        |
+| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                                                                                                                  |
+| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                                                                                                                  |
 
 ---
 
@@ -79,6 +81,10 @@ plataforma de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 | Acesso ao banco (servidor)  | `pg` (SQL parametrizado)                 | 8.23.1           |
 | Orquestração de LLM         | LangChain.js + LangGraph                 | 1.4.1 / 1.7.5    |
 | Modelo (fatia 012)          | ChatOpenAI `gpt-4o-mini`                 | 1.8.4            |
+| Ingestão de arquivos        | `pdf-parse` (PDF) + decodificação UTF-8  | 2.4.5            |
+| Upload multipart            | `multer` (`@types/multer`)               | 2.5.0 (2.3.0)    |
+| Banco de vetores local      | Weaviate via REST/GraphQL (`fetch`)      | 1.40.5           |
+| Embeddings (fatia 013)      | OpenAI `text-embedding-3-small`          | 1536 dimensões   |
 | E-mail transacional         | Mailtrap SDK (dev) + Resend HTTP API     | 6.2.0 / —        |
 | Hash de senha               | `node:crypto` scrypt (ADR 0014)          | —                |
 | Banco local                 | PostgreSQL via Docker Compose            | 18               |
@@ -154,6 +160,11 @@ apps/api/src/
 │   │   ├── application/         # GetConversationUseCase, SendMessageUseCase, portas de repositório e responder
 │   │   ├── infrastructure/      # repositório `pg`, adapter LangGraph/ChatOpenAI
 │   │   └── interface/           # GET /conversations, POST /conversations/messages + integração
+│   ├── sources/
+│   │   ├── domain/              # Source, SourceVersion, Chunk, Document, política de arquivo e hash
+│   │   ├── application/         # conectar, listar, processar, excluir e retry; portas de extrator/embedding/vetor/repositório
+│   │   ├── infrastructure/      # repositório `pg`, `pdf-parse`, OpenAIEmbeddings e Weaviate REST
+│   │   └── interface/           # GET/POST /sources, DELETE /sources/:id, POST /sources/:versionId/retry
 │   ├── hello/
 │   │   ├── domain/
 │   │   ├── application/
@@ -165,10 +176,10 @@ apps/api/src/
 └── main.ts
 ```
 
-Os domínios `experts` e `conversations` (spec 012) seguem o mesmo formato; novos domínios
-(`connectors`, `documents`, `knowledge`) devem segui-lo, criando `infrastructure/` quando houver
-implementação concreta. `auth` e `conversations` são as referências de slices completos com as
-quatro camadas.
+Os domínios `experts` e `conversations` (spec 012) e `sources` (spec 013) seguem o mesmo formato;
+novos domínios (`connectors`, `documents`, `knowledge`) devem segui-lo, criando `infrastructure/`
+quando houver implementação concreta. `auth`, `conversations` e `sources` são as referências de
+slices completos com as quatro camadas.
 
 Regras:
 
@@ -580,6 +591,68 @@ Regras:
 - Telemetria `expert.chat` registra identificadores, duração e desfecho — nunca conteúdo de prompt ou resposta.
 - A UI é en-US, light-only, responsiva em 360/768/1280 px, com `aria-live` no transcript e `role="alert"` nos erros; header/perfil/logout permanecem intactos.
 
+### 4.12 Fontes de conhecimento por arquivo (fatia 013)
+
+A home privada passa a ter um botão flutuante (FAB) que abre um painel de fontes conectadas. O
+processo de ingestão é assíncrono do ponto de vista da interface: o upload registra a versão como
+`processing` e responde `202`; o processamento em segundo plano extrai texto, gera chunks e
+embeddings, grava vetores no Weaviate e só então marca a versão como `ready`.
+
+```text
+/app (web, server) ── Server Action (multipart) ──► POST /api/v1/sources
+        │                                             │ ConnectSourcesUseCase
+        │                                             ├─ SHA-256 + normalized_name → Source/SourceVersion
+        │                                             ├─ source_files (bytea)
+        │                                             └─ ProcessSourceVersionUseCase (background)
+        │                                                    ├─ pdf-parse / UTF-8 → chunkText
+        │                                                    ├─ OpenAIEmbeddings (text-embedding-3-small)
+        │                                                    └─ Weaviate KnowledgeChunk (REST)
+        ▼
+KnowledgeSources (client) ◄── Server Actions ◄── GET/DELETE/POST retry /api/v1/sources
+```
+
+| Peça                                     | Responsabilidade                                                                                                                      |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `sources/domain/source.ts`               | Contrato compartilhado `Source`, `SourceVersion`, `Chunk`, `Document` e `SourceSummary` reutilizado pelas fatias 3 a 7                |
+| `source-file-policy.ts`                  | Tipos aceitos, limites, `safeFileName`, normalização, SHA-256 e chunking determinístico                                               |
+| `ConnectSourcesUseCase`                  | Dedup por hash no escopo do usuário, agrupamento por nome normalizado, versionamento e submit assíncrono                              |
+| `ProcessSourceVersionUseCase`            | Extrai, faz chunks, gera embeddings, grava vetores e marca `ready`; falha parcial persiste `failed`                                   |
+| `DeleteSourceUseCase`                    | Remove vetores, arquivo original, versões e chunks do usuário; retry limpa vetores parciais antes de reprocessar                      |
+| `PostgresSourcesRepository`              | SQL parametrizado com `withDbSpan`, `user_id` em toda consulta; tabelas `sources`, `source_versions`, `source_files`, `source_chunks` |
+| `DocumentTextExtractorAdapter`           | PDF via `pdf-parse`; TXT/Markdown com `TextDecoder` fatal (conteúdo vazio ou inválido não vira `ready`)                               |
+| `OpenAIEmbeddingGeneratorAdapter`        | `OpenAIEmbeddings`, `text-embedding-3-small`, 1536 dimensões; chave injetada do servidor via `loadEnv().openaiApiKey`                 |
+| `WeaviateRestVectorStoreAdapter`         | Collection `KnowledgeChunk`, `vectorizer: none`, cosine, IDs determinísticos; REST/GraphQL na porta 8080 (sem gRPC)                   |
+| `source-actions.ts` / `KnowledgeSources` | Server Actions e painel com estados vazio, `processing`, `ready`, `failed`, duplicado, retry e remoção                                |
+
+Endpoints autenticados (`SessionGuard`):
+
+| Rota                                    | Resposta                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `GET /api/v1/sources`                   | `200 { sources: SourceSummary[] }` (somente versão atual de cada fonte) |
+| `POST /api/v1/sources`                  | `202 { results: ConnectedSourceResult[] }`; multipart `files` (até 5)   |
+| `DELETE /api/v1/sources/:sourceId`      | `204` sem corpo                                                         |
+| `POST /api/v1/sources/:versionId/retry` | `202 { versionId, status: "processing" }`                               |
+
+Regras:
+
+- Deduplicação é por SHA-256 do conteúdo bruto **no escopo de `user_id`**; o nome normalizado apenas
+  agrupa versões. O índice único parcial `(user_id, content_hash) where status <> 'failed'`
+  transforma corrida concorrente em “Already connected” sem duplicar versão ou vetor.
+- O arquivo original fica em `source_files.bytes` (`bytea`), sem caminho de filesystem nem nova
+  variável de ambiente. Versões antigas e seus vetores são retidos até a exclusão da fonte; a
+  versão anterior deixa de ser a atual e é sinalizada como desatualizada para a fatia 5.
+- `POST /sources` valida tipo, tamanho e quantidade na borda antes de persistir. O web replica a
+  validação no Server Action e define `experimental.serverActions.bodySizeLimit: "64mb"` para
+  cobrir cinco arquivos de até 10 MB mais overhead multipart.
+- Limites provisórios: `MAX_SOURCE_FILE_BYTES = 10 MB` e `MAX_FILES_PER_UPLOAD = 5`, centralizados
+  no domínio e espelhados no web. Limites definitivos, retenção e metas numéricas seguem em aberto.
+- Telemetria `knowledge.sources` registra apenas `userId`, IDs opacos, desfecho, duração e
+  `chunkCount`. Nunca conteúdo, nome de arquivo, hash, trecho extraído ou valor de chave de API.
+- Conteúdo de documento é tratado como dado não confiável: o chunker apenas divide texto; nenhuma
+  instrução dentro do arquivo altera regras do Expert, do chat ou da plataforma.
+- As suítes usam fakes (`InMemorySourcesRepository`, extrator/embedding/vetor em memória) e um
+  servidor HTTP local para o adaptador Weaviate. A chave real não é usada nos testes.
+
 ---
 
 ## 5. Fluxo de dados alvo
@@ -622,7 +695,11 @@ Fluxo resumido:
 > esqueleto de navegação (`/auth/*` público, `/app/*` privado com shell e guard, raiz
 > redirecionando por sessão), o catálogo de Experts (`GET /api/v1/experts`), o chat em persona com
 > LangGraph/`gpt-4o-mini` (`GET /api/v1/conversations` e `POST /api/v1/conversations/messages`) e
-> o histórico isolado por usuário. O schema de auth veio na fatia 001 e o de conversas na fatia 012.
+> o histórico isolado por usuário. A fatia 013 acrescenta o FAB/painel de fontes, o upload
+> multipart de PDF/TXT/Markdown, deduplicação por hash, chunks, embeddings e gravação no Weaviate
+> local (`KnowledgeChunk`), com listagem, retry e exclusão isolados por usuário. O schema de auth
+> veio na fatia 001, o de conversas na fatia 012 e o de fontes na fatia 013; os vetores ainda não
+> são consultados pelo chat (fatia 5 do épico).
 
 ---
 
@@ -660,6 +737,11 @@ tomadas.
 | Histórico por `(user_id, expert_id)`         | Isolamento por usuário autenticado, sem workspace, com `unique` e RLS                   | ✅                                           |
 | LangChain.js + LangGraph para responder      | Orquestração do modelo atrás de `ExpertResponderPort`, isolada da aplicação             | ✅                                           |
 | `OPENAI_API_KEY` opcional no boot            | Ausência gera `503 MODEL_UNAVAILABLE` só no envio; boot e testes seguem determinísticos | ✅                                           |
+| Dedup de fontes por SHA-256 por usuário      | Reenvio idêntico não cria versão, chunk ou vetor; índice único cobre concorrência       | ✅                                           |
+| Arquivo original em `bytea`                  | Exclusão atômica com a fonte, sem diretório compartilhado ou nova env var               | ✅                                           |
+| Weaviate local com vectorizer `none`         | Vetores vêm do `text-embedding-3-small`; distância cosine e IDs determinísticos         | ✅                                           |
+| Adaptador Weaviate por REST/GraphQL          | Compose expõe apenas a porta HTTP 8080; cliente v3 exigiria gRPC 50051                  | ✅                                           |
+| Limites provisórios 10 MB / 5 arquivos       | Validação centralizada no domínio e ecoada no web; definição final segue em aberto      | ✅ (follow-up)                               |
 
 ---
 
@@ -672,6 +754,9 @@ tomadas.
 | Multi-tenancy         | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                     |
 | `packages/shared`     | Quais contratos realmente serão compartilhados entre web e api?                                |
 | PostgreSQL gerenciado | Qual provedor (Neon, RDS, Cloud SQL) será usado em produção?                                   |
+| Limites de upload     | Tamanho máximo por arquivo e quantidade por envio definitivos (hoje 10 MB / 5, provisórios).   |
+| Retenção de fontes    | Por quanto tempo manter arquivo original, versões antigas, chunks e embeddings após a conexão. |
+| Metas de ingestão     | Latência e custo máximos aceitáveis por arquivo processado.                                    |
 
 ---
 

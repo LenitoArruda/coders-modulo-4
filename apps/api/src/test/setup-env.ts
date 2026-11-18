@@ -21,3 +21,6 @@ process.env.SIGN_IN_RATE_LIMIT_WINDOW_SECONDS = "60";
 process.env.RESET_PASSWORD_RATE_LIMIT_MAX = "5";
 process.env.RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = "60";
 process.env.EXPERT_PROMPT_MAX_LENGTH = "4000";
+process.env.WEAVIATE_URL = "http://127.0.0.1:8080";
+process.env.EMBEDDING_DIMENSIONS = "1536";
+process.env.OPENAI_API_KEY = "";

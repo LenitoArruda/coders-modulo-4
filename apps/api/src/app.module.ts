@@ -5,6 +5,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { ConversationsModule } from "./modules/conversations/conversations.module";
 import { ExpertsModule } from "./modules/experts/experts.module";
 import { HelloModule } from "./modules/hello/hello.module";
+import { SourcesModule } from "./modules/sources/sources.module";
 import { DatabaseModule } from "./modules/shared/database/database.module";
 import { ErrorContractFilter } from "./modules/shared/interface/error-contract.filter";
 
@@ -15,6 +16,7 @@ import { ErrorContractFilter } from "./modules/shared/interface/error-contract.f
     HelloModule,
     ExpertsModule,
     ConversationsModule,
+    SourcesModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: ErrorContractFilter }],
 })

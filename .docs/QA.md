@@ -1,6 +1,6 @@
 # QA.md — Qualidade e verificação
 
-> **Status:** ativo · **Atualizado em:** 2026-11-10
+> **Status:** ativo · **Atualizado em:** 2026-11-18
 > **Use antes de declarar qualquer tarefa concluída.**
 
 Este documento é a fonte de verdade sobre **como verificar** mudanças. Se um comando citado
@@ -15,6 +15,7 @@ aqui não existir no `package.json`, ele está marcado como 🧭 planejado.
 | Node.js                 | >= 24                               |
 | Bun                     | 1.4.4                               |
 | Docker Desktop          | em execução (PostgreSQL e LGTM)     |
+| Weaviate local          | `127.0.0.1:8080` (spec 013)         |
 | Dependências instaladas | `bun install`                       |
 | Navegador do Playwright | `bun x playwright install chromium` |
 
@@ -70,9 +71,12 @@ Execute na raiz do monorepo:
 > reset-password, o token `reset-token:<nome>:<único>` vale uma única vez e, ao ser usado, troca a
 > senha de `<nome>@signin.example.com` e revoga as sessões dela (a senha antiga passa a falhar);
 > `rate-limited-reset-token` responde `429`, qualquer outro token responde `INVALID_RESET_TOKEN` e
-> a senha é validada antes do token, como na API real. Não deixe um
-> `bun run dev` antigo ocupando a porta 3000 antes do E2E, pois o Playwright reutiliza o servidor
-> existente em modo local.
+> a senha é validada antes do token, como na API real. A fake também implementa
+> `GET/POST /api/v1/sources`, `DELETE /api/v1/sources/:sourceId` e
+> `POST /api/v1/sources/:versionId/retry`, com estado isolado por token: dedup por SHA-256, nomes
+> com `fail`/`broken`/`corrupt` entram como `failed` e voltam a `ready` no retry, e `pending`
+> permanece `processing` até o polling. Não deixe um `bun run dev` antigo ocupando a porta 3000
+> antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
 
 ### 2.1 Comando do OpenCode
 
@@ -349,6 +353,28 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] O boot loga `nodeEnv` e `emailProvider`, sem chaves, tokens ou conteúdo de e-mail.
 - [ ] `.env.example` separa os blocos de Mailtrap e Resend e não contém segredos reais.
 
+### 5.16 Fontes de conhecimento por arquivo (fatia 013)
+
+- [ ] FAB na home privada abre/fecha o painel, expõe `aria-expanded`/`aria-controls` e tem alvo ≥ 44 px.
+- [ ] Lista mostra nome, tipo, tamanho, versão, quantidade de chunks e status; estado vazio orienta o upload.
+- [ ] Upload de PDF/TXT/Markdown responde `202` com versão `processing`; polling leva a `ready`.
+- [ ] Conteúdo idêntico do mesmo usuário responde “Already connected” sem nova versão, chunk ou vetor.
+- [ ] Mesmo conteúdo em usuário diferente cria fonte distinta (isolamento por `user_id`).
+- [ ] Tipo não suportado, arquivo vazio, acima de 10 MB e mais de 5 arquivos são recusados com
+      mensagem en-US; `.env.example` e `docker-compose.yml` não são alterados.
+- [ ] Mesmo nome normalizado com conteúdo diferente cria nova `SourceVersion`; a anterior deixa de
+      ser a atual e é sinalizada como desatualizada.
+- [ ] Falha de extração/embedding/vetor persiste `failed`, nunca `ready`; `POST /:versionId/retry`
+      limpa vetores parciais e permite reprocessar.
+- [ ] Dois envios simultâneos do mesmo hash: índice único parcial deixa uma versão válida e o
+      conflito vira “Already connected”.
+- [ ] `DELETE /:sourceId` responde `204` e remove arquivo (`bytea`), versões, chunks e vetores;
+      conversas do usuário permanecem.
+- [ ] Logs/telemetria `knowledge.sources` e o cliente não contêm conteúdo, nome de arquivo, hash,
+      chave de API ou token de sessão.
+- [ ] E2E cobre FAB, upload misto, dedup, versionamento, pendente, inválido, retry, remoção,
+      isolamento, teclado/foco e 360/768/1280 px sem rolagem horizontal.
+
 ---
 
 ## 6. QA manual — template
@@ -444,3 +470,39 @@ Requisitos:
 | Sessão única sem atomicidade no banco       | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                             |
 
 Ao resolver uma lacuna, atualize esta tabela e o documento relacionado.
+
+---
+
+## 11. Evidências da spec 013 (2026-11-18)
+
+Executadas na raiz do monorepo, em `spec/013`, com `OPENAI_API_KEY` disponível apenas no ambiente
+do servidor e sem chamada real à OpenAI durante os testes:
+
+| Comando                               | Resultado                                                                     |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| `bun run lint`                        | ok (todos os pacotes)                                                         |
+| `bun run types:check`                 | ok (todos os pacotes)                                                         |
+| `bun run test`                        | ok — API: 64 arquivos / 421 testes; web: 11 arquivos / 137 testes             |
+| Subconjunto `sources` da API (Vitest) | ok — 6 arquivos / 35 testes                                                   |
+| `bun run build`                       | ok — 2 tarefas Turbo (`api`, `web`), 13,64 s                                  |
+| `bun run test:e2e`                    | ok — 136 testes, ~2,5 min, incluindo os 13 cenários de fontes de conhecimento |
+
+Cobertura adicional da fatia 013:
+
+- Adaptador Weaviate validado contra servidor HTTP local (REST/GraphQL na porta 8080), sem gRPC.
+- Extrator, embeddings e repositório validados com fakes; nenhum documento real foi enviado e nenhum
+  valor de chave foi lido, exibido ou registrado.
+- Fake API do E2E implementa `GET/POST /api/v1/sources`, `DELETE /api/v1/sources/:sourceId` e
+  `POST /api/v1/sources/:versionId/retry`, com isolamento por token e dedup por SHA-256.
+- Telemetria `knowledge.sources` limitada a IDs opacos, `operation`, `outcome`, `durationMs`,
+  `chunkCount`, `userId` e códigos genéricos de erro; sem conteúdo, nome de arquivo, hash, token ou
+  chave de API.
+
+Limitação registrada:
+
+- `bun run db:migrate` foi executado uma vez e falhou com `ECONNREFUSED 127.0.0.1:5433`; não foi
+  repetido e nenhum comando destrutivo de banco foi executado. A migração aditiva
+  `0003_knowledge_sources.sql` e o teste `003_knowledge_sources.test.sql` foram entregues, mas a
+  aplicação local do schema não foi confirmada.
+- `bun run db:test` não foi autorizado para esta entrega e não foi executado. A validação real com
+  PostgreSQL, Weaviate e OpenAI segue como follow-up de integração.
