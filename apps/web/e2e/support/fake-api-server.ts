@@ -112,12 +112,42 @@ function readJsonBody(request: IncomingMessage): Promise<unknown> {
   });
 }
 
+type ChatCitation = {
+  citationNumber: number;
+  sourceId: string;
+  sourceVersionId: string;
+  chunkIndex: number;
+  sourceName: string;
+  sourceType: string;
+  location: { label: string; page?: number };
+  snippet: string;
+  isStale: boolean;
+  sourceRemoved: boolean;
+};
+
 type ChatMessage = {
   id: string;
   role: "user" | "expert";
   content: string;
   createdAt: string;
+  citations?: ChatCitation[];
+  retrieval?: {
+    queryEmbeddingModel: string;
+    vectorIndex: string;
+    topK: number;
+    threshold: number;
+    scores: number[];
+    latencyMs: number;
+    chunksConsidered: number;
+    status: "matched" | "no_match" | "unavailable";
+  };
+  answerStatus?: "plain" | "with_source" | "no_match" | "retrieval_unavailable";
 };
+
+const RAG_NO_MATCH_ANSWER =
+  "I couldn't find a basis in your connected knowledge for that question. Connect a source or try rephrasing it.";
+const RAG_UNAVAILABLE_NOTICE =
+  "Knowledge search is unavailable right now. Try again to include sources.";
 
 type StoredConversation = {
   conversationId: string;
@@ -163,6 +193,92 @@ function nextChatId(prefix: string): string {
   chatSequence += 1;
 
   return `${prefix}-${chatSequence}`;
+}
+
+function ragMetadata(
+  status: "matched" | "no_match" | "unavailable",
+  scores: number[],
+): NonNullable<ChatMessage["retrieval"]> {
+  return {
+    queryEmbeddingModel: "text-embedding-3-small",
+    vectorIndex: "KnowledgeChunk",
+    topK: 5,
+    threshold: 0.35,
+    scores,
+    latencyMs: 18,
+    chunksConsidered: scores.length,
+    status,
+  };
+}
+
+/**
+ * Deterministic RAG responses driven by prompt prefixes. Existing chat tests
+ * never use these prefixes, so their plain fatia 1 behavior stays unchanged.
+ */
+function groundedExpertMessage(
+  expert: { name: string },
+  prompt: string,
+  id: string,
+): ChatMessage {
+  const normalized = prompt.toLowerCase();
+
+  if (normalized.startsWith("vector-down:")) {
+    return {
+      id,
+      role: "expert",
+      content: `${RAG_UNAVAILABLE_NOTICE} As the ${expert.name}, here is a focused answer.`,
+      createdAt: new Date().toISOString(),
+      retrieval: ragMetadata("unavailable", []),
+      answerStatus: "retrieval_unavailable",
+    };
+  }
+
+  if (normalized.startsWith("nomatch:")) {
+    return {
+      id,
+      role: "expert",
+      content: RAG_NO_MATCH_ANSWER,
+      createdAt: new Date().toISOString(),
+      retrieval: ragMetadata("no_match", []),
+      answerStatus: "no_match",
+    };
+  }
+
+  const stale = normalized.startsWith("stale:");
+  const removed = normalized.startsWith("removed:");
+  const grounded = stale || removed || normalized.startsWith("cite:");
+
+  if (!grounded) {
+    return {
+      id,
+      role: "expert",
+      content: `As the ${expert.name}, here is a focused answer.`,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  const citation: ChatCitation = {
+    citationNumber: 1,
+    sourceId: "src-rag-1",
+    sourceVersionId: stale ? "ver-old" : "ver-current",
+    chunkIndex: 0,
+    sourceName: "engineering-handbook.txt",
+    sourceType: "txt",
+    location: { label: "Chunk 1", page: 7 },
+    snippet: "Ship in small batches and keep the roadmap visible.",
+    isStale: stale,
+    sourceRemoved: removed,
+  };
+
+  return {
+    id,
+    role: "expert",
+    content: `As the ${expert.name}, the connected knowledge says: [1]`,
+    createdAt: new Date().toISOString(),
+    citations: [citation],
+    retrieval: ragMetadata("matched", [0.91]),
+    answerStatus: "with_source",
+  };
 }
 
 function signUpFieldErrors(body: Body): Body {
@@ -1349,12 +1465,11 @@ async function handleSendMessage(
     content: prompt,
     createdAt: new Date().toISOString(),
   };
-  const expertMessage: ChatMessage = {
-    id: nextChatId("msg"),
-    role: "expert",
-    content: `As the ${expert.name}, here is a focused answer.`,
-    createdAt: new Date().toISOString(),
-  };
+  const expertMessage = groundedExpertMessage(
+    expert,
+    prompt,
+    nextChatId("msg"),
+  );
 
   stored.messages.push(userMessage, expertMessage);
   sendJson(response, 201, {

@@ -13,11 +13,48 @@ export type Expert = {
   suggestions: string[];
 };
 
+export type CitationLocation = {
+  page?: number;
+  line?: number;
+  timestampSeconds?: number;
+  label: string;
+};
+
+export type Citation = {
+  citationNumber: number;
+  sourceId: string;
+  sourceVersionId: string;
+  chunkIndex: number;
+  sourceName: string;
+  sourceType: string;
+  location: CitationLocation;
+  snippet: string;
+  isStale: boolean;
+  sourceRemoved: boolean;
+};
+
+export type RetrievalMetadata = {
+  queryEmbeddingModel: string;
+  vectorIndex: string;
+  topK: number;
+  threshold: number;
+  scores: number[];
+  latencyMs: number;
+  chunksConsidered: number;
+  status: "matched" | "no_match" | "unavailable";
+};
+
+export type AnswerStatus =
+  "plain" | "with_source" | "no_match" | "retrieval_unavailable";
+
 export type ChatMessage = {
   id: string;
   role: "user" | "expert";
   content: string;
   createdAt: string;
+  citations?: Citation[];
+  retrieval?: RetrievalMetadata | null;
+  answerStatus?: AnswerStatus;
 };
 
 export type ExpertsResponse = {

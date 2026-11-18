@@ -1,5 +1,24 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 
+import { ComposeCitedAnswerUseCase } from "../../citations/application/compose-cited-answer.use-case";
+import { RetrieveContextUseCase } from "../../citations/application/retrieve-context.use-case";
+import {
+  RAG_CITATIONS_ENABLED,
+  RAG_MAX_CONTEXT_CHARS,
+  RAG_MAX_HISTORY_MESSAGES,
+  RAG_THRESHOLD,
+  RAG_TOP_K,
+} from "../../citations/citations.tokens";
+import type {
+  GroundedAnswer,
+  GroundingContext,
+} from "../../citations/domain/citation";
+import {
+  DEFAULT_RAG_MAX_CONTEXT_CHARS,
+  DEFAULT_RAG_MAX_HISTORY_MESSAGES,
+  DEFAULT_RAG_THRESHOLD,
+  DEFAULT_RAG_TOP_K,
+} from "../../shared/config/env";
 import { getExpertById } from "../../experts/domain/expert-catalog";
 import {
   ModelUnavailableError,
@@ -25,10 +44,10 @@ export type SendMessageResult = {
 };
 
 /**
- * Validates the Expert, asks the model and persists both sides of the exchange.
- * A model failure happens before persistence, so no partial reply is stored.
- * Telemetry carries identifiers, duration and outcome only — never the prompt
- * or the response.
+ * Validates the Expert, optionally grounds the answer in the user's connected
+ * knowledge, asks the model and persists both sides of the exchange. A model
+ * failure happens before persistence, so no partial reply is stored. Telemetry
+ * carries identifiers, duration and outcome only — never prompt or response.
  */
 @Injectable()
 export class SendMessageUseCase {
@@ -37,6 +56,27 @@ export class SendMessageUseCase {
     private readonly conversations: ConversationsRepositoryPort,
     @Inject(ExpertResponderPort)
     private readonly responder: ExpertResponderPort,
+    @Optional()
+    @Inject(RAG_CITATIONS_ENABLED)
+    private readonly ragEnabled: boolean = false,
+    @Optional()
+    @Inject(RetrieveContextUseCase)
+    private readonly retrieveContext: RetrieveContextUseCase | null = null,
+    @Optional()
+    @Inject(ComposeCitedAnswerUseCase)
+    private readonly composeAnswer: ComposeCitedAnswerUseCase | null = null,
+    @Optional()
+    @Inject(RAG_TOP_K)
+    private readonly topK: number = DEFAULT_RAG_TOP_K,
+    @Optional()
+    @Inject(RAG_THRESHOLD)
+    private readonly threshold: number = DEFAULT_RAG_THRESHOLD,
+    @Optional()
+    @Inject(RAG_MAX_CONTEXT_CHARS)
+    private readonly maxContextChars: number = DEFAULT_RAG_MAX_CONTEXT_CHARS,
+    @Optional()
+    @Inject(RAG_MAX_HISTORY_MESSAGES)
+    private readonly maxHistoryMessages: number = DEFAULT_RAG_MAX_HISTORY_MESSAGES,
   ) {}
 
   async execute(input: SendMessageInput): Promise<SendMessageResult> {
@@ -71,10 +111,45 @@ export class SendMessageUseCase {
       expert.id,
     );
 
+    const retriever = this.retrieveContext;
+    const canRetrieve = this.ragEnabled && retriever !== null;
+    const grounding: GroundingContext | null =
+      canRetrieve && retriever !== null
+        ? await retriever.execute({
+            userId: input.userId,
+            prompt: input.prompt,
+            topK: this.topK,
+            threshold: this.threshold,
+            maxContextChars: this.maxContextChars,
+          })
+        : null;
+    const history: ConversationMessage[] =
+      grounding !== null && existingConversation !== null
+        ? (
+            await this.conversations.listMessages(
+              existingConversation.id,
+              input.userId,
+            )
+          ).slice(-this.maxHistoryMessages)
+        : [];
+
     let reply: string;
+    let groundedAnswer: GroundedAnswer | null = null;
 
     try {
-      reply = await this.responder.respond(expert, input.prompt);
+      reply = await this.responder.respond(
+        expert,
+        input.prompt,
+        grounding,
+        history,
+      );
+
+      if (grounding !== null) {
+        const composer = this.composeAnswer ?? new ComposeCitedAnswerUseCase();
+
+        groundedAnswer = composer.execute(reply, grounding);
+        reply = groundedAnswer.content;
+      }
     } catch (error) {
       log("warn", "expert.chat", {
         event: "response.failed",
@@ -100,7 +175,17 @@ export class SendMessageUseCase {
     const exchange = await this.conversations.appendExchange(
       conversation.id,
       input.userId,
-      { userContent: input.prompt, expertContent: reply },
+      {
+        userContent: input.prompt,
+        expertContent: reply,
+        ...(groundedAnswer === null
+          ? {}
+          : {
+              citations: groundedAnswer.citations,
+              retrieval: groundedAnswer.retrieval,
+              answerStatus: groundedAnswer.answerStatus,
+            }),
+      },
     );
 
     log("info", "expert.chat", {
@@ -110,7 +195,7 @@ export class SendMessageUseCase {
       conversationId: conversation.id,
       messageId: exchange.expertMessage.id,
       durationMs: Date.now() - startedAt,
-      outcome: "ok",
+      outcome: groundedAnswer === null ? "ok" : groundedAnswer.answerStatus,
     });
 
     return {

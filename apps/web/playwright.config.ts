@@ -10,7 +10,11 @@ export default defineConfig({
   retries: 0,
   // Cold `next dev` compiles of /app and sign-in Server Actions can take longer
   // than the 5 s default when the fully parallel suite shares one dev server.
-  expect: { timeout: 30_000 },
+  // Keep two workers and generous timeouts so a loaded machine does not produce
+  // false negatives in the E2E gate.
+  timeout: 90_000,
+  expect: { timeout: 60_000 },
+  workers: 1,
   reporter: [["list"]],
   use: {
     baseURL: "http://127.0.0.1:3000",

@@ -1,6 +1,8 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha + catálogo de Experts, chat, fontes de conhecimento por arquivo e por URL implementados · **Atualizado em:** 2026-11-18
+> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha + catálogo
+> de Experts, chat, fontes de arquivo, URL e mídia, recuperação vetorial e citações implementados ·
+> **Atualizado em:** 2026-11-18
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
@@ -11,9 +13,9 @@ engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md).
 ## 1. Visão geral
 
 Monorepo **Turborepo** com **Bun**, contendo aplicações Next.js, uma API NestJS e pacotes
-compartilhados. A fundação entrega web, API e PostgreSQL local; a primeira feature de produto —
-o catálogo de Experts e o chat em persona (spec 012) — e a ingestão de fontes de conhecimento por
-arquivo (spec 013) e por URL pública (spec 014) já estão implementadas. O produto é uma plataforma de Experts
+compartilhados. A fundação entrega web, API e PostgreSQL local; o catálogo de Experts e o chat em
+persona (spec 012), a ingestão de fontes de arquivo (013), URL (014) e mídia (015), e a recuperação
+vetorial com citações inline (016) já estão implementadas. O produto é uma plataforma de Experts
 (ver [BUSINESS.md](./BUSINESS.md)), com:
 
 - **Web app** para interação com Experts, conexão de arquivos locais e URLs públicas, e gestão de conectores.
@@ -52,14 +54,14 @@ arquivo (spec 013) e por URL pública (spec 014) já estão implementadas. O pro
 └── bun.lock
 ```
 
-| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                                                                                                                                      |
-| ---------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação, troca de senha, chat com Experts e painel de fontes de arquivo e URL na porta 3000                                                    |
-| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, catálogo de Experts, conversas com LangGraph, fontes de arquivo e URL com dedup/chunks/embeddings/Weaviate, contrato de erro, env, CORS, logs e OTel na porta 3333 |
-| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                                                                                                                                |
-| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                                                                                                                              |
-| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                                                                                                                        |
-| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                                                                                                                        |
+| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                                                                                                                                                                             |
+| ---------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação, troca de senha, chat com Experts, painel de fontes de arquivo/URL/mídia, citações inline e painel de origem na porta 3000                                                    |
+| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, catálogo de Experts, conversas com LangGraph, fontes de arquivo/URL/mídia com dedup/chunks/embeddings/Weaviate, recuperação vetorial com citações, contrato de erro, env, CORS, logs e OTel na porta 3333 |
+| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                                                                                                                                                                       |
+| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                                                                                                                                                                     |
+| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                                                                                                                                                               |
+| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                                                                                                                                                               |
 
 ---
 
@@ -160,6 +162,11 @@ apps/api/src/
 │   │   ├── application/         # GetConversationUseCase, SendMessageUseCase, portas de repositório e responder
 │   │   ├── infrastructure/      # repositório `pg`, adapter LangGraph/ChatOpenAI
 │   │   └── interface/           # GET /conversations, POST /conversations/messages + integração
+│   ├── citations/
+│   │   ├── domain/              # Citation, RetrievalResult, politicas de dedupe/contexto/sanitizacao
+│   │   ├── application/         # RetrieveContextUseCase, ComposeCitedAnswerUseCase, RefreshCitationsUseCase + portas
+│   │   ├── infrastructure/      # embedding de query, Weaviate GraphQL e metadados de fontes via `pg`
+│   │   └── interface/           # sem endpoints; consumida pela slice conversations
 │   ├── sources/
 │   │   ├── domain/              # Source, SourceVersion, Chunk, Document, políticas de arquivo/URL e hash
 │   │   ├── application/         # conectar arquivo/URL, listar, processar, excluir e retry; portas de extrator/embedding/vetor/repositório/fetch
@@ -176,10 +183,10 @@ apps/api/src/
 └── main.ts
 ```
 
-Os domínios `experts` e `conversations` (spec 012) e `sources` (specs 013 e 014) seguem o mesmo formato;
-novos domínios (`connectors`, `documents`, `knowledge`) devem segui-lo, criando `infrastructure/`
-quando houver implementação concreta. `auth`, `conversations` e `sources` são as referências de
-slices completos com as quatro camadas.
+Os domínios `experts` e `conversations` (spec 012), `sources` (specs 013–015) e `citations`
+(spec 016) seguem o mesmo formato; novos domínios (`connectors`, `documents`, `knowledge`) devem
+seguí-lo, criando `infrastructure/` quando houver implementação concreta. `auth`, `conversations`,
+`sources` e `citations` são as referências de slices completos, com `citations` sem endpoints próprios.
 
 Regras:
 
@@ -214,13 +221,13 @@ O schema de auth é criado em `db/migrations/` e é de uso **exclusivo da API**;
 acessa essas tabelas (RLS habilitado, nenhuma policy pública). A API acessa o banco como o usuário
 `postgres` do Compose, via pool `pg` e SQL parametrizado (ADR 0016).
 
-| Tabela          | Papel                                                                                            |
-| --------------- | ------------------------------------------------------------------------------------------------ |
-| `users`         | Conta da pessoa: nome, e-mail normalizado e único, hash de senha e confirmação de e-mail         |
-| `auth_tokens`   | Tokens opacos de uso único para confirmação de e-mail e reset de senha, persistidos só como hash |
-| `sessions`      | Registro server-side das sessões emitidas pela API, com expiração e revogação                    |
-| `conversations` | Uma conversa por `(user_id, expert_id)`; dono e Expert da troca (spec 012)                       |
-| `messages`      | Mensagens `user`/`expert` de uma conversa, com conteúdo e data/hora                              |
+| Tabela          | Papel                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`         | Conta da pessoa: nome, e-mail normalizado e único, hash de senha e confirmação de e-mail                                                    |
+| `auth_tokens`   | Tokens opacos de uso único para confirmação de e-mail e reset de senha, persistidos só como hash                                            |
+| `sessions`      | Registro server-side das sessões emitidas pela API, com expiração e revogação                                                               |
+| `conversations` | Uma conversa por `(user_id, expert_id)`; dono e Expert da troca (spec 012)                                                                  |
+| `messages`      | Mensagens `user`/`expert` de uma conversa, com conteúdo, data/hora e campos opcionais `citations`, `retrieval` e `answer_status` (spec 016) |
 
 Regras centrais:
 
@@ -749,6 +756,59 @@ Regras:
   embedding continua exclusivamente no servidor via `SOURCE_OPENAI_API_KEY`.
 - Modelos/formatos adicionais, OCR de frames e limites definitivos seguem como decisões abertas na
   spec; nenhum arquivo da fatia 014 (URLs) foi alterado.
+
+### 4.15 Recuperação, citações e painel de fontes (fatia 5 / spec 016)
+
+O slice `citations` liga o chat da fatia 012 à base vetorial da fatia 013. Ele não expõe rotas:
+`SendMessageUseCase` e `GetConversationUseCase` o consomem por portas. A flag
+`RAG_CITATIONS_ENABLED` (padrão `false`) controla a recuperação; com ela desligada, o chat é
+idêntico ao da fatia 012 e nenhum campo novo é gravado. O histórico com citações continua legível
+mesmo após desligar a flag.
+
+```text
+POST /conversations/messages ─► SendMessageUseCase
+        │                          ├─ RetrieveContextUseCase (embed → Weaviate → metadados)
+        │                          ├─ ExpertResponderPort (prompt aterrado, fontes como dados)
+        │                          └─ ComposeCitedAnswerUseCase ([n] validado → mensagem)
+        ▼
+GET /conversations ───────────► GetConversationUseCase ─► RefreshCitationsUseCase
+        ▼
+CitedContent/CitationPanel (web): citação clicável + painel lateral, fechável com Esc
+```
+
+| Peça                                  | Responsabilidade                                                                                                                                     |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `citations/domain/citation.ts`        | Contrato `Citation`, `RetrievalMetadata`, `GroundingContext`, `GroundedAnswer` e estados `plain`, `with_source`, `no_match`, `retrieval_unavailable` |
+| `citation-policy.ts`                  | Dedupe por `chunkId`, limiar, orçamento de caracteres, bloco de dados não confiáveis e remoção de `[n]` fora do intervalo injetado                   |
+| `QueryEmbeddingPort` / OpenAI adapter | Embedding da pergunta com `text-embedding-3-small`; chave apenas no servidor                                                                         |
+| `KnowledgeRetrievalPort` / Weaviate   | GraphQL `nearVector` em `KnowledgeChunk`, filtro obrigatório `userId`, `limit = topK` e timeout de 4 s                                               |
+| `CitationSourceMetadataPort` / `pg`   | Nome, tipo, versão atual, `isStale` e `sourceRemoved`; sem conteúdo de arquivo ou caminho absoluto                                                   |
+| `RetrieveContextUseCase`              | Orquestra recuperação, dedupe, seleção por relevância e metadados; falha vira `unavailable`                                                          |
+| `ComposeCitedAnswerUseCase`           | Sanitiza a resposta do modelo contra os trechos efetivamente injetados                                                                               |
+| `RefreshCitationsUseCase`             | Recalcula `isStale`/`sourceRemoved` ao ler o histórico, preservando o texto da citação                                                               |
+| `CitedContent` / `CitationPanel`      | Renderiza `[n]` como botões acessíveis, abre nome/tipo/localização/trecho e fecha com `Esc`                                                          |
+
+Configurações centrais: `RAG_TOP_K = 5`, `RAG_THRESHOLD = 0.35` (certainty do Weaviate),
+`RAG_MAX_CONTEXT_CHARS = 6000` e `RAG_MAX_HISTORY_MESSAGES = 6`. A migração aditiva
+`0005_rag_citations.sql` acrescenta `citations`, `retrieval` e `answer_status` a `messages`, sem
+alterar mensagens antigas e sem migração descendente executada. Nenhum arquivo da slice `sources`
+foi alterado: o contrato `KnowledgeChunk` é reusado e tipos novos de fonte são tolerados.
+
+Regras:
+
+- Toda consulta ao vetorial e aos metadados usa o `user_id` autenticado; não há workspace.
+- Trechos recuperados são dados não confiáveis em bloco delimitado; instruções dentro deles nunca
+  alteram papel, tom ou regras de citação do Expert.
+- Citação fora de `[1..k]` é removida; fonte inexistente não é inventada. A ordem das citações
+  segue a relevância da recuperação.
+- Sem trecho acima do limiar, a resposta diz que não encontrou base e não mostra citações.
+- Falha do Weaviate gera aviso en-US acionável, resposta básica sem citações e botão
+  "Retry search"; falha do modelo continua `503 MODEL_UNAVAILABLE`, sem detalhes técnicos e sem
+  persistência parcial.
+- Fonte antiga é sinalizada como "Outdated source"; fonte removida mantém o texto e desabilita o
+  botão com "Source removed".
+- Telemetria `rag.*` registra IDs opacos, contagens, duração e desfecho; nunca prompt, trecho,
+  chave de API, hash de conteúdo ou token de sessão.
 
 ---
 

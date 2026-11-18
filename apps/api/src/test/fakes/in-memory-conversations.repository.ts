@@ -92,6 +92,15 @@ export class InMemoryConversationsRepository extends ConversationsRepositoryPort
       role: "expert",
       content: exchange.expertContent,
       createdAt: new Date(Date.now() + 1),
+      ...(exchange.citations === undefined
+        ? {}
+        : { citations: exchange.citations }),
+      ...(exchange.retrieval === undefined
+        ? {}
+        : { retrieval: exchange.retrieval }),
+      ...(exchange.answerStatus === undefined
+        ? {}
+        : { answerStatus: exchange.answerStatus }),
     };
 
     this.messages.push(userMessage, expertMessage);

@@ -1,7 +1,7 @@
 # Respostas com recuperação e citações — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-17
+> **Status:** done
+> **Atualizado em:** 2026-11-18
 > **Autor:** OpenCode Agent
 > **Épico:** `.plans/012-expert-platform-breakdown.md` (fatia 5)
 > **Depende de:** `.specs/012-expert-chat.md`, `.specs/013-knowledge-files.md`
@@ -195,10 +195,10 @@ sugestões, dropdown de expert e histórico permanecem funcionando.
 
 ## 12. Rollout e migração
 
-- Habilitar RAG e citações com flag `rag_citations_enabled`, desligada por padrão; quando
+- Habilitar RAG e citações com a flag `RAG_CITATIONS_ENABLED`, desligada por padrão; quando
   desligada, o chat se comporta exatamente como na fatia 1.
-- Nenhuma migração obrigatória: mensagens antigas seguem sem citações; novas mensagens
-  passam a incluir os novos campos opcionais.
+- A migração `0005_rag_citations.sql` é aditiva: mensagens antigas seguem sem citações; novas
+  mensagens passam a incluir os campos opcionais quando a recuperação é executada.
 - Rollback: desligar a flag; histórico com citações continua legível, mas novas respostas
   voltam ao modo fatia 1.
 - Comunicação: explicar que o Expert agora procura nas fontes conectadas e mostra de onde
@@ -221,37 +221,37 @@ sugestões, dropdown de expert e histórico permanecem funcionando.
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um usuário com fontes conectadas, quando ele envia uma pergunta sobre o conteúdo,
+- [x] Dado um usuário com fontes conectadas, quando ele envia uma pergunta sobre o conteúdo,
       então o Expert responde com pelo menos uma citação válida `[n]`.
-- [ ] Dado uma citação exibida, quando o usuário clica nela, então o trecho original da fonte
+- [x] Dado uma citação exibida, quando o usuário clica nela, então o trecho original da fonte
       é aberto com nome, tipo e localização.
-- [ ] Dado um usuário sem fontes conectadas, quando ele envia uma pergunta, então o Expert
+- [x] Dado um usuário sem fontes conectadas, quando ele envia uma pergunta, então o Expert
       responde como na fatia 1 e nenhum bloco de fontes é exibido.
-- [ ] Dado um prompt sem trecho relevante acima do limiar, quando o Expert responde, então
+- [x] Dado um prompt sem trecho relevante acima do limiar, quando o Expert responde, então
       ele afirma não ter encontrado base e não exibe citações.
-- [ ] Dado um trecho recuperado de `SourceVersion` antiga, quando ele é citado, então a
+- [x] Dado um trecho recuperado de `SourceVersion` antiga, quando ele é citado, então a
       interface exibe aviso de fonte desatualizada.
-- [ ] Dado uma fonte excluída após uma resposta citada, quando a conversa é recarregada, então o
+- [x] Dado uma fonte excluída após uma resposta citada, quando a conversa é recarregada, então o
       texto da citação permanece, o link é desabilitado e a interface exibe "Source removed".
-- [ ] Dado dois usuários autenticados, quando um faz pergunta sobre fonte do outro, então a
+- [x] Dado dois usuários autenticados, quando um faz pergunta sobre fonte do outro, então a
       recuperação não retorna essa fonte.
-- [ ] Dado o Weaviate indisponível, quando o usuário envia uma pergunta, então o sistema
+- [x] Dado o Weaviate indisponível, quando o usuário envia uma pergunta, então o sistema
       exibe erro legível e oferece nova tentativa, sem inventar citações.
-- [ ] Dado um documento conectado com instrução para ignorar o papel do Expert, quando ele é
+- [x] Dado um documento conectado com instrução para ignorar o papel do Expert, quando ele é
       recuperado, então o Expert mantém papel, tom e regras de citação.
-- [ ] Dado uma resposta com citações, quando a conversa é recarregada, então as citações e os
+- [x] Dado uma resposta com citações, quando a conversa é recarregada, então as citações e os
       metadados de recuperação continuam disponíveis no histórico.
-- [ ] Dado um usuário usando teclado, quando ele percorre as citações, então cada uma tem
+- [x] Dado um usuário usando teclado, quando ele percorre as citações, então cada uma tem
       texto descritivo, foco visível e o painel pode ser fechado com `Esc`.
 
 ## 15. Decisões e questões abertas
 
-| Tema                      | Decisão ou pergunta                                                                                                    | Impacto                                        | Dono                 | Status   |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | -------------------- | -------- |
-| Parâmetros de recuperação | Definir `topK` e limiar de similaridade iniciais.                                                                      | Afeta precisão, cobertura e custo.             | Time de IA + Usuário | aberta   |
-| Formato da citação        | Confirmar `[n]` inline + lista abaixo da resposta.                                                                     | Define renderização no chat e no histórico.    | Usuário              | aberta   |
-| Abertura do trecho        | Modal ou painel lateral?                                                                                               | Impacta UX e acessibilidade.                   | Usuário              | aberta   |
-| Fonte desatualizada       | Aviso visual na citação quando `SourceVersion` não é a atual; sem bloqueio nem reprocessamento automático nesta fatia. | Define política de confiança.                  | Usuário + Time de IA | decidida |
-| Prompt contra fontes      | Permitir que o usuário peça ao Expert para ignorar fontes?                                                             | Pode conflitar com requisito de fundamentação. | Usuário              | aberta   |
-| Modelo de embedding       | Confirmar o mesmo modelo da fatia 2 para consultas.                                                                    | Garante compatibilidade dos vetores.           | Time de IA           | aberta   |
-| Orçamento de tokens       | Definir limite de histórico e trechos por resposta.                                                                    | Controla custo e latência.                     | Time de IA           | aberta   |
+| Tema                      | Decisão                                                                                                                     | Impacto                                     | Dono                 | Status   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | -------------------- | -------- |
+| Parâmetros de recuperação | `RAG_TOP_K = 5` e `RAG_THRESHOLD = 0.35` (certainty do Weaviate), ambos configuráveis.                                      | Afeta precisão, cobertura e custo.          | Time de IA + Usuário | decidida |
+| Formato da citação        | `[n]` inline, com citações válidas também listadas no painel lateral de fontes.                                             | Define renderização no chat e no histórico. | Usuário              | decidida |
+| Abertura do trecho        | Painel lateral (drawer), com nome, tipo, localização e trecho exato; fechamento por `Esc`.                                  | Define UX e acessibilidade.                 | Usuário              | decidida |
+| Fonte desatualizada       | Aviso "Outdated source" na citação quando `SourceVersion` não é a atual; sem bloqueio nem reprocessamento automático.       | Define política de confiança.               | Usuário + Time de IA | decidida |
+| Prompt contra fontes      | A recuperação sempre ocorre com a flag ligada; mensagem e trechos são dados não confiáveis e não alteram regras de citação. | Evita conflito com a fundamentação.         | Usuário              | decidida |
+| Modelo de embedding       | `text-embedding-3-small`, o mesmo da fatia 013, também para a consulta.                                                     | Garante compatibilidade dos vetores.        | Time de IA           | decidida |
+| Orçamento de tokens       | Até 6 mensagens recentes e 6.000 caracteres de contexto recuperado por resposta.                                            | Controla custo e latência.                  | Time de IA           | decidida |
