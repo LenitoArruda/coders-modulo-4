@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import {
   ConfigurationError,
@@ -471,6 +471,50 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ ...validEnv, WEB_ORIGIN: "not-a-url" })).toThrow(
       /WEB_ORIGIN/,
     );
+  });
+
+  it("deve manter mídia desativada por padrão com limites seguros", () => {
+    expect(loadEnv(validEnv)).toMatchObject({
+      multimediaDeliverablesEnabled: false,
+      mediaImageModelId: "gpt-image-2",
+      mediaVideoModelId: "gemini-omni-1.2-flash",
+      mediaImageQuotaPerHour: 10,
+      mediaVideoQuotaPerHour: 2,
+      mediaQuotaWindowSeconds: 3600,
+      mediaMaxFileBytes: 20 * 1024 * 1024,
+      openaiApiBaseUrl: "https://api.openai.com",
+      geminiApiBaseUrl: "https://generativelanguage.googleapis.com",
+    });
+  });
+
+  it("deve aceitar a flag de mídia e limites configurados", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        MULTIMEDIA_DELIVERABLES_ENABLED: "true",
+        MEDIA_IMAGE_QUOTA_PER_HOUR: "3",
+        MEDIA_VIDEO_QUOTA_PER_HOUR: "1",
+        MEDIA_MAX_FILE_BYTES: "1048576",
+        OPENAI_API_BASE_URL: "http://127.0.0.1:3437",
+        GEMINI_API_BASE_URL: "http://127.0.0.1:3437",
+      }),
+    ).toMatchObject({
+      multimediaDeliverablesEnabled: true,
+      mediaImageQuotaPerHour: 3,
+      mediaVideoQuotaPerHour: 1,
+      mediaMaxFileBytes: 1048576,
+      openaiApiBaseUrl: "http://127.0.0.1:3437",
+      geminiApiBaseUrl: "http://127.0.0.1:3437",
+    });
+  });
+
+  it("deve rejeitar limites de mídia fora da faixa", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, MEDIA_VIDEO_QUOTA_PER_HOUR: "0" }),
+    ).toThrow(/MEDIA_VIDEO_QUOTA_PER_HOUR/);
+    expect(() =>
+      loadEnv({ ...validEnv, GEMINI_API_BASE_URL: "ftp://example.com" }),
+    ).toThrow(/GEMINI_API_BASE_URL/);
   });
 });
 

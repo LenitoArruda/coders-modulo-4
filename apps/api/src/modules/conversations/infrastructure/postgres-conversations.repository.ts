@@ -19,12 +19,13 @@ import type {
   Citation,
   RetrievalMetadata,
 } from "../../citations/domain/citation";
+import type { MediaAttachment } from "../../media/domain/media";
 
 const CONVERSATION_COLUMNS = "id, user_id, expert_id, created_at, updated_at";
 const MESSAGE_COLUMNS =
-  "id, conversation_id, role, content, created_at, citations, retrieval, answer_status";
+  "id, conversation_id, role, content, created_at, citations, retrieval, answer_status, media";
 const MESSAGE_SELECT =
-  "m.id, m.conversation_id, m.role, m.content, m.created_at, m.citations, m.retrieval, m.answer_status";
+  "m.id, m.conversation_id, m.role, m.content, m.created_at, m.citations, m.retrieval, m.answer_status, m.media";
 
 type ConversationRow = {
   id: string;
@@ -43,6 +44,7 @@ type MessageRow = {
   citations: unknown;
   retrieval: unknown;
   answer_status: string | null;
+  media: unknown;
 };
 
 function toConversation(row: ConversationRow): Conversation {
@@ -80,6 +82,7 @@ function toMessage(row: MessageRow): ConversationMessage {
   const answerStatus = ANSWER_STATUSES.find(
     (status) => status === row.answer_status,
   );
+  const media = readJson(row.media);
 
   return {
     id: row.id,
@@ -94,6 +97,7 @@ function toMessage(row: MessageRow): ConversationMessage {
       ? { retrieval: retrieval as RetrievalMetadata }
       : {}),
     ...(answerStatus === undefined ? {} : { answerStatus }),
+    ...(Array.isArray(media) ? { media: media as MediaAttachment[] } : {}),
   };
 }
 
@@ -223,10 +227,10 @@ export class PostgresConversationsRepository extends ConversationsRepositoryPort
         () =>
           this.pool.query<MessageRow>(
             `insert into public.messages
-               (conversation_id, role, content, citations, retrieval, answer_status)
+               (conversation_id, role, content, citations, retrieval, answer_status, media)
              values
-               ($1, 'user', $2, null, null, null),
-               ($1, 'expert', $3, $4::jsonb, $5::jsonb, $6)
+               ($1, 'user', $2, null, null, null, null),
+               ($1, 'expert', $3, $4::jsonb, $5::jsonb, $6, $7::jsonb)
              returning ${MESSAGE_COLUMNS}`,
             [
               conversationId,
@@ -235,6 +239,9 @@ export class PostgresConversationsRepository extends ConversationsRepositoryPort
               citations,
               retrieval,
               exchange.answerStatus ?? null,
+              exchange.media === undefined
+                ? null
+                : JSON.stringify(exchange.media),
             ],
           ),
       );

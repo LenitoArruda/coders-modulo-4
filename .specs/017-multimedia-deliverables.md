@@ -1,7 +1,7 @@
 # Entregáveis multimídia no chat — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-17
+> **Status:** done
+> **Atualizado em:** 2026-11-18
 > **Autor:** OpenCode Agent
 > **Épico:** `.plans/012-expert-platform-breakdown.md` (fatia 6)
 > **Depende de:** `.specs/012-expert-chat.md`; usa `.specs/015-knowledge-media.md` quando há referência de mídia
@@ -219,36 +219,41 @@ para citar a origem quando aplicável.
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um usuário autenticado, quando ele pede "create a launch image for social media",
+- [x] Dado um usuário autenticado, quando ele pede "create a launch image for social media",
       então o Expert gera uma imagem com `gpt-image-2` e a exibe no chat com preview e download.
-- [ ] Dado um usuário autenticado, quando ele pede um vídeo curto sobre um tema, então o
+- [x] Dado um usuário autenticado, quando ele pede um vídeo curto sobre um tema, então o
       modelo Gemini gera um clipe dentro do limite de duração e o anexo aparece no chat.
-- [ ] Dado um pedido sem informação crítica, quando o Expert processa o prompt, então ele faz
+- [x] Dado um pedido sem informação crítica, quando o Expert processa o prompt, então ele faz
       uma pergunta curta de confirmação e não inicia geração.
-- [ ] Dado um job em andamento, quando o usuário acompanha a mensagem, então o status muda de
+- [x] Dado um job em andamento, quando o usuário acompanha a mensagem, então o status muda de
       `queued` para `generating` e, ao concluir, para `ready`.
-- [ ] Dado uma falha de geração, quando o erro ocorre, então a mensagem exibe erro legível em
+- [x] Dado uma falha de geração, quando o erro ocorre, então a mensagem exibe erro legível em
       en-US e oferece "Try again" sem arquivo parcial.
-- [ ] Dado um pedido acima do limite de duração ou tamanho, quando o sistema valida, então o
+- [x] Dado um pedido acima do limite de duração ou tamanho, quando o sistema valida, então o
       Expert sugere um ajuste e não envia a requisição ao modelo.
-- [ ] Dado um usuário autenticado, quando ele recarrega a conversa, então os arquivos gerados
+- [x] Dado um usuário autenticado, quando ele recarrega a conversa, então os arquivos gerados
       continuam disponíveis para download com seus metadados.
-- [ ] Dado outro usuário autenticado, quando ele tenta baixar o arquivo gerado, então o acesso
+- [x] Dado outro usuário autenticado, quando ele tenta baixar o arquivo gerado, então o acesso
       é negado.
-- [ ] Dado um pedido que referencia uma imagem conectada, quando a geração usa essa
+- [x] Dado um pedido que referencia uma imagem conectada, quando a geração usa essa
       referência, então a citação da fonte aparece junto ao entregável.
-- [ ] Dado um usuário usando leitor de tela, quando a mídia é exibida, então o preview tem
+- [x] Dado um usuário usando leitor de tela, quando a mídia é exibida, então o preview tem
       texto alternativo e o status é anunciado.
 
 ## 15. Decisões e questões abertas
 
-| Tema                 | Decisão ou pergunta                                                                                                             | Impacto                                     | Dono                 | Status |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | -------------------- | ------ |
-| Modelo de vídeo      | Confirmar `gemini-omni-1.1-flash` (referência estável encontrada) como ID final; `gemini-omni-flash-preview` foi descontinuado. | Define compatibilidade, custo e qualidade.  | Usuário + Time de IA | aberta |
-| Modelo de imagem     | Confirmar `gpt-image-2` como definitivo e tamanhos suportados.                                                                  | Define parâmetros e custo por imagem.       | Usuário              | aberta |
-| Limites de geração   | Definir duração máxima do vídeo, resolução e tamanho da imagem.                                                                 | Controla latência e custo.                  | Usuário + Time de IA | aberta |
-| Cota por usuário     | Quantas imagens/vídeos por período?                                                                                             | Evita abuso e estouro de orçamento.         | Usuário              | aberta |
-| Confirmação          | Quando o Expert deve perguntar antes de gerar?                                                                                  | Equilibra fricção e qualidade do resultado. | Usuário              | aberta |
-| Referência de mídia  | Como exatamente usar imagem/vídeo conectado como referência?                                                                    | Define contrato com as fatias 4 e 5.        | Time de IA           | aberta |
-| Retenção de arquivos | Por quanto tempo manter mídia gerada no storage local?                                                                          | Impacta storage, custo e privacidade.       | Usuário              | aberta |
-| Exibição no chat     | Preview inline, galeria na conversa ou ambos?                                                                                   | Impacta UX e acessibilidade.                | Usuário              | aberta |
+| Tema                 | Decisão                                                                                                                                      | Impacto                                     | Dono                 | Status  |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | -------------------- | ------- |
+| Flag de ativação     | `MULTIMEDIA_DELIVERABLES_ENABLED` (API, default `false`) e `multimedia_deliverables_enabled` (web via env/cookie, default `false`).          | Controla rollout por ambiente.              | Time de IA           | fechada |
+| Modelo de vídeo      | `gemini-omni-1.2-flash` (o `1.1-flash` da spec está desatualizado); `MEDIA_VIDEO_MODEL_ID` e `GEMINI_API_BASE_URL` configuráveis.            | Define compatibilidade, custo e qualidade.  | Usuário + Time de IA | fechada |
+| Modelo de imagem     | `gpt-image-2` via OpenAI Images REST; `MEDIA_IMAGE_MODEL_ID` configurável; saídas `1024x1024`, `1024x1536`, `1536x1024`.                     | Define parâmetros e custo por imagem.       | Usuário              | fechada |
+| Limites de geração   | Briefing até 2.000 caracteres; vídeo 4/6/8 s (máx. 8) a 720p; arquivo até 20 MB.                                                             | Controla latência e custo.                  | Usuário + Time de IA | fechada |
+| Cota por usuário     | 10 imagens e 2 vídeos por hora por `user_id`, em memória e configurável; solicitações canceladas devolvem a cota.                            | Evita abuso e estouro de orçamento.         | Usuário              | fechada |
+| Confirmação          | Detecção por palavras-chave; sem tema ou sem tipo, uma pergunta curta em en-US e nenhum job.                                                 | Equilibra fricção e qualidade do resultado. | Usuário              | fechada |
+| Referência de mídia  | Marcador `[n]` usa a citação `n` da última mensagem do Expert (016) e anexa a citação ao entregável; bytes da fonte ao modelo são follow-up. | Define contrato com as fatias 4 e 5.        | Time de IA           | fechada |
+| Retenção de arquivos | `generated_media` com `bytea` e metadados, cascade de `messages`/`users`, mesma retenção do histórico; sem job de limpeza nesta fatia.       | Impacta storage, custo e privacidade.       | Usuário              | fechada |
+| Exibição no chat     | Preview inline `<img>`/`<video>`, metadados, `aria-live`, download autenticado, "Try again" e "Cancel".                                      | Impacta UX e acessibilidade.                | Usuário              | fechada |
+
+> Os critérios foram validados com providers fakeados e servidor HTTP local. A chamada real de
+> vídeo ao Gemini depende de billing/API Google habilitados e permanece como follow-up de rollout;
+> nenhuma chave, prompt, bytes, hash ou valor de `.env` foi registrado nesta spec.

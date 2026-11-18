@@ -47,6 +47,39 @@ export type RetrievalMetadata = {
 export type AnswerStatus =
   "plain" | "with_source" | "no_match" | "retrieval_unavailable";
 
+/** Public metadata for one generated file (spec 017). Bytes stay on the API. */
+export type MediaAttachment = {
+  mediaId: string;
+  kind: "image" | "video";
+  status: "queued" | "generating" | "ready" | "failed" | "cancelled";
+  /** Authenticated web route that proxies the API download. */
+  uri: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
+  modelId: string;
+  modelVersion: string | null;
+  parameters: {
+    kind: "image" | "video";
+    size?: "1024x1024" | "1024x1536" | "1536x1024";
+    durationSeconds?: 4 | 6 | 8;
+    resolution?: "720p";
+    style?: string;
+    citationNumber?: number;
+  };
+  createdAt: string;
+  citation?: {
+    citationNumber: number;
+    sourceName: string;
+    locationLabel: string;
+  };
+  errorCode?: string;
+  errorMessage?: string;
+  attempts?: number;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "expert";
@@ -55,6 +88,7 @@ export type ChatMessage = {
   citations?: Citation[];
   retrieval?: RetrievalMetadata | null;
   answerStatus?: AnswerStatus;
+  media?: MediaAttachment[];
 };
 
 export type ExpertsResponse = {

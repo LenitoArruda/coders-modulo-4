@@ -780,7 +780,7 @@ Critérios correspondentes permanecem marcados como não validados na spec/plan 
 
 ---
 
-## 17. Evidências da fatia 018 — observabilidade local (worktree `spec/018`)
+## 18. Evidências da fatia 018 — observabilidade local (worktree `spec/018`)
 
 Executado em 2026-11-18 na worktree isolada, com PATH explícito para Bun/Node. Nenhuma migration
 foi adicionada: traces não são persistidos em PostgreSQL.
@@ -815,3 +815,35 @@ os defaults e os fluxos 012–016 permanecem intactos.
 
 Nenhum valor de `.env`, chave, token, URL sensível, hash, prompt, resposta ou conteúdo de arquivo
 foi registrado em logs, relatórios ou documentação.
+
+## 19. Evidências da spec 017 (2026-11-18)
+
+Executadas no worktree isolado `spec-017`, branch `spec/017`, sem merge/push e sem alterar as
+specs/worktrees de 014–018.
+
+| Comando                                                         | Resultado                                                                         |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `bun run db:migrate`                                            | bloqueado — Postgres/Docker indisponível (`ECONNREFUSED 127.0.0.1:5433`)          |
+| `bun run db:test`                                               | bloqueado — mesma causa; nenhuma validação SQL foi inventada                      |
+| `bun run lint`                                                  | ok — 3 tarefas Turbo                                                              |
+| `bun run types:check`                                           | ok — 3 tarefas Turbo                                                              |
+| `bun run test`                                                  | ok — API: 78 arquivos / 517 testes; web: 13 arquivos / 156 testes                 |
+| `bun run build`                                                 | ok — `api` + `web`; rota `/app/media/[mediaId]/content` compilada                 |
+| `bunx playwright test --config=playwright.multimedia.config.ts` | ok — 5/5 cenários da spec 017 em 46,4 s, portas isoladas 3017 (web) e 3437 (fake) |
+
+Cobertura adicional da fatia 017:
+
+- API: detecção de intenção, limites, cota por usuário, cancelamento com devolução de cota, retry
+  até 3 tentativas, jobs órfãos, download isolado, citação anexada, env e adapters OpenAI/Gemini
+  contra servidor HTTP local. Integração cobre flag on/off e ciclo `queued → ready`.
+- Web: flag por env/cookie, ações de status/cancel/retry, componente com polling, preview,
+  metadados, `aria-live`, Try again/Cancel e proxy autenticado de download com headers seguros.
+- E2E determinístico: geração de imagem com preview e download autenticado, pedido ambíguo sem
+  job, cancelamento sem download, retry de falha e isolamento entre contas. A API fake usa bytes
+  locais e transições controladas; nenhuma chamada paga foi feita.
+- A suíte E2E padrão não foi reexecutada nas portas 3000/3434 para não colidir com worktrees
+  paralelos; a regressão é coberta pelos gates unitários/integração e pela evidência da spec 016.
+- O arquivo temporário `apps/web/playwright.multimedia.config.ts` foi removido após a execução.
+- Billing/API Google e a chamada real de vídeo não foram validados; são follow-up de rollout.
+  Nenhuma chave, token, URL sensível, prompt, trecho, hash, bytes ou valor de `.env` foi lido,
+  exibido ou registrado.

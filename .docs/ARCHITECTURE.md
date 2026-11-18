@@ -812,6 +812,63 @@ Regras:
 
 ---
 
+### 4.16 Entregáveis multimídia (fatia 017)
+
+O slice `media` gera imagens e vídeos curtos a partir de um briefing em inglês enviado ao chat.
+Ele segue o padrão das fatias anteriores: domínio puro, casos de uso, portas e adaptadores. A
+flag `MULTIMEDIA_DELIVERABLES_ENABLED` (padrão `false`) controla a API; no web, a mesma variável
+ou o cookie de sessão `multimedia_deliverables_enabled=1` controla a interface. Com a flag off, o
+chat permanece idêntico ao da fatia 016.
+
+```text
+POST /conversations/messages ─► SendMessageUseCase ─► RequestMediaGenerationUseCase
+          │                         │                      ├─ detectMediaIntent (en-US)
+          │                         │                      ├─ InMemoryMediaQuota (por userId)
+          │                         │                      ├─ MediaGeneratorRouter
+          │                         │                      │    ├─ OpenAI Images (gpt-image-2)
+          │                         │                      │    └─ Gemini video (gemini-omni-1.2-flash)
+          │                         │                      └─ PostgresMediaRepository (bytea)
+          │                         └─ mensagem expert com messages.media
+          ▼
+GET /media/:id/status ────────► GetMediaStatusUseCase ─► attachment público
+POST /media/:id/cancel ───────► CancelMediaGenerationUseCase ─► fila aborta + quota devolvida
+POST /media/:id/retry ────────► RetryMediaGenerationUseCase ─► até 3 tentativas
+GET /media/:id/content ───────► DownloadMediaUseCase ─► bytes com headers de download seguro
+          ▲
+          └── web: /app/media/:id/content (Server Route autenticada, proxy para a API)
+```
+
+| Peça                                            | Responsabilidade                                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `media/domain/media.ts`                         | Tipos, limites, mensagens en-US, detecção de intenção e prompt do provedor                         |
+| `RequestMediaGenerationUseCase`                 | Valida briefing/tipo/tópico, aplica cota de 10 imagens e 2 vídeos por hora e enfileira o job       |
+| `ProcessMediaGenerationUseCase`                 | Executa o gerador com `AbortController`, persiste bytes e publica `ready` ou `failed`              |
+| `InMemoryMediaJobQueue` / `InMemoryMediaQuota`  | Estado volátil de jobs e cotas; reinício do processo é follow-up de persistência                   |
+| `OpenAIImageGenerator` / `GeminiVideoGenerator` | Adaptadores HTTP com chaves apenas no servidor; tamanhos 1024², retrato e paisagem; 4/6/8 s a 720p |
+| `PostgresMediaRepository`                       | `generated_media` com `bytea`, metadados, `message_id` e cascade por mensagem/usuário              |
+| `MediaAttachmentView`                           | `<img>`/`<video>`, metadados, `aria-live`, polling, Download, Try again e Cancel                   |
+| `/app/media/[mediaId]/content`                  | Proxy autenticado; `Cache-Control: private, no-store` e `X-Content-Type-Options: nosniff`          |
+
+Regras de produto e segurança:
+
+- Isolamento é sempre por `user_id` autenticado; não há workspace nesta fatia.
+- Briefing acima de 2.000 caracteres ou arquivo acima de 20 MB recebe sugestão en-US sem chamar
+  provedor. Sem tipo ou sem tópico, o Expert faz uma única pergunta curta e nenhum job é criado.
+- `[n]` resolve a citação `n` da última mensagem do Expert (fatia 016) e é anexado ao entregável;
+  envio dos bytes da fonte ao modelo é follow-up.
+- Estados: `queued → generating → ready | failed | cancelled`. Jobs órfãos viram `failed` na leitura
+  após 10 minutos; tentativas são persistidas e limitadas a 3.
+- Erros de provedor, prompts e detalhes de chave nunca chegam a logs, respostas ou telemetria; o
+  usuário vê apenas mensagens estáveis em en-US.
+- Migration aditiva `0006_multimedia_deliverables.sql` cria `generated_media` e `messages.media`
+  sem migração de dados nem down-migration. Política de retenção e job de limpeza ficam como
+  follow-up.
+- O modelo de vídeo da spec (`gemini-omni-1.1-flash`) foi substituído por
+  `gemini-omni-1.2-flash`; ambos os modelos são configuráveis por ambiente. A validação de uma
+  chamada real de vídeo depende de billing/API Google habilitados e não foi executada nesta fatia.
+
+---
+
 ## 5. Fluxo de dados alvo
 
 ```text
