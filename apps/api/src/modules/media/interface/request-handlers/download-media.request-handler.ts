@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Res, UseGuards } from "@nestjs/common";
 import type { Response } from "express";
 
-import { AuthUser } from "../../../auth/domain/auth-user";
+import type { AuthUser } from "../../../auth/domain/auth-user";
 import { CurrentUser } from "../../../auth/interface/current-user.decorator";
 import { SessionGuard } from "../../../auth/interface/session.guard";
 import { DownloadMediaUseCase } from "../../application/download-media.use-case";

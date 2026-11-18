@@ -11,7 +11,7 @@ import {
 } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
 
-import { AuthUser } from "../../../auth/domain/auth-user";
+import type { AuthUser } from "../../../auth/domain/auth-user";
 import { CurrentUser } from "../../../auth/interface/current-user.decorator";
 import { SessionGuard } from "../../../auth/interface/session.guard";
 import {

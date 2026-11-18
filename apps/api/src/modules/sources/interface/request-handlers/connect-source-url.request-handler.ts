@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, Post, UseGuards } from "@nestjs/common";
 
-import { AuthUser } from "../../../auth/domain/auth-user";
+import type { AuthUser } from "../../../auth/domain/auth-user";
 import { CurrentUser } from "../../../auth/interface/current-user.decorator";
 import { SessionGuard } from "../../../auth/interface/session.guard";
 import { ConnectSourceUrlUseCase } from "../../application/connect-source-url.use-case";
