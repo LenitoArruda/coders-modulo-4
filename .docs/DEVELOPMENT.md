@@ -1,10 +1,12 @@
 # DEVELOPMENT.md — Padrões de desenvolvimento
 
-> **Status:** ativo · **Atualizado em:** 2026-11-09
+> **Status:** ativo · **Atualizado em:** 2026-11-18
 > **Aplica-se a:** qualquer alteração em `apps/` ou `packages/`.
 
 Este documento define **como** escrever código neste repositório. Para regras de processo e
 entrega, consulte [RULES.md](./RULES.md). Para estrutura e stack, [ARCHITECTURE.md](./ARCHITECTURE.md).
+Para contratos e limites de IA/RAG/mídia, consulte [AI.md](./AI.md); para telemetria e avaliação,
+[OBSERVABILITY.md](./OBSERVABILITY.md).
 
 ---
 
@@ -227,19 +229,33 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 
 ## 9. Observabilidade
 
-- Logs estruturados em JSON, com nível (`debug`, `info`, `warn`, `error`).
-- Inclua `requestId`/`correlationId` para rastrear fluxos.
-- **Nunca** logue tokens (JWT, cookie, `auth_tokens`), senhas, e-mails completos ou payloads
-  sensíveis; use `userId`/`sessionId` como contexto.
-- Métricas para ingestão, latência, erros e custo de LLM.
-- Traces para chamadas externas e processamento assíncrono.
+- Logs estruturados em JSON, com nível (`debug`, `info`, `warn`, `error`), escritos no console e
+  emitidos via OTel. Campos fixos: `timestamp`, `level`, `service`, `message` e atributos
+  primitivos (sem objetos aninhados ou `Error`).
+- O `requestId` é gerado ou lido de `x-request-id` pelo middleware HTTP e devolvido no header de
+  resposta; ele aparece no log `HTTP request completed` e no filtro de erros. **Hoje não há**
+  injeção automática de `requestId`/`correlationId` em todos os logs nem unificação com o
+  `traceId` OTel ou com o `traceId` dos spans locais (spec 018) — ver
+  [OBSERVABILITY.md](./OBSERVABILITY.md#6-limites-conhecidos-e-dívida-técnica).
+- **Nunca** logue tokens (JWT, cookie, `auth_tokens`), senhas, e-mails completos, prompt,
+  resposta, chunk ou conteúdo de arquivo; use `userId`, `sessionId` ou o pseudônimo HMAC quando
+  aplicável.
+- Métricas existentes: `http.server.request.duration`, `http.server.requests` e as métricas
+  padrão de runtime/OTel. Métricas de domínio (ingestão, tokens, custo de LLM, mídia, fila) são
+  🧭 planejadas: hoje esses sinais existem apenas como atributos de log/span.
+- Traces: OTel nativo (HTTP + spans manuais de banco `<OPERAÇÃO> <tabela>`) e, separadamente,
+  spans locais tipo LangSmith da spec 018, desligados por padrão. Spans de casos de uso de chat,
+  RAG e mídia em OTel são 🧭 planejados.
 - Stack atual: **Grafana LGTM** (imagem `grafana/otel-lgtm`, com Loki, Grafana, Tempo e
-  Prometheus) recebendo OTLP em `4317`/`4318`.
+  Prometheus) recebendo OTLP em `4317`/`4318`, coletor `postgres-metrics` e dashboard **API
+  Overview** gerado por `observability/gen-dashboard.mjs`.
 - A API emite logs, métricas e traces via OpenTelemetry desde a fundação. Novos serviços seguem
-  o mesmo padrão.
+  o mesmo padrão; use `withDbSpan` para operações de banco e preserve a política de sanitização.
 - Logs OTel são emitidos com `logs` de `@opentelemetry/api` (1.10+), que compartilha o provider
   global registrado pelo `NodeSDK`. Não use o pacote separado `@opentelemetry/api-logs` — ele
   mantém outro global e os logs não chegam ao coletor.
+- Ao mudar nomes de campos, métricas ou queries, atualize também o gerador de dashboard e a seção
+  de inventário em [OBSERVABILITY.md](./OBSERVABILITY.md#2-inventário-e-pipeline-de-telemetria).
 
 ---
 
@@ -248,10 +264,13 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 - Segredos apenas em variáveis de ambiente; valide no boot.
 - `.env` nunca é commitado.
 - Autenticação e autorização em toda rota protegida.
-- Isole dados por workspace/tenant; com PostgreSQL, use **RLS**.
+- Isole dados pelo usuário autenticado; quando existir workspace/tenant, use **RLS** (decisão em
+  aberto em [ARCHITECTURE.md](./ARCHITECTURE.md#7-decisões-em-aberto)).
 - Tokens de conectores criptografados e com menor privilégio.
-- Sanitize entradas e evite injeção (SQL, prompt, HTML).
-- Em IA: trate conteúdo externo como **não confiável** (prompt injection).
+- Valide e restrinja entradas; evite injeção (SQL, prompt injection, HTML).
+- Em IA: trate conteúdo externo (arquivo, URL, mídia, histórico) como **não confiável**;
+  instruções nele não podem alterar a persona, as ferramentas ou as permissões do Expert. Detalhes
+  em [AI.md](./AI.md#8-segurança-de-ia).
 
 ---
 
@@ -319,3 +338,10 @@ acessível e responsiva, documentação sincronizada e relatório final entregue
 - `docker-compose.langsmith.yml` é opcional e depende de imagem licenciada; não altere o Compose
   padrão nem tente "simular" LangSmith com imagens inventadas.
 - Nenhuma migration foi necessária: traces não são persistidos em PostgreSQL.
+- O campo de custo emitido é `estimatedCostUsd` (não `estimatedCost`). `createMediaSpanMetadata()`
+  e `createSourceSpanMetadata()` existem e são testados, mas **não são chamados** nos fluxos reais
+  de mídia/fontes — conectá-los é follow-up (ver
+  [OBSERVABILITY.md](./OBSERVABILITY.md#6-limites-conhecidos-e-dívida-técnica)).
+- A fila do `HttpTraceSink` é um array em memória **sem limite e sem backpressure**; não a
+  descreva como fila limitada. Não há métrica de profundidade ou drops — apenas o log
+  `obs.trace.dropped`.

@@ -538,19 +538,19 @@ Requisitos:
 
 ## 10. Lacunas conhecidas
 
-| Lacuna                                      | Impacto                                                                                                                              |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Nenhum CI                                   | Verificação depende do ambiente local                                                                                                |
-| Commitlint apenas local                     | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
-| Produto não implementado                    | Apenas a rota de hello world e a fundação existem                                                                                    |
-| Sem Vitest/Testing Library no pacote `ui`   | Componentes compartilhados não têm testes unitários                                                                                  |
-| Migrações sem rollback automático           | `scripts/db.mjs` aplica em transação, mas não gera `down`; reverter exige nova migração                                              |
-| PostgreSQL local em `18`                    | Versão do Compose; o provedor gerenciado de produção segue em aberto (ADR 0016)                                                      |
-| OXLint/OXFmt não adotados                   | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
-| Skills locais em `.agents/` não versionadas | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
-| Rate limit em memória                       | Limites de sign-up e confirmação são locais ao processo; store compartilhado é follow-up                                             |
-| Sem refresh de sessão                       | Sign-out implementado em `POST /api/v1/auth/sign-out`; a sessão ainda só é renovada por novo sign-in                                 |
-| Sessão única sem atomicidade no banco       | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                             |
+| Lacuna                                       | Impacto                                                                                                                            |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Nenhum CI                                    | Verificação depende do ambiente local                                                                                              |
+| Commitlint apenas local                      | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                  |
+| Stack LangSmith licenciada não validada      | Studio, traces ao vivo e persistência dependem de imagem Enterprise; a validação entregue é local-first/offline (spec 018)         |
+| Sem Vitest/Testing Library no pacote `ui`    | Componentes compartilhados não têm testes unitários                                                                                |
+| Migrações sem rollback automático            | `scripts/db.mjs` aplica em transação, mas não gera `down`; reverter exige nova migração                                            |
+| PostgreSQL local em `18`                     | Versão do Compose; o provedor gerenciado de produção segue em aberto (ADR 0016)                                                    |
+| OXLint/OXFmt não adotados                    | ESLint + Prettier seguem como padrão nesta entrega                                                                                 |
+| Skills versionadas, disponibilidade variável | `implement-me`, `breakdown-specs` etc. estão em `.agents/skills/`; se o cliente não as carregar, use a política durável em `.docs` |
+| Rate limit em memória                        | Limites de sign-up, confirmação, forgot/sign-in/reset são locais ao processo; store compartilhado é follow-up                      |
+| Sem refresh de sessão                        | Sign-out implementado em `POST /api/v1/auth/sign-out`; a sessão ainda só é renovada por novo sign-in                               |
+| Sessão única sem atomicidade no banco        | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                           |
 
 Ao resolver uma lacuna, atualize esta tabela e o documento relacionado.
 
@@ -872,3 +872,30 @@ usar `WEB_URL`/`FAKE_API_URL` de `apps/web/e2e/support/ports.ts` em vez das port
 As migrações `0001`–`0006` e seus testes SQL foram validados nos worktrees com bancos isolados.
 Não foram registrados chaves, tokens, URLs sensíveis, prompts, respostas, hashes, trechos ou bytes
 de arquivo em logs, relatórios ou documentação.
+
+---
+
+## 21. Índice navegável spec → plano → evidência
+
+Todas as specs `000`–`018` têm `Status: done`. As seções `11`–`20` registram as evidências
+datadas de `013`–`018`; para `000`–`012`, a evidência está no próprio plano (quando registrada) e
+no histórico de commits da spec.
+
+| Spec                                                   | Plano                                                                                                                                   | Evidência de QA / observação                                                                         |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `000-foundation`                                       | [plano](../.plans/000-foundation-plan.md)                                                                                               | §11 "Resultado da execução" do plano                                                                 |
+| `001-auth-schema` … `003-auth-routes`                  | [001](../.plans/001-auth-schema-plan.md), [002](../.plans/002-auth-session-plan.md), [003](../.plans/003-auth-routes-plan.md)           | QA manual nos planos; breakdown em [`.plans/001-auth-breakdown.md`](../.plans/001-auth-breakdown.md) |
+| `004-auth-sign-up` … `006-auth-sign-in`                | [004](../.plans/004-auth-sign-up-plan.md), [005](../.plans/005-auth-confirm-account-plan.md), [006](../.plans/006-auth-sign-in-plan.md) | Orquestração [002–008](../.plans/002-008-orchestration.md)                                           |
+| `007-auth-forgot-password` … `008-auth-reset-password` | [007](../.plans/007-auth-forgot-password-plan.md), [008](../.plans/008-auth-reset-password-plan.md)                                     | QA manual 2026-11-10 no plano 007; orquestração 002–008                                              |
+| `009-postgres-nativo`                                  | [plano](../.plans/009-postgres-nativo-plan.md)                                                                                          | §11 "Resultados do QA (2026-11-12)" do plano                                                         |
+| `010-email-provider-by-node-env`                       | [plano](../.plans/010-email-provider-by-node-env-plan.md)                                                                               | "Gates automatizados" no plano                                                                       |
+| `011-ui-redesign`                                      | [plano](../.plans/011-ui-redesign-plan.md)                                                                                              | Evidências de UI no plano; direção visual em [DESIGN.md](./DESIGN.md)                                |
+| `012-expert-chat`                                      | [plano](../.plans/012-expert-chat-plan.md)                                                                                              | §9 "Histórico" do plano; [breakdown 012–018](../.plans/012-expert-platform-breakdown.md)             |
+| `013-knowledge-files`                                  | [plano](../.plans/013-knowledge-files-plan.md)                                                                                          | §11 desta seção                                                                                      |
+| `014-knowledge-url`                                    | [plano](../.plans/014-knowledge-url-plan.md)                                                                                            | §12 e §14                                                                                            |
+| `015-knowledge-media`                                  | [plano](../.plans/015-knowledge-media-plan.md)                                                                                          | §13 e §14                                                                                            |
+| `016-rag-citations`                                    | [plano](../.plans/016-rag-citations-plan.md)                                                                                            | §15 e §16                                                                                            |
+| `017-multimedia-deliverables`                          | [plano](../.plans/017-multimedia-deliverables-plan.md)                                                                                  | §19 e §20                                                                                            |
+| `018-langsmith-local`                                  | [plano](../.plans/018-langsmith-local-plan.md)                                                                                          | §17, §18 e §20; detalhes em [OBSERVABILITY.md](./OBSERVABILITY.md)                                   |
+
+Para revisar ou reabrir uma spec, use `refine-spec` e registre a divergência na spec e neste índice.

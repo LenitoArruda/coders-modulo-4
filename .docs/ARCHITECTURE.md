@@ -1,12 +1,12 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha + catálogo
-> de Experts, chat, fontes de arquivo, URL e mídia, recuperação vetorial e citações implementados ·
-> **Atualizado em:** 2026-11-18
+> **Status:** specs `000`–`018` entregues (018 no modo local-first; stack LangSmith licenciada
+> bloqueada) · **Atualizado em:** 2026-11-18
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
-engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md).
+engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md); para o detalhamento de IA/RAG/mídia,
+[AI.md](./AI.md); para telemetria e avaliação, [OBSERVABILITY.md](./OBSERVABILITY.md).
 
 ---
 
@@ -14,8 +14,9 @@ engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 Monorepo **Turborepo** com **Bun**, contendo aplicações Next.js, uma API NestJS e pacotes
 compartilhados. A fundação entrega web, API e PostgreSQL local; o catálogo de Experts e o chat em
-persona (spec 012), a ingestão de fontes de arquivo (013), URL (014) e mídia (015), e a recuperação
-vetorial com citações inline (016) já estão implementadas. O produto é uma plataforma de Experts
+persona (012), a ingestão de fontes de arquivo (013), URL (014) e mídia (015), a recuperação
+vetorial com citações inline (016), os entregáveis multimídia (017) e a observabilidade/avaliação
+local-first (018) estão implementados. O produto é uma plataforma de Experts
 (ver [BUSINESS.md](./BUSINESS.md)), com:
 
 - **Web app** para interação com Experts, conexão de arquivos locais e URLs públicas, e gestão de conectores.
@@ -23,7 +24,9 @@ vetorial com citações inline (016) já estão implementadas. O produto é uma 
 - **PostgreSQL 18** como banco relacional; a **autenticação é própria da API** (JWT emitido pela
   API, sem provedor externo).
 - **Weaviate local** como banco de vetores da base de conhecimento, na porta HTTP 8080.
-- **Conectores externos** para trazer dados de Notion, Google Drive, Jira, PDF etc.
+- **Fontes de conhecimento implementadas:** arquivo (PDF/TXT/Markdown), URL pública e mídia
+  convertida em texto. Conectores de Notion/Google Drive/Jira são 🧭 planejados (ver
+  [BUSINESS.md](./BUSINESS.md#7-conectores)).
 
 ---
 
@@ -39,12 +42,18 @@ vetorial com citações inline (016) já estão implementadas. O produto é uma 
 │   ├── eslint-config/           # Configurações ESLint compartilhadas
 │   └── typescript-config/       # tsconfig base/nextjs/react-library
 ├── scripts/
-│   ├── infra.mjs                # Orquestra o Compose (PostgreSQL + LGTM)
-│   └── db.mjs                   # Executor de migrações e testes SQL
+│   ├── infra.mjs                # Orquestra o Compose (PostgreSQL + LGTM + Weaviate)
+│   ├── db.mjs                   # Executor de migrações e testes SQL
+│   ├── k6.mjs                   # Executa cenários de carga
+│   └── obs-eval.ts              # CLI de evaluation offline (spec 018)
 ├── db/
 │   ├── migrations/              # Migrações versionadas (.sql)
 │   └── tests/                   # Testes de schema em SQL
-├── docker-compose.yml           # PostgreSQL 18 + LGTM (Grafana, OTel Collector, Loki/Tempo/Prometheus)
+├── observability/               # Dashboards, gerador, coletor Postgres e LGTM built-ins
+├── eval/datasets/               # Datasets sintéticos de avaliação de IA
+├── load-tests/                  # Cenários k6 e seed de carga
+├── docker-compose.yml           # PostgreSQL 18 + LGTM + Weaviate
+├── docker-compose.langsmith.yml # Override opcional (profile `langsmith`, licenciado)
 ├── .plans/                      # Planos de tarefas (<numero>-<slug>-plan.md)
 ├── .specs/                      # Specs de feature (<numero>-<slug>.md)
 ├── .docs/                       # Documentação do projeto
@@ -916,8 +925,11 @@ Fluxo resumido:
 > indexação. A fatia 015 acrescenta imagem, áudio e vídeo convertidos em texto por
 > OCR/transcrição local e indexados pelo mesmo pipeline, atrás da flag
 > `knowledge_media_enabled` (desligada por padrão). O schema de auth veio na fatia 001, o de
-> conversas na fatia 012 e o de fontes na fatia 013, com colunas opcionais de mídia na migração
-> 0004; os vetores ainda não são consultados pelo chat (fatia 5 do épico).
+> conversas na fatia 012 e o de fontes na fatia 013, com colunas opcionais de mídia na migração 0004. A fatia 016 passou a consultar os vetores no chat, com recuperação, contexto e citações
+> inline controlados por `RAG_CITATIONS_ENABLED`; a 017 acrescentou geração assíncrona de
+> imagem/vídeo com cota por hora e anexos no chat, controlada por
+> `MULTIMEDIA_DELIVERABLES_ENABLED`; a 018 acrescentou spans locais sanitizados e evaluation
+> offline (spec 018). Detalhes em [AI.md](./AI.md) e [OBSERVABILITY.md](./OBSERVABILITY.md).
 
 ---
 
@@ -927,58 +939,71 @@ Cada decisão abaixo possui um registro correspondente em [`.adrs/`](../.adrs/RE
 contexto, alternativas e consequências. Decisões ainda em aberto permanecem na §7 até serem
 tomadas.
 
-| Decisão                                      | Motivo                                                                                  | Estado                                       |
-| -------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Monorepo com Turborepo + Bun                 | Compartilhar código, cache e execução paralela                                          | ✅                                           |
-| Next.js App Router no front-end              | Server Components, streaming e SEO                                                      | ✅                                           |
-| API separada em NestJS                       | Isolar domínio, ingestão e orquestração do front                                        | ✅                                           |
-| PostgreSQL 18 via Docker Compose             | Ambiente reproduzível sem instalação global nem stack proprietária                      | ✅                                           |
-| Auth própria na API (sem provedor externo)   | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação                 | ✅ (schema + sessão + sign-up + recuperação) |
-| Acesso ao banco com `pg` + SQL parametrizado | Sem ORM/query builder; SQL explícito e migrações versionadas (ADR 0016)                 | ✅                                           |
-| Hash de senha com scrypt nativo              | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                      | ✅                                           |
-| Sessão com JWT HS256 + registro server-side  | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`               | ✅                                           |
-| Cookie `HttpOnly` com ponte `Bearer` no web  | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API                  | ✅                                           |
-| Sessão única com create-then-revoke          | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)                | ✅ (follow-up)                               |
-| Namespace `/api/v1`                          | Versionar a API e manter contrato estável desde a primeira rota                         | ✅                                           |
-| Grupos `/auth/*` público e `/app/*` privado  | Separar fluxo de auth da área privada, com guard server-side e layouts próprios         | ✅                                           |
-| Contrato de erro global `{ code, message }`  | Respostas previsíveis para o web sem stack, SQL ou detalhes internos                    | ✅                                           |
-| Arquitetura em camadas + vertical slices     | Baixo acoplamento e evolução por domínio                                                | ✅ (auth, hello)                             |
-| Request handler 1:1 por endpoint             | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015)       | ✅                                           |
-| Light theme único                            | Direção visual definida em `DESIGN.md`                                                  | ✅                                           |
-| Tailwind CSS + shadcn/ui em `packages/ui`    | Base visual compartilhada e tokens únicos                                               | ✅                                           |
-| TypeScript `strict`                          | Segurança de tipos no monorepo                                                          | ✅                                           |
-| OpenTelemetry + Grafana LGTM desde o dia 0   | Diagnosticar ingestão e respostas de IA                                                 | ✅                                           |
-| Vitest + Playwright + Supertest              | Unitário, E2E e API                                                                     | ✅                                           |
-| LGTM all-in-one via Compose                  | Menos configuração e versões fixadas                                                    | ✅                                           |
-| Migrações versionadas com executor próprio   | SQL versionado, transacional e concurrency-safe sem CLI de terceiros (ADR 0016)         | ✅                                           |
-| Catálogo de Experts na API (fonte única)     | Web consome o catálogo no servidor; sem duplicação no cliente ou em `packages/ui`       | ✅                                           |
-| Histórico por `(user_id, expert_id)`         | Isolamento por usuário autenticado, sem workspace, com `unique` e RLS                   | ✅                                           |
-| LangChain.js + LangGraph para responder      | Orquestração do modelo atrás de `ExpertResponderPort`, isolada da aplicação             | ✅                                           |
-| `OPENAI_API_KEY` opcional no boot            | Ausência gera `503 MODEL_UNAVAILABLE` só no envio; boot e testes seguem determinísticos | ✅                                           |
-| Dedup de fontes por SHA-256 por usuário      | Reenvio idêntico não cria versão, chunk ou vetor; índice único cobre concorrência       | ✅                                           |
-| Arquivo original em `bytea`                  | Exclusão atômica com a fonte, sem diretório compartilhado ou nova env var               | ✅                                           |
-| Weaviate local com vectorizer `none`         | Vetores vêm do `text-embedding-3-small`; distância cosine e IDs determinísticos         | ✅                                           |
-| Adaptador Weaviate por REST/GraphQL          | Compose expõe apenas a porta HTTP 8080; cliente v3 exigiria gRPC 50051                  | ✅                                           |
-| Limites provisórios 10 MB / 5 arquivos       | Validação centralizada no domínio e ecoada no web; definição final segue em aberto      | ✅ (follow-up)                               |
-| URL como fonte `txt` com marcador MIME       | Reusa o contrato 013 sem migração; hash do texto extraído e retry refaz a busca         | ✅                                           |
-| Política SSRF centralizada no domínio        | Validação antes do fetch, no DNS e em cada redirecionamento; host privado nunca buscado | ✅                                           |
+| Decisão                                      | Motivo                                                                                  | Estado                                      |
+| -------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Monorepo com Turborepo + Bun                 | Compartilhar código, cache e execução paralela                                          | ✅                                          |
+| Next.js App Router no front-end              | Server Components, streaming e SEO                                                      | ✅                                          |
+| API separada em NestJS                       | Isolar domínio, ingestão e orquestração do front                                        | ✅                                          |
+| PostgreSQL 18 via Docker Compose             | Ambiente reproduzível sem instalação global nem stack proprietária                      | ✅                                          |
+| Auth própria na API (sem provedor externo)   | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação                 | ✅ (schema + fluxos 004–008)                |
+| Acesso ao banco com `pg` + SQL parametrizado | Sem ORM/query builder; SQL explícito e migrações versionadas (ADR 0016)                 | ✅                                          |
+| Hash de senha com scrypt nativo              | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                      | ✅                                          |
+| Sessão com JWT HS256 + registro server-side  | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`               | ✅                                          |
+| Cookie `HttpOnly` com ponte `Bearer` no web  | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API                  | ✅                                          |
+| Sessão única com create-then-revoke          | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)                | ✅ (follow-up)                              |
+| Namespace `/api/v1`                          | Versionar a API e manter contrato estável desde a primeira rota                         | ✅                                          |
+| Grupos `/auth/*` público e `/app/*` privado  | Separar fluxo de auth da área privada, com guard server-side e layouts próprios         | ✅                                          |
+| Contrato de erro global `{ code, message }`  | Respostas previsíveis para o web sem stack, SQL ou detalhes internos                    | ✅                                          |
+| Arquitetura em camadas + vertical slices     | Baixo acoplamento e evolução por domínio                                                | ✅ (todas as slices 001–018)                |
+| Request handler 1:1 por endpoint             | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015)       | ✅                                          |
+| Light theme único                            | Direção visual definida em `DESIGN.md`                                                  | ✅                                          |
+| Tailwind CSS + shadcn/ui em `packages/ui`    | Base visual compartilhada e tokens únicos                                               | ✅                                          |
+| TypeScript `strict`                          | Segurança de tipos no monorepo                                                          | ✅                                          |
+| OpenTelemetry + Grafana LGTM desde o dia 0   | Diagnosticar ingestão e respostas de IA                                                 | ✅                                          |
+| Vitest + Playwright + Supertest              | Unitário, E2E e API                                                                     | ✅                                          |
+| LGTM all-in-one via Compose                  | Menos configuração e versões fixadas                                                    | ✅                                          |
+| Migrações versionadas com executor próprio   | SQL versionado, transacional e concurrency-safe sem CLI de terceiros (ADR 0016)         | ✅                                          |
+| Catálogo de Experts na API (fonte única)     | Web consome o catálogo no servidor; sem duplicação no cliente ou em `packages/ui`       | ✅                                          |
+| Histórico por `(user_id, expert_id)`         | Isolamento por usuário autenticado, sem workspace, com `unique` e RLS                   | ✅                                          |
+| LangChain.js + LangGraph para responder      | Orquestração do modelo atrás de `ExpertResponderPort`, isolada da aplicação             | ✅                                          |
+| `OPENAI_API_KEY` opcional no boot            | Ausência gera `503 MODEL_UNAVAILABLE` só no envio; boot e testes seguem determinísticos | ✅                                          |
+| Dedup de fontes por SHA-256 por usuário      | Reenvio idêntico não cria versão, chunk ou vetor; índice único cobre concorrência       | ✅                                          |
+| Arquivo original em `bytea`                  | Exclusão atômica com a fonte, sem diretório compartilhado ou nova env var               | ✅                                          |
+| Weaviate local com vectorizer `none`         | Vetores vêm do `text-embedding-3-small`; distância cosine e IDs determinísticos         | ✅                                          |
+| Adaptador Weaviate por REST/GraphQL          | Compose expõe apenas a porta HTTP 8080; cliente v3 exigiria gRPC 50051                  | ✅                                          |
+| Limites provisórios 10 MB / 5 arquivos       | Validação centralizada no domínio e ecoada no web; definição final segue em aberto      | ✅ (follow-up)                              |
+| URL como fonte `txt` com marcador MIME       | Reusa o contrato 013 sem migração; hash do texto extraído e retry refaz a busca         | ✅                                          |
+| Política SSRF centralizada no domínio        | Validação antes do fetch, no DNS e em cada redirecionamento; host privado nunca buscado | ✅                                          |
+| Mídia como conhecimento via OCR/transcrição  | Reaproveita o pipeline de chunks/embeddings sem novo contrato de fonte                  | ✅                                          |
+| RAG com citações por similaridade vetorial   | Respostas verificáveis, com `topK`/limiar configuráveis e painel de fontes              | ✅ (flag `RAG_CITATIONS_ENABLED`)           |
+| Entregáveis multimídia assíncronos           | Geração de imagem/vídeo com job persistido, cota e anexo no chat                        | ✅ (flag `MULTIMEDIA_DELIVERABLES_ENABLED`) |
+| Tracing local-first com sanitização          | Observar chat/RAG sem enviar prompt, PII ou segredo a serviço externo                   | ✅ (spec 018; stack licenciada 🔍)          |
+| Pseudonimização HMAC de usuário em spans     | Correlacionar por usuário sem expor identidade                                          | ✅                                          |
+| Evaluation offline determinística            | Gate local antes de mudanças de prompt/modelo, sem chamada externa                      | ✅ (`bun run obs:eval`)                     |
+| Dashboard LGTM gerado por script             | Renovação reproduzível de painéis a partir de uma única fonte                           | ✅ (`observability/gen-dashboard.mjs`)      |
 
 ---
 
 ## 7. Decisões em aberto
 
-| Tema                  | Pergunta                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------ |
-| Deploy da API         | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render).   |
-| OXLint/OXFmt          | Migrar do ESLint/Prettier atual ou manter?                                                       |
-| Multi-tenancy         | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                       |
-| `packages/shared`     | Quais contratos realmente serão compartilhados entre web e api?                                  |
-| PostgreSQL gerenciado | Qual provedor (Neon, RDS, Cloud SQL) será usado em produção?                                     |
-| Limites de upload     | Tamanho máximo por arquivo e quantidade por envio definitivos (hoje 10 MB / 5, provisórios).     |
-| Retenção de fontes    | Por quanto tempo manter arquivo original, versões antigas, chunks e embeddings após a conexão.   |
-| Metas de ingestão     | Latência e custo máximos aceitáveis por arquivo e por página processados.                        |
-| Limites de URL        | Timeout, tamanho máximo de resposta e redirecionamentos definitivos (hoje 8 s / 2 MB / 3).       |
-| Robots e termos       | Verificar `robots.txt` antes de buscar páginas externas? Hoje apenas conteúdo público é buscado. |
+| Tema                  | Pergunta                                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Deploy da API         | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render).              |
+| OXLint/OXFmt          | Migrar do ESLint/Prettier atual ou manter?                                                                  |
+| Multi-tenancy         | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                                  |
+| `packages/shared`     | Quais contratos realmente serão compartilhados entre web e api?                                             |
+| PostgreSQL gerenciado | Qual provedor (Neon, RDS, Cloud SQL) será usado em produção?                                                |
+| Limites de upload     | Tamanho máximo por arquivo e quantidade por envio definitivos (hoje 10 MB / 5, provisórios).                |
+| Retenção de fontes    | Por quanto tempo manter arquivo original, versões antigas, chunks e embeddings após a conexão.              |
+| Metas de ingestão     | Latência e custo máximos aceitáveis por arquivo e por página processados.                                   |
+| Limites de URL        | Timeout, tamanho máximo de resposta e redirecionamentos definitivos (hoje 8 s / 2 MB / 3).                  |
+| Robots e termos       | Verificar `robots.txt` antes de buscar páginas externas? Hoje apenas conteúdo público é buscado.            |
+| Correlação de IDs     | Unificar `requestId` HTTP, `traceId` OTel e `traceId` dos spans locais em um único identificador navegável? |
+| Alertas e SLOs        | Quais regras provisionar (5xx, p95, `obs.trace.dropped`, deadlocks) e qual janela/orçamento?                |
+| Métricas de domínio   | Nomes e donos para chat, RAG, tokens, custo, mídia e profundidade da fila de traces.                        |
+| LangSmith licenciado  | Versão/imagem, backend, retenção de traces e conteúdo (ou não) de prompt/resposta em spans.                 |
+| Fila do sink local    | Limite, backpressure e política de descarte para `HttpTraceSink` (hoje array sem limite).                   |
+| Filtro do dashboard   | Alinhar `postgresql_database_name` do gerador ao `POSTGRES_DB` do Compose.                                  |
 
 ---
 
@@ -992,12 +1017,18 @@ infraestrutura implementando a porta `TraceSinkPort`.
 - **Instrumentação por injeção opcional** (`@Optional()`) em `SendMessageUseCase`,
   `RetrieveContextUseCase` e `LangGraphExpertResponder`: assinaturas existentes preservadas e flag
   desligada por padrão. Nenhuma rota, controller ou contrato de API foi alterado.
-- **Correlação:** um `traceId` por requisição liga os spans raiz, de recuperação e de geração.
-  `conversationId`/`messageId` entram quando disponíveis, senão recebem `missing`.
+- **Correlação:** um `traceId` local por requisição liga os spans raiz, de recuperação e de geração.
+  `conversationId`/`messageId` entram quando disponíveis, senão recebem `missing`. Esse ID **não**
+  é o `traceId` OTel nem o `requestId` HTTP; a unificação é decisão em aberto (§7).
 - **Privacidade:** `userPseudonym` é HMAC-SHA256 com sal server-side; sanitização recursiva remove
   chaves proibidas antes do sink. Prompt, resposta e PII nunca entram no payload.
-- **Resiliência:** emissão assíncrona em fila; falha do coletor gera `obs.trace.dropped` em log e
-  nunca propaga para o fluxo do usuário.
+- **Resiliência:** emissão assíncrona em array em memória, com flush por tamanho/tempo; falha do
+  coletor gera `obs.trace.dropped` em log e nunca propaga para o fluxo do usuário. A fila não tem
+  limite nem backpressure e não expõe métrica de profundidade — ver
+  [OBSERVABILITY.md](./OBSERVABILITY.md#6-limites-conhecidos-e-dívida-técnica).
+- **Contrato de custo:** o campo emitido é `estimatedCostUsd`. Os builders
+  `createMediaSpanMetadata()` e `createSourceSpanMetadata()` existem e são testados, mas ainda não
+  são chamados nos fluxos reais de mídia/fontes.
 - **Configuração local-only:** endpoint cloud, protocolo não HTTP(S) e URL com credenciais são
   rejeitados no boot quando `LANGSMITH_TRACING_ENABLED=true`.
 - **Evaluation:** scorer puro e determinístico em `domain/evaluation.ts`, CLI em

@@ -1,7 +1,8 @@
 # BUSINESS.md — Negócio e produto
 
 > **Status:** hipóteses iniciais + catálogo de Experts, chat, fontes de arquivo, URLs públicas,
-> mídia como conhecimento, citações e entregáveis multimídia implementados (fatias 012–017) ·
+> mídia como conhecimento, citações, entregáveis multimídia e avaliação local-first implementados
+> (fatias 012–018) ·
 > **Atualizado em:** 2026-11-18
 > **Público:** produto, engenharia e agentes que precisam entender **o que** estamos construindo.
 
@@ -142,11 +143,13 @@ Requisitos por conector:
 4. Expert responde com análise e referências.
 5. Usuário refina o pedido ou solicita um entregável.
 
-> **Estado atual (fatias 012–013):** seleção do Expert, sugestões clicáveis, envio de prompt, resposta
-> no papel do Expert e histórico isolado por usuário já funcionam. A fatia 013 permite conectar
-> PDF/TXT/Markdown e indexar chunks/embeddings no Weaviate local, mas o chat ainda não consulta essa
-> base: a resposta continua vindo do modelo com a persona do Expert. A recuperação de contexto e as
-> citações (passos 3–4) entram na fatia 5.
+> **Estado atual (fatias 012–018):** seleção do Expert, sugestões clicáveis, envio de prompt,
+> resposta no papel do Expert e histórico isolado por usuário funcionam. É possível conectar
+> PDF/TXT/Markdown, URLs públicas e mídia convertida em texto; chunks/embeddings são indexados no
+> Weaviate local. A recuperação de contexto e as citações inline (passos 3–4) **já estão
+> implementadas** e são controladas por `RAG_CITATIONS_ENABLED`. Entregáveis multimídia (passo 5)
+> também estão implementados, atrás de `MULTIMEDIA_DELIVERABLES_ENABLED`. Contratos e limites em
+> [AI.md](./AI.md).
 
 ### 8.3 Pedido → conhecimento → entregável
 
