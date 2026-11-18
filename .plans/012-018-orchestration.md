@@ -21,14 +21,14 @@ Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
 ## 2. Ondas
 
-| Onda | Specs         | Lançada em | Concluída em | Merge/push                     |
-| ---- | ------------- | ---------- | ------------ | ------------------------------ |
-| 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push pendente |
-| 2    | 014, 015, 016 | —          | —            | —                              |
-| 3    | 017, 018      | —          | —            | —                              |
+| Onda | Specs         | Lançada em | Concluída em | Merge/push                      |
+| ---- | ------------- | ---------- | ------------ | ------------------------------- |
+| 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push `b1d10c7` |
+| 2    | 014, 015, 016 | —          | —            | —                               |
+| 3    | 017, 018      | —          | —            | —                               |
 
-Ondas confirmadas pelo usuário em 2026-11-17. A onda 1 foi concluída após o desbloqueio de
-credenciais e da decisão de embedding; as ondas 2 e 3 seguem após o push verde da onda 1.
+Ondas confirmadas pelo usuário em 2026-11-17. A onda 1 foi concluída e publicada com QA verde;
+as ondas 2 e 3 seguem agora.
 
 ## 3. Grafo de dependências
 
@@ -90,7 +90,7 @@ Detalhamento:
 
 ## 6. Retomada
 
-Para retomar: (a) publicar `c697486`, `b8c99d8` e `40e941b` com a credencial `LenitoArruda`;
-(b) remover o worktree `../spec-013` e a branch `spec/013`; (c) lançar a onda 2 (014, 015, 016)
-em worktrees independentes com HEAD já atualizado; (d) integrar com QA verde e lançar a onda 3
-(017, 018). Risco futuro: geração de vídeo da 017 via Gemini/Veo pode exigir billing ativado.
+Para retomar: (a) remover o worktree `../spec-013` e a branch `spec/013`; (b) lançar a onda 2
+(014, 015, 016) em worktrees independentes com HEAD já atualizado; (c) integrar com QA verde e
+lançar a onda 3 (017, 018). Risco futuro: geração de vídeo da 017 via Gemini/Veo pode exigir
+billing ativado.
