@@ -285,3 +285,166 @@ Versão/licença do LangSmith, backend de armazenamento, retenção, conteúdo d
 spans, limiares por suite, gate de deploy automático e evolução para Kubernetes. Somam-se a elas
 as decisões de correlação, alertas, métricas de domínio e fila do sink listadas em §6. Ver
 [`.specs/018-langsmith-local.md`](../.specs/018-langsmith-local.md), seção 15.
+
+---
+
+## 10. Evidência demonstrativa e diagnóstico de erros
+
+Esta seção torna a observabilidade **demonstrável sem subir a stack**. Ela complementa §5
+(implementação), §7 (runbook) e §8 (verificação ao vivo) com um artefato reproduzível e com o
+caminho de diagnóstico apoiado nos campos que o código realmente emite.
+
+> Não existe registro de incidente real de produção versionado neste repositório, nem captura do
+> Grafana em execução. Os exemplos abaixo vêm do código e dos cenários simulados da suíte de
+> testes; eles mostram **como diagnosticar**, não afirmam que determinado erro ocorreu em produção.
+
+### 10.1 Prévia estrutural do dashboard
+
+O artefato [`observability/dashboard-preview.svg`](../observability/dashboard-preview.svg) é gerado
+de forma determinística a partir de `observability/dashboards/api-overview.json`:
+
+```sh
+bun observability/gen-dashboard-preview.mjs
+```
+
+O gerador usa apenas `node:fs`/`node:path`, lê o JSON versionado e escreve um SVG independente:
+**10 rows, 51 visualizações, 64 queries**, com painéis agrupados por row e identificados por tipo,
+fonte e número de queries. Cores: azul = Loki, laranja = Prometheus, roxo = Tempo, cinza = sem
+datasource (`alertlist`). O cabeçalho registra UID, refresh (`30s`), janela (`now-3h → now`) e o
+aviso explícito de que aquilo é a **estrutura do painel, não dados reais de produção**.
+
+Para ver dados ao vivo — e tirar uma captura autêntica — é necessário subir o LGTM
+(`bun run infra:up`), gere tráfego na API e abrir <http://localhost:3010> conforme §8. Essa etapa
+continua bloqueada neste ambiente (Docker/PostgreSQL indisponíveis).
+
+### 10.2 Inventário por row (extraído do JSON)
+
+| Row                                              | Painéis | Queries | Fontes                                          |
+| ------------------------------------------------ | ------: | ------: | ----------------------------------------------- |
+| Visão geral (período selecionado)                |       6 |       6 | Loki, Prometheus                                |
+| Tráfego, erros e latência                        |       4 |       6 | Loki                                            |
+| Endpoints: o que funciona e o que não            |       2 |       2 | Loki                                            |
+| Autenticação e eventos de negócio                |       2 |       2 | Loki                                            |
+| Logs                                             |       3 |       3 | Loki                                            |
+| Traces (Tempo) e RED por span                    |       5 |       7 | Prometheus, Tempo                               |
+| Banco de dados: queries da API (spans)           |       9 |       9 | Prometheus, Tempo                               |
+| Postgres: saúde do banco (métricas do servidor)  |      13 |      19 | Prometheus                                      |
+| Alertas                                          |       1 |       0 | sem datasource                                  |
+| Saúde da pipeline de telemetria (OTel Collector) |       6 |      10 | Prometheus                                      |
+| **Total**                                        |  **51** |  **64** | 16 Loki / 30 Prometheus / 4 Tempo / 1 sem fonte |
+
+Consultas que sustentam a prévia (valores de serviço/banco mascarados):
+
+```logql
+sum(count_over_time({service_name="<svc>"} |= "HTTP request completed" [$__range]))
+max(quantile_over_time(0.95, {service_name="<svc>"} |= "HTTP request completed" | unwrap durationMs [$__range]))
+sum by (statusCode, path) (count_over_time({service_name="<svc>"} |= "HTTP request completed" | statusCode=~"[45].." [$__auto]))
+```
+
+```promql
+sum by (span_name) (rate(traces_spanmetrics_calls_total{service="<svc>"}[$__rate_interval]))
+histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{service="<svc>"}[$__rate_interval])))
+```
+
+```traceql
+{ resource.service.name = "<svc>" && duration > 300ms }
+{ resource.service.name = "<svc>" && span.db.system = "postgresql" && status = error }
+```
+
+### 10.3 Logs estruturados emitidos pela aplicação
+
+Formato base em `apps/api/src/modules/shared/observability/app-logger.ts`: `timestamp`, `level`,
+`service`, `message`, atributos primitivos e `traceId` quando há span ativo. A linha vai para
+stdout/stderr e para `otelLogger.emit()`.
+
+| Mensagem                     | Campos principais                                                      | Origem no código                                                 |
+| ---------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `HTTP request completed`     | `requestId`, `method`, `path`, `statusCode`, `durationMs`, `traceId`?  | `modules/shared/logging/request-logging.middleware.ts`           |
+| `Sign-in rejected`           | `outcome`, `userId`?                                                   | `modules/auth/application/sign-in.use-case.ts`                   |
+| `Sign-in succeeded`          | `outcome`, `userId`                                                    | `modules/auth/application/sign-in.use-case.ts`                   |
+| `expert.chat`                | `event`, `expertId`, `userId`, `source`?, `outcome`                    | `modules/conversations/application/send-message.use-case.ts`     |
+| `rag`                        | `event`, `userId`, `topK`, `durationMs`?, `outcome`, `error`?          | `modules/citations/application/retrieve-context.use-case.ts`     |
+| `knowledge.sources`          | `event`, `outcome`, `userId`, `sourceId`?, `versionId`?, `error`?      | `modules/sources/application/process-source-version.use-case.ts` |
+| `media_generation.requested` | `event`, `mediaId`, `userId`, `expertId`, `kind`, `modelId`, `outcome` | `modules/media/application/request-media-generation.use-case.ts` |
+| `obs.trace.missing_metadata` | `spanId`, `traceId`, `fields`                                          | `modules/observability/application/trace-emitter.ts`             |
+| `obs.trace.dropped`          | `spanId`, `traceId`, `error` (nome do erro)                            | `trace-emitter.ts` e `infrastructure/http-trace.sink.ts`         |
+| `Exceção não tratada`        | `requestId`, `statusCode`, `error` (`<ErrorName>: <mensagem>`)         | `modules/shared/interface/error-contract.filter.ts`              |
+| `API iniciada`               | `port`, `webOrigin`, `nodeEnv`, `emailProvider`                        | `main.ts`                                                        |
+
+Exemplo sanitizado (placeholders, sem valor real):
+
+```json
+{
+  "timestamp": "<ISO-8601>",
+  "level": "info",
+  "service": "coders-modulo-4-api",
+  "message": "HTTP request completed",
+  "requestId": "<uuid>",
+  "method": "<METHOD>",
+  "path": "<normalized-or-raw-path>",
+  "statusCode": "<status>",
+  "durationMs": "<ms>",
+  "traceId": "<span-trace-id>"
+}
+```
+
+Spans de banco não são linhas de log: `withDbSpan()`
+(`modules/shared/observability/db-span.ts`) cria spans CLIENT `<OPERAÇÃO> <tabela>` com
+`db.system`, `db.collection.name`, `db.operation.name` e, em erro, `db.response.status_code` e
+`error.type`. Eles alimentam os painéis Prometheus/Tempo descritos em §5.
+
+### 10.4 Diagnóstico de erros: do sintoma à causa
+
+Sequência recomendada ao investigar um erro reportado por usuário ou por 5xx no painel:
+
+1. **Isole a requisição.** Pegue o `x-request-id` (ou o `requestId` devolvido) e filtre no Loki:
+   `{service_name="<svc>"} | requestId="<id>"`. A linha `HTTP request completed` traz `method`,
+   `path`, `statusCode` e `durationMs`; o painel "Requisições por status HTTP" e "Taxa de erro por
+   rota (4xx/5xx)" mostram o comportamento agregado. Atenção: `path` não é normalizado (§6) — não
+   copie query string para tickets, ela pode conter PII.
+2. **Classifique o status.** `4xx` é falha de contrato/validação/autorização (o corpo segue
+   `{ code, message, fieldErrors? }`); `5xx` indica falha da aplicação ou de integração e exige
+   o próximo passo. `429` é esperado quando um rate limit local foi atingido; `401` pode ser
+   sessão revogada por login anterior (sessão única).
+3. **Leia o `outcome` e o `error` dos eventos de domínio.** Exemplos reais de campos emitidos:
+   - e-mail falhou → `E-mail de confirmação/recuperação/nova sessão/senha alterada não foi enviado`
+     com `outcome` (`confirmation_email_failed`, `reset_email_failed` etc.) e `error` (nome do
+     erro). Em cenários simulados, o sign-up chega a `503` com `HttpException` no log
+     `Exceção não tratada`;
+   - RAG indisponível → `rag` com `event:"rag.retrieval.completed"`,
+     `outcome:"unavailable"` e `error` — a resposta ao usuário pode continuar normal;
+   - fonte/mídia → `knowledge.sources` com `NO_SPEECH_DETECTED`,
+     `SOURCE_VECTOR_STORE_UNAVAILABLE` ou `SOURCE_URL_NO_TEXT`, e eventos
+     `media.extraction.started/completed/failed`;
+   - tracing local → `obs.trace.dropped` (coletor/timeout; erro engolido por design) e
+     `obs.trace.missing_metadata` (marcador `missing`, não é erro).
+4. **Vá do log ao trace.** O `traceId` presente no log aponta para o span no Tempo (busca por
+   `traceID`), onde a row "Traces (Tempo) e RED por span" separa latência, erro e `span_name`.
+   Para banco, use "Queries lentas (> 100 ms)", "Queries com erro" e a row "Banco de dados:
+   queries da API (spans)", com `db.operation.name`/`db.collection.name`.
+5. **Confirme a pipeline antes de culpar a aplicação.** Se não há nem logs, o painel "API enviando
+   telemetria" e as queries `up{job="otelcol-contrib"}`, `otelcol_exporter_queue_size` e
+   `otelcol_receiver_*` dizem se o coletor recebeu e exportou. Painéis Postgres vazios têm causa
+   conhecida em §5 (filtro `postgresql_database_name` fixo).
+6. **Aja conforme o sinal.**
+
+| Sinal                                             | Interpretação provável          | Ação                                                                 |
+| ------------------------------------------------- | ------------------------------- | -------------------------------------------------------------------- |
+| `4xx` isolado com `outcome` de validação          | comportamento de contrato       | Ajustar cliente/dados; não abrir alerta de disponibilidade           |
+| `429` em auth                                     | rate limit local ao processo    | Verificar origem e janela; store compartilhado é follow-up           |
+| `503` + `*_email_failed`                          | provedor de e-mail indisponível | Conferir provedor por `NODE_ENV` e logs do envio; resposta é 503     |
+| `rag` `outcome:"unavailable"`                     | recuperação vetorial falhou     | Conferir Weaviate/embeddings; citações degradam, chat pode responder |
+| `obs.trace.dropped`                               | sink local não entregou         | Conferir endpoint/timeout do coletor; resposta ao usuário não muda   |
+| `statusCode=error` em span `db.system=postgresql` | query ou conexão falhou         | Usar `db.operation.name`/tabela e correlação com `postgresql_*`      |
+| `up{job="otelcol-contrib"} == 0`                  | coletor fora                    | Subir LGTM/coletor; ver §7                                           |
+
+### 10.5 Limites desta evidência
+
+- A correlação `requestId` → `traceId` OTel → `traceId` local ainda não é unificada (§6): o
+  diagnóstico cruza campos manualmente.
+- Não há alertas provisionados nem painéis de chat/RAG/custo/mídia/fila; sinais de domínio existem
+  só como atributos de log/span.
+- A prévia SVG prova a **estrutura versionada**, não a efetividade do painel com dados. Para
+  evidência "ao vivo", execute §8 com Docker/LGTM disponíveis e anexe a captura ao relatório.
+- O checklist reproduzível de testes/cobertura está em
+  [QA.md §22](./QA.md#22-evidências-de-testes-e-cobertura--revisão-do-módulo-4-2026-11-18).

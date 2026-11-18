@@ -316,6 +316,12 @@ Contratos, flags, limites e decisões abertas: [`.docs/AI.md`](./.docs/AI.md).
   pseudonimização e fallback gracioso. Não é a stack LangSmith licenciada.
 - **Avaliação offline:** `bun run obs:eval` (detalhes em
   [`eval/datasets/README.md`](./eval/datasets/README.md)).
+- **Prévia estrutural:** [`observability/dashboard-preview.svg`](./observability/dashboard-preview.svg)
+  mostra as 10 rows, 51 visualizações e 64 queries do dashboard versionado; gere com
+  `bun observability/gen-dashboard-preview.mjs`. É a estrutura do painel, **não dados reais**.
+- **Evidências de qualidade:** resultados de testes/cobertura em
+  [`.docs/QA.md §22`](./.docs/QA.md#22-evidências-de-testes-e-cobertura--revisão-do-módulo-4-2026-11-18)
+  e diagnóstico de erros em [`.docs/OBSERVABILITY.md §10`](./.docs/OBSERVABILITY.md#10-evidência-demonstrativa-e-diagnóstico-de-erros).
 - **Limites conhecidos:** os três identificadores (`requestId`, `traceId` OTel, `traceId` local)
   ainda não são unificados; não há alertas provisionados nem métricas de domínio (custo, RAG,
   mídia, fila). Inventário e runbook em

@@ -899,3 +899,103 @@ no histórico de commits da spec.
 | `018-langsmith-local`                                  | [plano](../.plans/018-langsmith-local-plan.md)                                                                                          | §17, §18 e §20; detalhes em [OBSERVABILITY.md](./OBSERVABILITY.md)                                   |
 
 Para revisar ou reabrir uma spec, use `refine-spec` e registre a divergência na spec e neste índice.
+
+---
+
+## 22. Evidências de testes e cobertura — revisão do Módulo 4 (2026-11-18)
+
+Esta seção responde ao ponto da avaliação que pediu **procedimentos, resultados de sucesso/falha e
+cobertura** documentados. Ela consolida o que foi executado novamente nesta rodada; as seções
+`11`–`20` continuam como histórico datado de cada spec.
+
+### 22.1 Execução registrada
+
+| Item            | Valor                                                            |
+| --------------- | ---------------------------------------------------------------- |
+| Comando         | `bun run test` (raiz do monorepo, via Turbo)                     |
+| Data            | 2026-11-18 (início da suíte web às 15:55:52, hora local)         |
+| Ambiente        | Bun 1.4.4 em Windows; sem Docker, PostgreSQL ou LGTM em execução |
+| Código de saída | `0`                                                              |
+| Turbo           | `2 successful, 2 total` · `0 cached, 2 total` · `46.804s`        |
+
+| Suíte                     | Arquivos | Testes  | Duração | Resultado |
+| ------------------------- | -------- | ------- | ------- | --------- |
+| API — `apps/api` (Vitest) | 91       | 627     | 42,27 s | ok        |
+| Web — `apps/web` (Vitest) | 13       | 156     | 3,37 s  | ok        |
+| **Total**                 | **104**  | **783** | —       | ok        |
+
+A suíte de IA/evaluation também foi reexecutada: `bun run obs:eval` → código `0`,
+`Summary: 4/4 datasets passed` (`citation_fidelity`, `answer_quality`, `media_intent`, `no_answer`,
+todos com `overall: 0.800 PASS`). É uma avaliação determinística offline, **não** métrica de
+cobertura de código.
+
+### 22.2 Reprodução
+
+```sh
+bun run test                                              # todas as suítes unitárias/de integração
+bun run test -- --reporter=verbose                        # saída nominal por arquivo
+bunx turbo test --filter=api --only -- --reporter=verbose # apenas API
+bunx turbo test --filter=web --only -- --reporter=verbose # apenas web
+bun run obs:eval                                          # evaluation offline de IA
+bun run test:e2e                                          # Playwright (API fake + Next dev)
+```
+
+Use sempre `bun run <script>`: `bun test` é o runner nativo do Bun e não executa os scripts do
+monorepo. A suíte API usa `apps/api/src/test/setup-env.ts` e fakes em `apps/api/src/test/fakes/`;
+ela não depende de banco real nem de chaves de produção.
+
+### 22.3 Sucesso, falha e erros esperados
+
+- **Falhas de teste nesta execução:** nenhuma. Nenhum arquivo ou caso foi reportado como
+  `failed`; os dois processos terminaram com código `0`.
+- **Caminhos de erro exercitados com sucesso:** a saída contém linhas `warn`/`error` intencionais
+  dos testes de integração, por exemplo `HTTP request completed` com `401`, `429`, `503`,
+  `E-mail de confirmação não foi enviado`, `rag` com `outcome:"unavailable"` e `knowledge.sources`
+  com `error:"NO_SPEECH_DETECTED"` / `"SOURCE_VECTOR_STORE_UNAVAILABLE"`. São **cenários
+  simulados que passaram**, não testes quebrados nem incidentes reais.
+- **E2E:** não foi reexecutado nesta rodada. A última evidência registrada é §20 —
+  `bun run test:e2e` ok, `168/168`. Para reproduzir, use `bun run test:e2e`; o Playwright sobe a
+  API fake em `127.0.0.1:3434` e o web em `3000` (portas configuráveis por
+  `E2E_WEB_PORT`/`E2E_FAKE_API_PORT`). Atenção a `reuseExistingServer`: servidores antigos podem
+  gerar falsos negativos (ver §13).
+- **Bloqueios conhecidos:** `bun run db:test`/`db:migrate` exigem PostgreSQL local (§§11–20);
+  não há `.github/workflows`, portanto toda evidência é manual/local. `packages/ui` não tem
+  Vitest/Testing Library e fica fora das contagens acima.
+
+### 22.4 Cobertura de código — situação real e pendência
+
+🧭 **Ainda não há cobertura mensurada.** Não existe `@vitest/coverage-v8` nem
+`@vitest/coverage-istanbul` declarado ou instalado em nenhum workspace; no `bun.lock` eles aparecem
+apenas como _peerDependencies_ opcionais do `vitest@5.1.0`, o que não habilita o recurso. Nenhum
+`vitest.config.mts` define `test.coverage`, provider, reporter ou limiares.
+
+Tentativa executada nesta rodada:
+
+| Comando                                             | Resultado                                                                                |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `bunx turbo test --filter=web --only -- --coverage` | falhou (código `1`): `MISSING DEPENDENCY — Cannot find dependency '@vitest/coverage-v8'` |
+
+Portanto **nenhum percentual de cobertura é afirmado** neste documento. Para habilitar a medição:
+
+1. adicionar `@vitest/coverage-v8@5.1.0` como devDependency em `apps/api` e `apps/web`
+   (compatível com o Vitest 5.1.0 já usado);
+2. configurar `test.coverage` nos dois `vitest.config.mts` com `provider: "v8"`, reporters
+   (`text`, `html`, `lcov`) e limiares revisados — o plano `000` registrou apenas "sem meta
+   numérica de cobertura nesta entrega";
+3. declarar `coverage/**` em `turbo.json` (`outputs` da tarefa `test` hoje é `[]`) se o relatório
+   precisar ser preservado em cache;
+4. executar `bun run test -- --coverage --force` e registrar aqui os percentuais **medidos**.
+   O diretório gerado não deve ser versionado; registre apenas o resumo.
+
+A pendência acima é deliberada: instalar dependência ou inventar um número sem medição violaria as
+regras do projeto. O histórico de "cobertura adicional da fatia" nas seções `11`–`20` refere-se a
+**cenários funcionais**, não a cobertura de código.
+
+### 22.5 Evidência visual de observabilidade
+
+A demonstração estrutural do dashboard está em
+[`observability/dashboard-preview.svg`](../observability/dashboard-preview.svg), gerada por
+`bun observability/gen-dashboard-preview.mjs` a partir do JSON versionado. Ela mostra 10 rows,
+51 visualizações e 64 queries — representação da estrutura, **não dados de produção**. O inventário
+detalhado e o diagnóstico de erros estão em
+[OBSERVABILITY.md §10](./OBSERVABILITY.md#10-evidência-demonstrativa-e-diagnóstico-de-erros).
