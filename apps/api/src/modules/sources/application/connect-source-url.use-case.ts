@@ -70,6 +70,7 @@ export class ConnectSourceUrlUseCase {
           type: "txt",
           contentHash: sha256Hex(buffer),
           byteSize: buffer.byteLength,
+          durationSeconds: null,
           buffer,
         },
       ],

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { FakeMediaTextExtractor } from "../../../test/fakes/fake-media-text-extractor";
+import { FakeWebPageFetcher } from "../../../test/fakes/fake-web-page-fetcher";
 import { InMemorySourcesRepository } from "../../../test/fakes/in-memory-sources.repository";
 import { FakeDocumentTextExtractor } from "../../../test/fakes/fake-document-text-extractor";
 import { FakeEmbeddingGenerator } from "../../../test/fakes/fake-embedding-generator";
@@ -57,6 +58,7 @@ describe("knowledge media use cases", () => {
   let list: ListSourcesUseCase;
   let remove: DeleteSourceUseCase;
   let retry: RetrySourceVersionUseCase;
+  let pages: FakeWebPageFetcher;
 
   beforeEach(() => {
     sources = new InMemorySourcesRepository();
@@ -73,7 +75,13 @@ describe("knowledge media use cases", () => {
     connect = new ConnectSourcesUseCase(sources, processVersion);
     list = new ListSourcesUseCase(sources);
     remove = new DeleteSourceUseCase(sources, vectors);
-    retry = new RetrySourceVersionUseCase(sources, vectors, processVersion);
+    pages = new FakeWebPageFetcher();
+    retry = new RetrySourceVersionUseCase(
+      sources,
+      vectors,
+      processVersion,
+      pages,
+    );
   });
 
   async function connectFile(
