@@ -1,7 +1,7 @@
 # Fontes de conhecimento por arquivo — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-17
+> **Status:** done
+> **Atualizado em:** 2026-11-18
 > **Autor:** OpenCode Agent
 > **Épico:** `.plans/012-expert-platform-breakdown.md` (fatia 2)
 > **Depende de:** `.specs/012-expert-chat.md`
@@ -211,27 +211,27 @@ As metas numéricas de latência e custo ficam como decisão aberta com o solici
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um usuário autenticado na home privada, quando há fontes conectadas, então o botão
+- [x] Dado um usuário autenticado na home privada, quando há fontes conectadas, então o botão
       flutuante está visível e a lista mostra cada fonte com nome, tipo, tamanho e status.
-- [ ] Dado um arquivo PDF, TXT ou Markdown válido, quando é enviado, então a versão aparece em
+- [x] Dado um arquivo PDF, TXT ou Markdown válido, quando é enviado, então a versão aparece em
       `queued`/`processing` e, ao concluir, passa a `ready` com quantidade de chunks e vetores
       gravados.
-- [ ] Dado um arquivo já conectado pelo mesmo usuário, quando é reenviado com o mesmo conteúdo,
+- [x] Dado um arquivo já conectado pelo mesmo usuário, quando é reenviado com o mesmo conteúdo,
       então nenhuma versão, chunk ou embedding novo é criado e a interface informa "Already
       connected".
-- [ ] Dado um arquivo com conteúdo idêntico enviado por usuário diferente, quando é processado,
+- [x] Dado um arquivo com conteúdo idêntico enviado por usuário diferente, quando é processado,
       então cada usuário possui sua própria fonte, sem compartilhamento.
-- [ ] Dado um arquivo de tipo não suportado, quando é enviado, então é recusado com mensagem em
+- [x] Dado um arquivo de tipo não suportado, quando é enviado, então é recusado com mensagem em
       inglês que lista os formatos aceitos.
-- [ ] Dado um arquivo com nome já conectado e conteúdo diferente, quando é processado, então uma
+- [x] Dado um arquivo com nome já conectado e conteúdo diferente, quando é processado, então uma
       nova `SourceVersion` é criada, a anterior deixa de ser a atual e é marcada como desatualizada.
-- [ ] Dado uma falha ao gravar os vetores, quando o processamento termina, então a versão aparece
+- [x] Dado uma falha ao gravar os vetores, quando o processamento termina, então a versão aparece
       como `failed`, não é marcada como `ready` e pode ser tentada novamente.
-- [ ] Dado dois envios simultâneos do mesmo conteúdo pelo mesmo usuário, quando ambos terminam,
+- [x] Dado dois envios simultâneos do mesmo conteúdo pelo mesmo usuário, quando ambos terminam,
       então existe exatamente uma versão válida e os vetores não estão duplicados.
-- [ ] Dado uma fonte conectada, quando a pessoa a exclui, então arquivo, versões, chunks e vetores
+- [x] Dado uma fonte conectada, quando a pessoa a exclui, então arquivo, versões, chunks e vetores
       são removidos, a fonte desaparece da lista e o histórico de chat permanece.
-- [ ] Dado qualquer arquivo processado, quando inspecionados logs e telemetria, então nenhum trecho
+- [x] Dado qualquer arquivo processado, quando inspecionados logs e telemetria, então nenhum trecho
       de conteúdo, nome de arquivo ou hash aparece registrado.
 
 ## 15. Decisões e questões abertas
@@ -247,3 +247,11 @@ As metas numéricas de latência e custo ficam como decisão aberta com o solici
 | Retenção            | Por quanto tempo manter arquivo original, versões antigas, chunks e embeddings após a conexão?                                             | Define política de privacidade e custo de armazenamento.               | Solicitante | aberta   |
 | Exclusão de fonte   | A pessoa remove fonte, arquivo, todas as versões e vetores; o histórico de chat permanece e a fatia 5 trata a citação órfã.                | Define regras de limpeza e contrato compartilhado com as fatias 3 e 4. | Solicitante | decidida |
 | Metas de qualidade  | Latência e custo máximos aceitáveis por arquivo processado.                                                                                | Permite transformar telemetria em gate de aceite.                      | Solicitante | aberta   |
+
+> **Registro da entrega (2026-11-18):** limites provisórios de 10 MB por arquivo e 5 arquivos por
+> envio ficaram centralizados em `MAX_SOURCE_FILE_BYTES`/`MAX_FILES_PER_UPLOAD`; a retenção atual
+> mantém arquivo original, versões antigas, chunks e vetores até a exclusão da fonte, com versões
+> antigas marcadas como desatualizadas. Limites definitivos, política de retenção e metas numéricas
+> de latência/custo continuam como follow-up do solicitante. A migração `0003_knowledge_sources.sql`
+> foi entregue, mas a validação local ficou limitada à indisponibilidade do PostgreSQL na porta 5433
+> (ver `.docs/QA.md` e relatório final).

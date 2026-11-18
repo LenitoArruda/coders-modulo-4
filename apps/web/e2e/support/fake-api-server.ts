@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -465,6 +466,418 @@ async function handleResetPassword(
   sendJson(response, 200, { message: RESET_PASSWORD_SUCCESS_MESSAGE });
 }
 
+type SourceType = "pdf" | "txt" | "markdown";
+type SourceStatus = "queued" | "processing" | "ready" | "failed";
+
+type UploadedFile = {
+  originalName: string;
+  mimeType: string;
+  buffer: Buffer;
+};
+
+type FakeSourceVersion = {
+  id: string;
+  contentHash: string;
+  name: string;
+  type: SourceType;
+  byteSize: number;
+  status: SourceStatus;
+  chunkCount: number;
+  createdAt: string;
+  polls: number;
+};
+
+type FakeSource = {
+  id: string;
+  normalizedName: string;
+  currentVersionId: string;
+  versions: FakeSourceVersion[];
+};
+
+type FakeSourceSummary = {
+  id: string;
+  name: string;
+  type: SourceType;
+  byteSize: number;
+  status: SourceStatus;
+  versionId: string;
+  versionNumber: number;
+  chunkCount: number;
+  isStale: boolean;
+  createdAt: string;
+};
+
+const MAX_FAKE_SOURCE_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FAKE_SOURCE_FILES = 5;
+
+const UNSUPPORTED_SOURCE_MESSAGE =
+  "Only PDF, TXT or Markdown files are supported.";
+const TOO_MANY_SOURCES_MESSAGE =
+  "Too many files. Send up to 5 files at a time.";
+const EMPTY_SOURCE_MESSAGE = "The file has no text we can index.";
+const SOURCE_TOO_LARGE_MESSAGE =
+  "One of the files is too large. Try a smaller file.";
+const SOURCE_NOT_FOUND_MESSAGE = "That source is no longer available.";
+const SOURCE_VERSION_NOT_FOUND_MESSAGE = "That version is no longer available.";
+
+/** Source state is keyed by session token so parallel E2E tests stay isolated. */
+const sourcesByToken = new Map<string, FakeSource[]>();
+let sourceSequence = 0;
+
+function nextSourceId(prefix: string): string {
+  sourceSequence += 1;
+
+  return `${prefix}-${sourceSequence}`;
+}
+
+function tokenSources(token: string): FakeSource[] {
+  let sources = sourcesByToken.get(token);
+
+  if (sources === undefined) {
+    sources = [];
+    sourcesByToken.set(token, sources);
+  }
+
+  return sources;
+}
+
+function readRawBody(request: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => resolve(Buffer.concat(chunks)));
+    request.on("error", () => resolve(Buffer.alloc(0)));
+  });
+}
+
+/** Minimal multipart reader for the browser's `FormData` upload payload. */
+async function readMultipartFiles(
+  request: IncomingMessage,
+): Promise<UploadedFile[]> {
+  const contentType = request.headers["content-type"] ?? "";
+  const boundaryMatch = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  const boundary = (boundaryMatch?.[1] ?? boundaryMatch?.[2] ?? "").trim();
+
+  if (boundary === "") return [];
+
+  const raw = await readRawBody(request);
+  const delimiter = Buffer.from(`--${boundary}`);
+  const files: UploadedFile[] = [];
+  let cursor = raw.indexOf(delimiter);
+
+  while (cursor >= 0) {
+    const partStart = cursor + delimiter.length;
+    const next = raw.indexOf(delimiter, partStart);
+
+    if (next < 0) break;
+
+    let part = raw.subarray(partStart, next);
+
+    if (part[0] === 13 && part[1] === 10) part = part.subarray(2);
+    if (part[part.length - 2] === 13 && part[part.length - 1] === 10) {
+      part = part.subarray(0, part.length - 2);
+    }
+
+    const headerEnd = part.indexOf(Buffer.from("\r\n\r\n"));
+
+    if (headerEnd >= 0) {
+      const headers = part.subarray(0, headerEnd).toString("utf8");
+      const disposition =
+        headers
+          .split("\r\n")
+          .find((line) => /^content-disposition:/i.test(line)) ?? "";
+      const fieldName = /name="([^"]+)"/i.exec(disposition)?.[1];
+      const fileName = /filename="([^"]*)"/i.exec(disposition)?.[1];
+      const declaredType = /^content-type:\s*(.+)$/im.exec(headers)?.[1];
+
+      if (fieldName === "files" && fileName !== undefined && fileName !== "") {
+        files.push({
+          originalName: fileName.split(/[\\/]/).pop()?.trim() ?? fileName,
+          mimeType: declaredType?.trim() ?? "application/octet-stream",
+          buffer: Buffer.from(part.subarray(headerEnd + 4)),
+        });
+      }
+    }
+
+    cursor = next;
+  }
+
+  return files;
+}
+
+function fakeSourceType(file: UploadedFile): SourceType | null {
+  const name = file.originalName.trim().toLowerCase();
+
+  if (name.endsWith(".pdf")) return "pdf";
+  if (name.endsWith(".txt")) return "txt";
+  if (name.endsWith(".md") || name.endsWith(".markdown")) return "markdown";
+
+  return null;
+}
+
+function normalizeFakeSourceName(name: string): string {
+  return (
+    name
+      .split(/[\\/]/)
+      .pop()
+      ?.trim()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim() ?? ""
+  );
+}
+
+function fakeChunkCount(version: FakeSourceVersion): number {
+  return Math.max(1, Math.ceil(version.byteSize / 24));
+}
+
+function currentVersion(source: FakeSource): FakeSourceVersion | undefined {
+  return source.versions.find(
+    (version) => version.id === source.currentVersionId,
+  );
+}
+
+function toFakeSummary(source: FakeSource): FakeSourceSummary | null {
+  const version = currentVersion(source);
+
+  if (version === undefined) return null;
+
+  return {
+    id: source.id,
+    name: version.name,
+    type: version.type,
+    byteSize: version.byteSize,
+    status: version.status,
+    versionId: version.id,
+    versionNumber: source.versions.indexOf(version) + 1,
+    chunkCount: version.chunkCount,
+    isStale: false,
+    createdAt: version.createdAt,
+  };
+}
+
+function sourceError(
+  response: ServerResponse,
+  status: number,
+  code: string,
+  message: string,
+): void {
+  sendJson(response, status, { code, message });
+}
+
+/** GET /api/v1/sources — processing versions settle after a second poll. */
+function handleListSources(
+  request: IncomingMessage,
+  response: ServerResponse,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const sources = tokenSources(bearerToken(request));
+
+  for (const source of sources) {
+    const version = currentVersion(source);
+
+    if (version?.status !== "processing") continue;
+
+    version.polls += 1;
+
+    if (version.polls >= 2) {
+      version.status = "ready";
+      version.chunkCount = fakeChunkCount(version);
+    }
+  }
+
+  const summaries = sources
+    .map(toFakeSummary)
+    .filter((summary): summary is FakeSourceSummary => summary !== null);
+
+  sendJson(response, 200, { sources: summaries });
+}
+
+/** POST /api/v1/sources — mirrors the real 202 + async processing contract. */
+async function handleConnectSources(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const files = await readMultipartFiles(request);
+
+  if (files.length === 0) {
+    sourceError(
+      response,
+      400,
+      "UNSUPPORTED_SOURCE_FILE",
+      UNSUPPORTED_SOURCE_MESSAGE,
+    );
+    return;
+  }
+  if (files.length > MAX_FAKE_SOURCE_FILES) {
+    sourceError(
+      response,
+      400,
+      "TOO_MANY_SOURCE_FILES",
+      TOO_MANY_SOURCES_MESSAGE,
+    );
+    return;
+  }
+
+  for (const file of files) {
+    if (fakeSourceType(file) === null) {
+      sourceError(
+        response,
+        400,
+        "UNSUPPORTED_SOURCE_FILE",
+        UNSUPPORTED_SOURCE_MESSAGE,
+      );
+      return;
+    }
+    if (file.buffer.byteLength === 0) {
+      sourceError(response, 400, "EMPTY_SOURCE_FILE", EMPTY_SOURCE_MESSAGE);
+      return;
+    }
+    if (file.buffer.byteLength > MAX_FAKE_SOURCE_FILE_BYTES) {
+      sourceError(
+        response,
+        400,
+        "SOURCE_FILE_TOO_LARGE",
+        SOURCE_TOO_LARGE_MESSAGE,
+      );
+      return;
+    }
+  }
+
+  const sources = tokenSources(bearerToken(request));
+  const results = files.map((file) => {
+    const type = fakeSourceType(file) as SourceType;
+    const contentHash = createHash("sha256").update(file.buffer).digest("hex");
+    const existing = sources
+      .flatMap((source) =>
+        source.versions.map((version) => ({ source, version })),
+      )
+      .find((candidate) => candidate.version.contentHash === contentHash);
+
+    if (existing !== undefined) {
+      return {
+        name: file.originalName,
+        type,
+        byteSize: file.buffer.byteLength,
+        sourceId: existing.source.id,
+        versionId: existing.version.id,
+        status: existing.version.status,
+        alreadyConnected: true,
+      };
+    }
+
+    const normalizedName = normalizeFakeSourceName(file.originalName);
+    let source = sources.find(
+      (candidate) => candidate.normalizedName === normalizedName,
+    );
+
+    if (source === undefined) {
+      source = {
+        id: nextSourceId("src"),
+        normalizedName,
+        currentVersionId: "",
+        versions: [],
+      };
+      sources.unshift(source);
+    }
+
+    const shouldFail = /fail|broken|corrupt/i.test(file.originalName);
+    const status: SourceStatus = shouldFail ? "failed" : "processing";
+    const version: FakeSourceVersion = {
+      id: nextSourceId("ver"),
+      contentHash,
+      name: file.originalName,
+      type,
+      byteSize: file.buffer.byteLength,
+      status,
+      chunkCount: 0,
+      createdAt: new Date().toISOString(),
+      polls: /pending/i.test(file.originalName) ? 0 : 1,
+    };
+
+    source.versions.push(version);
+    source.currentVersionId = version.id;
+
+    return {
+      name: file.originalName,
+      type,
+      byteSize: file.buffer.byteLength,
+      sourceId: source.id,
+      versionId: version.id,
+      status,
+      alreadyConnected: false,
+    };
+  });
+
+  sendJson(response, 202, { results });
+}
+
+/** DELETE /api/v1/sources/:sourceId */
+function handleDeleteSource(
+  request: IncomingMessage,
+  response: ServerResponse,
+  sourceId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const sources = tokenSources(bearerToken(request));
+  const index = sources.findIndex((source) => source.id === sourceId);
+
+  if (index < 0) {
+    sourceError(response, 404, "SOURCE_NOT_FOUND", SOURCE_NOT_FOUND_MESSAGE);
+    return;
+  }
+
+  sources.splice(index, 1);
+  response.writeHead(204);
+  response.end();
+}
+
+/** POST /api/v1/sources/:versionId/retry — failures recover deterministically. */
+function handleRetrySourceVersion(
+  request: IncomingMessage,
+  response: ServerResponse,
+  versionId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const match = tokenSources(bearerToken(request))
+    .flatMap((source) => source.versions)
+    .find((version) => version.id === versionId);
+
+  if (match === undefined) {
+    sourceError(
+      response,
+      404,
+      "SOURCE_VERSION_NOT_FOUND",
+      SOURCE_VERSION_NOT_FOUND_MESSAGE,
+    );
+    return;
+  }
+
+  match.status = "ready";
+  match.chunkCount = fakeChunkCount(match);
+  sendJson(response, 202, { versionId: match.id, status: "processing" });
+}
+
 function handleListExperts(
   request: IncomingMessage,
   response: ServerResponse,
@@ -683,6 +1096,38 @@ const server = createServer(async (request, response) => {
     request.method === "POST"
   ) {
     await handleSendMessage(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/sources" && request.method === "GET") {
+    handleListSources(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/sources" && request.method === "POST") {
+    await handleConnectSources(request, response);
+    return;
+  }
+
+  const retryMatch = /^\/api\/v1\/sources\/([^/]+)\/retry$/.exec(pathname);
+
+  if (retryMatch !== null && request.method === "POST") {
+    handleRetrySourceVersion(
+      request,
+      response,
+      decodeURIComponent(retryMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  const sourceMatch = /^\/api\/v1\/sources\/([^/]+)$/.exec(pathname);
+
+  if (sourceMatch !== null && request.method === "DELETE") {
+    handleDeleteSource(
+      request,
+      response,
+      decodeURIComponent(sourceMatch[1] ?? ""),
+    );
     return;
   }
 

@@ -1,6 +1,6 @@
 # BUSINESS.md — Negócio e produto
 
-> **Status:** hipóteses iniciais + catálogo de Experts e chat implementados (fatia 012) · **Atualizado em:** 2026-11-17
+> **Status:** hipóteses iniciais + catálogo de Experts, chat e fontes de arquivo implementados (fatias 012–013) · **Atualizado em:** 2026-11-18
 > **Público:** produto, engenharia e agentes que precisam entender **o que** estamos construindo.
 
 Este documento descreve o problema, a proposta de valor e o escopo do produto. Decisões ainda
@@ -96,6 +96,13 @@ papel, escopo, tom e sugestões) vive na API (`EXPERT_CATALOG`) e é a fonte ún
 | Linear        | Issues e projetos            | Próxima fase          |
 | ClickUp       | Tarefas e docs               | Próxima fase          |
 
+> **Estado atual (fatia 013):** upload de PDF, TXT e Markdown já está implementado na home privada.
+> A pessoa anexa arquivos pelo botão flutuante, acompanha `queued`/`processing`/`ready`/`failed`,
+> recebe "Already connected" quando reenvia o mesmo conteúdo e pode remover uma fonte. O hash do
+> conteúdo deduplica no escopo do usuário; nome igual com conteúdo diferente cria nova versão e a
+> anterior fica desatualizada. Arquivo, versões, chunks e vetores são removidos juntos na exclusão.
+> Google Drive e Notion seguem como hipótese de MVP, não implementados nesta fatia.
+
 Requisitos por conector:
 
 - Autenticação segura e renovação de token.
@@ -124,10 +131,11 @@ Requisitos por conector:
 4. Expert responde com análise e referências.
 5. Usuário refina o pedido ou solicita um entregável.
 
-> **Estado atual (fatia 012):** seleção do Expert, sugestões clicáveis, envio de prompt, resposta no
-> papel do Expert e histórico isolado por usuário já funcionam. A recuperação de contexto das fontes
-> e as citações (passos 3–4) entram nas fatias seguintes; hoje a resposta vem do modelo com a persona
-> do Expert, sem fontes conectadas.
+> **Estado atual (fatias 012–013):** seleção do Expert, sugestões clicáveis, envio de prompt, resposta
+> no papel do Expert e histórico isolado por usuário já funcionam. A fatia 013 permite conectar
+> PDF/TXT/Markdown e indexar chunks/embeddings no Weaviate local, mas o chat ainda não consulta essa
+> base: a resposta continua vindo do modelo com a persona do Expert. A recuperação de contexto e as
+> citações (passos 3–4) entram na fatia 5.
 
 ### 8.3 Gestão
 
@@ -143,7 +151,8 @@ Requisitos por conector:
 
 - Autenticação (implementada); workspace segue como hipótese.
 - Catálogo de nove Experts com chat em persona (implementado na fatia 012).
-- Conexão de 2 a 3 fontes (PDF, Markdown, Google Drive ou Notion).
+- Conexão de fontes de arquivo (PDF, TXT e Markdown — implementada na fatia 013); Google Drive e
+  Notion seguem como hipótese de MVP.
 - Pergunta e resposta com citações das fontes (citações nas fatias seguintes).
 - Histórico de conversas isolado por usuário (implementado na fatia 012).
 - Controle básico de acesso por workspace.
