@@ -8,8 +8,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
-  // Cold `next dev` compiles of /app can exceed the 5 s default on the first hit.
-  expect: { timeout: 15_000 },
+  // Cold `next dev` compiles of /app and sign-in Server Actions can take longer
+  // than the 5 s default when the fully parallel suite shares one dev server.
+  expect: { timeout: 30_000 },
   reporter: [["list"]],
   use: {
     baseURL: "http://127.0.0.1:3000",

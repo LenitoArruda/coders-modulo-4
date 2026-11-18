@@ -312,6 +312,10 @@ test.describe("returnTo", () => {
 
 test.describe("single session", () => {
   test("segundo dispositivo invalida o primeiro", async ({ browser }) => {
+    // Two sign-ins plus three navigations share the 30 s default test budget
+    // with fully parallel workers and cold `next dev` compiles.
+    test.setTimeout(90_000);
+
     const email = uniqueEmail("single");
     const first = await newSignedInContext(browser, email);
     const second = await newSignedInContext(browser, email);
