@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
+import { isIP } from "node:net";
 
 import {
   E2E_CONFIRM_RATE_LIMITED_TOKEN,
@@ -14,6 +16,7 @@ import {
   E2E_SIGN_IN_PASSWORD,
   E2E_VALID_SESSION_TOKEN,
 } from "./fake-session";
+import { FAKE_EXPERTS } from "./fake-experts";
 
 /**
  * Minimal API used only by Playwright. Session validation happens on the Next
@@ -107,6 +110,595 @@ function readJsonBody(request: IncomingMessage): Promise<unknown> {
     });
     request.on("error", () => resolve(null));
   });
+}
+
+type ChatCitation = {
+  citationNumber: number;
+  sourceId: string;
+  sourceVersionId: string;
+  chunkIndex: number;
+  sourceName: string;
+  sourceType: string;
+  location: { label: string; page?: number };
+  snippet: string;
+  isStale: boolean;
+  sourceRemoved: boolean;
+};
+
+type ChatMessage = {
+  id: string;
+  role: "user" | "expert";
+  content: string;
+  createdAt: string;
+  citations?: ChatCitation[];
+  retrieval?: {
+    queryEmbeddingModel: string;
+    vectorIndex: string;
+    topK: number;
+    threshold: number;
+    scores: number[];
+    latencyMs: number;
+    chunksConsidered: number;
+    status: "matched" | "no_match" | "unavailable";
+  };
+  answerStatus?: "plain" | "with_source" | "no_match" | "retrieval_unavailable";
+  media?: FakeMediaAttachment[];
+};
+
+type FakeMediaKind = "image" | "video";
+type FakeMediaStatus =
+  "queued" | "generating" | "ready" | "failed" | "cancelled";
+type FakeMediaSize = "1024x1024" | "1024x1536" | "1536x1024";
+type FakeMediaDuration = 4 | 6 | 8;
+
+type FakeMediaParameters = {
+  kind: FakeMediaKind;
+  size?: FakeMediaSize;
+  durationSeconds?: FakeMediaDuration;
+  resolution?: "720p";
+  style?: string;
+  citationNumber?: number;
+};
+
+type FakeMediaCitation = {
+  citationNumber: number;
+  sourceName: string;
+  locationLabel: string;
+};
+
+/** Mirrors the API's public media contract without exposing bytes in JSON. */
+type FakeMediaAttachment = {
+  mediaId: string;
+  kind: FakeMediaKind;
+  status: FakeMediaStatus;
+  uri: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
+  modelId: string;
+  modelVersion: string | null;
+  parameters: FakeMediaParameters;
+  createdAt: string;
+  citation?: FakeMediaCitation;
+  errorCode?: string;
+  errorMessage?: string;
+  attempts?: number;
+};
+
+type FakeMediaRecord = {
+  attachment: FakeMediaAttachment;
+  ownerToken: string;
+  fileName: string;
+  bytes: Buffer;
+  polls: number;
+};
+
+const RAG_NO_MATCH_ANSWER =
+  "I couldn't find a basis in your connected knowledge for that question. Connect a source or try rephrasing it.";
+const RAG_UNAVAILABLE_NOTICE =
+  "Knowledge search is unavailable right now. Try again to include sources.";
+
+type StoredConversation = {
+  conversationId: string;
+  messages: ChatMessage[];
+};
+
+/**
+ * Transcripts are keyed by session token and Expert, so every E2E test (which
+ * signs in with a unique account) sees only its own history. State lives only
+ * for the lifetime of the fake API process.
+ */
+const storedConversations = new Map<string, StoredConversation>();
+let chatSequence = 0;
+
+/** Deliverables are keyed by session token so every E2E account stays isolated. */
+const mediaByToken = new Map<string, FakeMediaRecord[]>();
+let mediaSequence = 0;
+
+function bearerToken(request: IncomingMessage): string {
+  return (request.headers.authorization ?? "").replace(/^Bearer /, "");
+}
+
+function isAuthenticated(request: IncomingMessage): boolean {
+  const token = bearerToken(request);
+
+  if (token === E2E_VALID_SESSION_TOKEN) {
+    return true;
+  }
+
+  const owner = signInTokenOwner(token);
+
+  return owner !== null && latestSignInSession.get(owner.local) === owner.n;
+}
+
+function unauthorized(response: ServerResponse): void {
+  sendJson(response, 401, {
+    code: "UNAUTHORIZED",
+    message: "Your session is invalid or has expired. Sign in again.",
+  });
+}
+
+function conversationKey(token: string, expertId: string): string {
+  return `${token}|${expertId}`;
+}
+
+// A 1x1 PNG is enough for the inline <img> preview; no provider is contacted.
+const FAKE_IMAGE_BYTES = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+  "base64",
+);
+// The video preview only needs a downloadable payload in this fake API.
+const FAKE_VIDEO_BYTES = Buffer.from("fake-mp4-payload-for-e2e", "utf8");
+
+const MEDIA_GENERATE_WORDS =
+  /\b(create|generate|make|draw|produce|design|render|build)\b/i;
+const MEDIA_IMAGE_WORDS =
+  /\b(image|picture|photo|poster|thumbnail|illustration|banner|graphic|cover art|social media post)\b/i;
+const MEDIA_VIDEO_WORDS = /\b(video|clip|animation|reel|story|motion|movie)\b/i;
+
+type FakeMediaPromptPlan =
+  | {
+      outcome: "media";
+      kind: FakeMediaKind;
+      parameters: FakeMediaParameters;
+      reply: string;
+      fail?: boolean;
+    }
+  | { outcome: "text"; reply: string }
+  | { outcome: "none" };
+
+function mediaDetail(parameters: FakeMediaParameters): string {
+  return parameters.kind === "video"
+    ? `${parameters.durationSeconds ?? 6}-second 720p video`
+    : `${parameters.size ?? "1024x1024"} image`;
+}
+
+function mediaIntroduction(
+  expertName: string,
+  parameters: FakeMediaParameters,
+): string {
+  return `As the ${expertName}, I started your ${mediaDetail(parameters)}. The preview and download link appear below as soon as it is ready.`;
+}
+
+/** Deterministic en-US media replies mirroring the real intent rules for E2E. */
+function mediaPromptPlan(
+  prompt: string,
+  expertName: string,
+): FakeMediaPromptPlan {
+  const text = prompt.trim();
+  const normalized = text.toLowerCase();
+
+  if (normalized.startsWith("fail-media:")) {
+    return {
+      outcome: "media",
+      kind: "image",
+      parameters: { kind: "image", size: "1024x1024" },
+      reply: mediaIntroduction(expertName, {
+        kind: "image",
+        size: "1024x1024",
+      }),
+      fail: true,
+    };
+  }
+
+  if (!MEDIA_GENERATE_WORDS.test(text)) return { outcome: "none" };
+
+  const isImage = MEDIA_IMAGE_WORDS.test(text);
+  const isVideo = MEDIA_VIDEO_WORDS.test(text);
+
+  if (isImage === isVideo) {
+    return {
+      outcome: "text",
+      reply: "What should I create — an image or a short video?",
+    };
+  }
+
+  if (text.length > 2_000) {
+    return {
+      outcome: "text",
+      reply:
+        "Keep the briefing under 2,000 characters so I can create a focused deliverable.",
+    };
+  }
+
+  const topic = text
+    .replace(MEDIA_GENERATE_WORDS, " ")
+    .replace(MEDIA_IMAGE_WORDS, " ")
+    .replace(MEDIA_VIDEO_WORDS, " ")
+    .replace(/\b(a|an|the|me|please|short|new|some)\b/gi, " ")
+    .replace(/\b\d+\s*(?:s|sec|secs|second|seconds)\b/gi, " ")
+    .replace(
+      /\b(720p|4k|8k|square|portrait|vertical|landscape|horizontal)\b/gi,
+      " ",
+    )
+    .replace(/\[\d+\]/g, " ")
+    .replace(/[,.;:!?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (topic.length === 0) {
+    return {
+      outcome: "text",
+      reply: "What should it show? Send me a short topic or briefing.",
+    };
+  }
+
+  const kind: FakeMediaKind = isImage ? "image" : "video";
+  const parameters: FakeMediaParameters = { kind };
+  const citationNumber = /\[(\d+)\]/.exec(text)?.[1];
+  const style = text.match(
+    /\b(minimalist|minimalistic|bold|vintage|modern|abstract|flat|cinematic|colorful|simple|retro)\b/i,
+  )?.[0];
+  const size: FakeMediaSize | undefined = /\b(portrait|vertical)\b/i.test(text)
+    ? "1024x1536"
+    : /\b(landscape|horizontal|banner|wide)\b/i.test(text)
+      ? "1536x1024"
+      : /\b(square|post)\b/i.test(text)
+        ? "1024x1024"
+        : undefined;
+
+  if (style !== undefined) parameters.style = style.toLowerCase();
+  if (citationNumber !== undefined)
+    parameters.citationNumber = Number(citationNumber);
+
+  if (kind === "image") {
+    if (/\b(4k|8k|ultra hd|3840|4096)\b/i.test(text)) {
+      return {
+        outcome: "text",
+        reply:
+          "Images are available in square, portrait or landscape sizes. Which one should I use?",
+      };
+    }
+    if (size !== undefined) parameters.size = size;
+  } else {
+    const durationMatch = /(\d+)\s*(?:s|sec|secs|second|seconds)\b/i.exec(text);
+    const duration =
+      durationMatch?.[1] === undefined ? null : Number(durationMatch[1]);
+
+    if (duration !== null && ![4, 6, 8].includes(duration)) {
+      return {
+        outcome: "text",
+        reply:
+          "Short videos can be 4, 6 or 8 seconds long. Which duration should I use?",
+      };
+    }
+
+    parameters.durationSeconds = (duration ?? 6) as FakeMediaDuration;
+    parameters.resolution = "720p";
+  }
+
+  return {
+    outcome: "media",
+    kind,
+    parameters,
+    reply: mediaIntroduction(expertName, parameters),
+  };
+}
+
+function tokenMedia(token: string): FakeMediaRecord[] {
+  let records = mediaByToken.get(token);
+
+  if (records === undefined) {
+    records = [];
+    mediaByToken.set(token, records);
+  }
+
+  return records;
+}
+
+function nextMediaId(): string {
+  mediaSequence += 1;
+
+  return `media-${mediaSequence}`;
+}
+
+function publicMedia(record: FakeMediaRecord): FakeMediaAttachment {
+  return { ...record.attachment };
+}
+
+function findOwnedMedia(
+  token: string,
+  mediaId: string,
+): FakeMediaRecord | null {
+  return (
+    tokenMedia(token).find((record) => record.attachment.mediaId === mediaId) ??
+    null
+  );
+}
+
+function createFakeMedia(
+  token: string,
+  plan: Extract<FakeMediaPromptPlan, { outcome: "media" }>,
+): FakeMediaRecord {
+  const mediaId = nextMediaId();
+  const mimeType = plan.kind === "image" ? "image/png" : "video/mp4";
+  const bytes = plan.kind === "image" ? FAKE_IMAGE_BYTES : FAKE_VIDEO_BYTES;
+  const citation =
+    plan.parameters.citationNumber === undefined
+      ? {}
+      : {
+          citation: {
+            citationNumber: plan.parameters.citationNumber,
+            sourceName: "engineering-handbook.txt",
+            locationLabel: "Chunk 1",
+          },
+        };
+  const attachment: FakeMediaAttachment = {
+    mediaId,
+    kind: plan.kind,
+    status: plan.fail === true ? "failed" : "queued",
+    uri: `/api/v1/media/${mediaId}/content`,
+    mimeType: plan.fail === true ? null : mimeType,
+    sizeBytes: plan.fail === true ? null : bytes.byteLength,
+    width: plan.kind === "image" ? 1 : null,
+    height: plan.kind === "image" ? 1 : null,
+    durationSeconds:
+      plan.kind === "video" ? (plan.parameters.durationSeconds ?? 6) : null,
+    modelId: plan.kind === "image" ? "gpt-image-2" : "gemini-omni-1.2-flash",
+    modelVersion: null,
+    parameters: { ...plan.parameters },
+    createdAt: new Date().toISOString(),
+    ...citation,
+    ...(plan.fail === true
+      ? {
+          errorCode: "PROVIDER_UNAVAILABLE",
+          errorMessage: "We couldn't create this file. Try again.",
+        }
+      : {}),
+    attempts: 1,
+  };
+  const record: FakeMediaRecord = {
+    attachment,
+    ownerToken: token,
+    fileName: plan.kind === "image" ? "deliverable.png" : "deliverable.mp4",
+    bytes,
+    polls: 0,
+  };
+
+  tokenMedia(token).unshift(record);
+
+  return record;
+}
+
+/** Two status polls settle a job: queued → generating → ready. */
+function advanceFakeMedia(record: FakeMediaRecord): void {
+  if (record.attachment.status === "queued") {
+    record.attachment.status = "generating";
+    return;
+  }
+
+  if (record.attachment.status === "generating") {
+    record.polls += 1;
+    if (record.polls >= 1) record.attachment.status = "ready";
+  }
+}
+
+function mediaNotFound(response: ServerResponse): void {
+  sendJson(response, 404, {
+    code: "MEDIA_NOT_FOUND",
+    message: "That file is no longer available.",
+  });
+}
+
+function handleGetMediaStatus(
+  request: IncomingMessage,
+  response: ServerResponse,
+  mediaId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const record = findOwnedMedia(bearerToken(request), mediaId);
+
+  if (record === null) {
+    mediaNotFound(response);
+    return;
+  }
+
+  advanceFakeMedia(record);
+  sendJson(response, 200, publicMedia(record));
+}
+
+function handleCancelMedia(
+  request: IncomingMessage,
+  response: ServerResponse,
+  mediaId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const record = findOwnedMedia(bearerToken(request), mediaId);
+
+  if (record === null) {
+    mediaNotFound(response);
+    return;
+  }
+
+  if (record.attachment.status !== "ready") {
+    record.attachment.status = "cancelled";
+    record.attachment.errorCode = "CANCELLED";
+    record.attachment.errorMessage = "Generation cancelled. No file was kept.";
+  }
+
+  sendJson(response, 200, publicMedia(record));
+}
+
+function handleRetryMedia(
+  request: IncomingMessage,
+  response: ServerResponse,
+  mediaId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const record = findOwnedMedia(bearerToken(request), mediaId);
+
+  if (record === null) {
+    mediaNotFound(response);
+    return;
+  }
+
+  record.attachment.status = "queued";
+  record.attachment.attempts = (record.attachment.attempts ?? 1) + 1;
+  delete record.attachment.errorCode;
+  delete record.attachment.errorMessage;
+  record.polls = 0;
+  sendJson(response, 200, publicMedia(record));
+}
+
+function handleGetMediaContent(
+  request: IncomingMessage,
+  response: ServerResponse,
+  mediaId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const record = findOwnedMedia(bearerToken(request), mediaId);
+
+  if (record === null) {
+    mediaNotFound(response);
+    return;
+  }
+
+  if (record.attachment.status !== "ready") {
+    sendJson(response, 409, {
+      code: "MEDIA_NOT_READY",
+      message: "This file is not ready yet.",
+    });
+    return;
+  }
+
+  response.writeHead(200, {
+    "Content-Type": record.attachment.mimeType ?? "application/octet-stream",
+    "Content-Length": String(record.bytes.byteLength),
+    "Content-Disposition": `attachment; filename="${record.fileName}"`,
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  response.end(record.bytes);
+}
+
+function nextChatId(prefix: string): string {
+  chatSequence += 1;
+
+  return `${prefix}-${chatSequence}`;
+}
+
+function ragMetadata(
+  status: "matched" | "no_match" | "unavailable",
+  scores: number[],
+): NonNullable<ChatMessage["retrieval"]> {
+  return {
+    queryEmbeddingModel: "text-embedding-3-small",
+    vectorIndex: "KnowledgeChunk",
+    topK: 5,
+    threshold: 0.35,
+    scores,
+    latencyMs: 18,
+    chunksConsidered: scores.length,
+    status,
+  };
+}
+
+/**
+ * Deterministic RAG responses driven by prompt prefixes. Existing chat tests
+ * never use these prefixes, so their plain fatia 1 behavior stays unchanged.
+ */
+function groundedExpertMessage(
+  expert: { name: string },
+  prompt: string,
+  id: string,
+): ChatMessage {
+  const normalized = prompt.toLowerCase();
+
+  if (normalized.startsWith("vector-down:")) {
+    return {
+      id,
+      role: "expert",
+      content: `${RAG_UNAVAILABLE_NOTICE} As the ${expert.name}, here is a focused answer.`,
+      createdAt: new Date().toISOString(),
+      retrieval: ragMetadata("unavailable", []),
+      answerStatus: "retrieval_unavailable",
+    };
+  }
+
+  if (normalized.startsWith("nomatch:")) {
+    return {
+      id,
+      role: "expert",
+      content: RAG_NO_MATCH_ANSWER,
+      createdAt: new Date().toISOString(),
+      retrieval: ragMetadata("no_match", []),
+      answerStatus: "no_match",
+    };
+  }
+
+  const stale = normalized.startsWith("stale:");
+  const removed = normalized.startsWith("removed:");
+  const grounded = stale || removed || normalized.startsWith("cite:");
+
+  if (!grounded) {
+    return {
+      id,
+      role: "expert",
+      content: `As the ${expert.name}, here is a focused answer.`,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  const citation: ChatCitation = {
+    citationNumber: 1,
+    sourceId: "src-rag-1",
+    sourceVersionId: stale ? "ver-old" : "ver-current",
+    chunkIndex: 0,
+    sourceName: "engineering-handbook.txt",
+    sourceType: "txt",
+    location: { label: "Chunk 1", page: 7 },
+    snippet: "Ship in small batches and keep the roadmap visible.",
+    isStale: stale,
+    sourceRemoved: removed,
+  };
+
+  return {
+    id,
+    role: "expert",
+    content: `As the ${expert.name}, the connected knowledge says: [1]`,
+    createdAt: new Date().toISOString(),
+    citations: [citation],
+    retrieval: ragMetadata("matched", [0.91]),
+    answerStatus: "with_source",
+  };
 }
 
 function signUpFieldErrors(body: Body): Body {
@@ -411,6 +1003,921 @@ async function handleResetPassword(
   sendJson(response, 200, { message: RESET_PASSWORD_SUCCESS_MESSAGE });
 }
 
+type MediaType = "image" | "audio" | "video";
+type SourceType = "pdf" | "txt" | "markdown" | MediaType;
+type SourceStatus = "queued" | "processing" | "ready" | "failed";
+type ProcessingPhase = "extracting" | "chunking" | "embedding";
+
+type UploadedFile = {
+  originalName: string;
+  mimeType: string;
+  buffer: Buffer;
+};
+
+type FakeSourceVersion = {
+  id: string;
+  contentHash: string;
+  name: string;
+  type: SourceType;
+  byteSize: number;
+  status: SourceStatus;
+  chunkCount: number;
+  createdAt: string;
+  polls: number;
+  url?: string;
+  errorMessage?: string | null;
+  processingPhase?: ProcessingPhase | null;
+  mediaType?: MediaType | null;
+  durationSeconds?: number | null;
+};
+
+type FakeSource = {
+  id: string;
+  normalizedName: string;
+  currentVersionId: string;
+  versions: FakeSourceVersion[];
+};
+
+type FakeSourceSummary = {
+  id: string;
+  name: string;
+  type: SourceType;
+  byteSize: number;
+  status: SourceStatus;
+  versionId: string;
+  versionNumber: number;
+  chunkCount: number;
+  isStale: boolean;
+  createdAt: string;
+  url?: string;
+  errorMessage?: string | null;
+  processingPhase?: ProcessingPhase | null;
+  mediaType?: MediaType | null;
+  durationSeconds?: number | null;
+};
+
+type FakePageKind = "text" | "no-text" | "unavailable";
+
+type FakePage = {
+  title: string;
+  text: string;
+  kind: FakePageKind;
+};
+
+const MAX_FAKE_SOURCE_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FAKE_MEDIA_FILE_BYTES = 200 * 1024 * 1024;
+const MAX_FAKE_SOURCE_FILES = 5;
+
+const UNSUPPORTED_SOURCE_MESSAGE =
+  "Only PDF, TXT or Markdown files are supported.";
+const UNSUPPORTED_ALL_SOURCE_MESSAGE =
+  "Only PDF, TXT, Markdown, JPEG, PNG, MP3 or MP4 files are supported.";
+const NO_SPEECH_MESSAGE = "No speech detected";
+const TOO_MANY_SOURCES_MESSAGE =
+  "Too many files. Send up to 5 files at a time.";
+const EMPTY_SOURCE_MESSAGE = "The file has no text we can index.";
+const SOURCE_TOO_LARGE_MESSAGE =
+  "One of the files is too large. Try a smaller file.";
+const SOURCE_NOT_FOUND_MESSAGE = "That source is no longer available.";
+const SOURCE_VERSION_NOT_FOUND_MESSAGE = "That version is no longer available.";
+const INVALID_URL_MESSAGE =
+  "Enter a valid public HTTP or HTTPS URL (255 characters or fewer).";
+const BLOCKED_URL_MESSAGE =
+  "That address is not allowed. Use a public HTTP or HTTPS link.";
+const NO_TEXT_URL_MESSAGE =
+  "That page has no text we can index. Try another URL or upload a file.";
+const UNAVAILABLE_URL_MESSAGE =
+  "We could not load that page. Check the address and try again.";
+
+/** Source state is keyed by session token so parallel E2E tests stay isolated. */
+const sourcesByToken = new Map<string, FakeSource[]>();
+/** Fake page contents, keyed by normalized URL; tests may update them. */
+const fakePages = new Map<string, FakePage>();
+let sourceSequence = 0;
+
+function nextSourceId(prefix: string): string {
+  sourceSequence += 1;
+
+  return `${prefix}-${sourceSequence}`;
+}
+
+function tokenSources(token: string): FakeSource[] {
+  let sources = sourcesByToken.get(token);
+
+  if (sources === undefined) {
+    sources = [];
+    sourcesByToken.set(token, sources);
+  }
+
+  return sources;
+}
+
+const FAKE_TRACKING_PARAMS = new Set([
+  "fbclid",
+  "gclid",
+  "igshid",
+  "mc_cid",
+  "mc_eid",
+  "msclkid",
+  "ref",
+  "ref_src",
+  "source",
+]);
+
+/** Mirrors the API's public-URL normalization closely enough for E2E. */
+function normalizeFakeSourceUrl(input: string): string | null {
+  const trimmed = input.trim();
+
+  if (trimmed.length === 0 || trimmed.length > 255 || /\s/.test(trimmed)) {
+    return null;
+  }
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (
+    (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+    parsed.hostname === "" ||
+    parsed.username !== "" ||
+    parsed.password !== ""
+  ) {
+    return null;
+  }
+
+  for (const key of Array.from(parsed.searchParams.keys())) {
+    const lower = key.toLowerCase();
+
+    if (lower.startsWith("utm_") || FAKE_TRACKING_PARAMS.has(lower)) {
+      parsed.searchParams.delete(key);
+    }
+  }
+
+  parsed.host = parsed.host.toLowerCase();
+  parsed.hash = "";
+
+  let normalized = parsed.toString();
+
+  if (normalized.endsWith("/") && parsed.pathname === "/") {
+    normalized = normalized.slice(0, -1);
+  }
+
+  return normalized.length > 0 && normalized.length <= 255 ? normalized : null;
+}
+
+function isBlockedFakeHost(hostname: string): boolean {
+  const normalized = hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+
+  if (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized.endsWith(".local") ||
+    normalized.endsWith(".cluster.local") ||
+    normalized.endsWith(".svc") ||
+    normalized === "metadata" ||
+    normalized === "metadata.google.internal" ||
+    normalized === "metadata.goog" ||
+    normalized === "instance-data" ||
+    normalized === "kubernetes.default.svc"
+  ) {
+    return true;
+  }
+
+  if (isIP(normalized) === 0) return false;
+
+  if (
+    normalized === "::" ||
+    normalized === "::1" ||
+    normalized.startsWith("0.") ||
+    normalized.startsWith("10.") ||
+    normalized.startsWith("127.") ||
+    normalized.startsWith("169.254.") ||
+    normalized.startsWith("192.168.") ||
+    normalized.startsWith("192.0.")
+  ) {
+    return true;
+  }
+
+  const parts = normalized.split(".");
+  const second = parts.length > 1 ? Number(parts[1]) : 0;
+
+  return normalized.startsWith("172.") && second >= 16 && second <= 31;
+}
+
+function fakePageTitle(url: string): string {
+  const parsed = new URL(url);
+  const segment =
+    decodeURIComponent(parsed.pathname).split("/").filter(Boolean).pop() ??
+    parsed.hostname;
+  const titled = segment
+    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  return titled === "" ? parsed.hostname : titled;
+}
+
+function fakePageFor(url: string): FakePage {
+  const configured = fakePages.get(url);
+
+  if (configured !== undefined) return configured;
+
+  const title = fakePageTitle(url);
+
+  return { title, text: `${title}: public knowledge page.`, kind: "text" };
+}
+
+function readRawBody(request: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => resolve(Buffer.concat(chunks)));
+    request.on("error", () => resolve(Buffer.alloc(0)));
+  });
+}
+
+/** Minimal multipart reader for the browser's `FormData` upload payload. */
+async function readMultipartFiles(
+  request: IncomingMessage,
+): Promise<UploadedFile[]> {
+  const contentType = request.headers["content-type"] ?? "";
+  const boundaryMatch = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  const boundary = (boundaryMatch?.[1] ?? boundaryMatch?.[2] ?? "").trim();
+
+  if (boundary === "") return [];
+
+  const raw = await readRawBody(request);
+  const delimiter = Buffer.from(`--${boundary}`);
+  const files: UploadedFile[] = [];
+  let cursor = raw.indexOf(delimiter);
+
+  while (cursor >= 0) {
+    const partStart = cursor + delimiter.length;
+    const next = raw.indexOf(delimiter, partStart);
+
+    if (next < 0) break;
+
+    let part = raw.subarray(partStart, next);
+
+    if (part[0] === 13 && part[1] === 10) part = part.subarray(2);
+    if (part[part.length - 2] === 13 && part[part.length - 1] === 10) {
+      part = part.subarray(0, part.length - 2);
+    }
+
+    const headerEnd = part.indexOf(Buffer.from("\r\n\r\n"));
+
+    if (headerEnd >= 0) {
+      const headers = part.subarray(0, headerEnd).toString("utf8");
+      const disposition =
+        headers
+          .split("\r\n")
+          .find((line) => /^content-disposition:/i.test(line)) ?? "";
+      const fieldName = /name="([^"]+)"/i.exec(disposition)?.[1];
+      const fileName = /filename="([^"]*)"/i.exec(disposition)?.[1];
+      const declaredType = /^content-type:\s*(.+)$/im.exec(headers)?.[1];
+
+      if (fieldName === "files" && fileName !== undefined && fileName !== "") {
+        files.push({
+          originalName: fileName.split(/[\\/]/).pop()?.trim() ?? fileName,
+          mimeType: declaredType?.trim() ?? "application/octet-stream",
+          buffer: Buffer.from(part.subarray(headerEnd + 4)),
+        });
+      }
+    }
+
+    cursor = next;
+  }
+
+  return files;
+}
+
+function fakeSourceType(file: UploadedFile): SourceType | null {
+  const name = file.originalName.trim().toLowerCase();
+
+  if (name.endsWith(".pdf")) return "pdf";
+  if (name.endsWith(".txt")) return "txt";
+  if (name.endsWith(".md") || name.endsWith(".markdown")) return "markdown";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image";
+  if (name.endsWith(".png")) return "image";
+  if (name.endsWith(".mp3")) return "audio";
+  if (name.endsWith(".mp4")) return "video";
+
+  return null;
+}
+
+function isFakeMediaType(type: SourceType): type is MediaType {
+  return type === "image" || type === "audio" || type === "video";
+}
+
+function normalizeFakeSourceName(name: string): string {
+  return (
+    name
+      .split(/[\\/]/)
+      .pop()
+      ?.trim()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim() ?? ""
+  );
+}
+
+function fakeChunkCount(version: FakeSourceVersion): number {
+  return Math.max(1, Math.ceil(version.byteSize / 24));
+}
+
+function currentVersion(source: FakeSource): FakeSourceVersion | undefined {
+  return source.versions.find(
+    (version) => version.id === source.currentVersionId,
+  );
+}
+
+function toFakeSummary(source: FakeSource): FakeSourceSummary | null {
+  const version = currentVersion(source);
+
+  if (version === undefined) return null;
+
+  return {
+    id: source.id,
+    name: version.name,
+    type: version.type,
+    byteSize: version.byteSize,
+    status: version.status,
+    versionId: version.id,
+    versionNumber: source.versions.indexOf(version) + 1,
+    chunkCount: version.chunkCount,
+    isStale: false,
+    createdAt: version.createdAt,
+    ...(version.url === undefined ? {} : { url: version.url }),
+    processingPhase: version.processingPhase ?? null,
+    mediaType: version.mediaType ?? null,
+    durationSeconds: version.durationSeconds ?? null,
+    errorMessage: version.errorMessage ?? null,
+  };
+}
+
+function sourceError(
+  response: ServerResponse,
+  status: number,
+  code: string,
+  message: string,
+): void {
+  sendJson(response, status, { code, message });
+}
+
+/** GET /api/v1/sources — processing versions settle after a few polls. */
+function handleListSources(
+  request: IncomingMessage,
+  response: ServerResponse,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const sources = tokenSources(bearerToken(request));
+
+  for (const source of sources) {
+    const version = currentVersion(source);
+
+    if (version?.status !== "processing") continue;
+
+    version.polls += 1;
+
+    if (version.mediaType !== undefined && version.mediaType !== null) {
+      if (version.polls === 1) {
+        version.processingPhase = "chunking";
+      } else if (version.polls === 2) {
+        version.processingPhase = "embedding";
+      } else if (version.polls >= 3) {
+        version.status = "ready";
+        version.processingPhase = null;
+        version.chunkCount = fakeChunkCount(version);
+      }
+      continue;
+    }
+
+    if (version.polls >= 2) {
+      version.status = "ready";
+      version.chunkCount = fakeChunkCount(version);
+    }
+  }
+
+  const summaries = sources
+    .map(toFakeSummary)
+    .filter((summary): summary is FakeSourceSummary => summary !== null);
+
+  sendJson(response, 200, { sources: summaries });
+}
+
+/** POST /api/v1/sources — mirrors the real 202 + async processing contract. */
+async function handleConnectSources(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const files = await readMultipartFiles(request);
+
+  if (files.length === 0) {
+    sourceError(
+      response,
+      400,
+      "UNSUPPORTED_SOURCE_FILE",
+      UNSUPPORTED_SOURCE_MESSAGE,
+    );
+    return;
+  }
+  if (files.length > MAX_FAKE_SOURCE_FILES) {
+    sourceError(
+      response,
+      400,
+      "TOO_MANY_SOURCE_FILES",
+      TOO_MANY_SOURCES_MESSAGE,
+    );
+    return;
+  }
+
+  for (const file of files) {
+    const type = fakeSourceType(file);
+
+    if (type === null) {
+      sourceError(
+        response,
+        400,
+        "UNSUPPORTED_SOURCE_FILE",
+        UNSUPPORTED_ALL_SOURCE_MESSAGE,
+      );
+      return;
+    }
+    if (file.buffer.byteLength === 0) {
+      sourceError(response, 400, "EMPTY_SOURCE_FILE", EMPTY_SOURCE_MESSAGE);
+      return;
+    }
+    const limit = isFakeMediaType(type)
+      ? MAX_FAKE_MEDIA_FILE_BYTES
+      : MAX_FAKE_SOURCE_FILE_BYTES;
+
+    if (file.buffer.byteLength > limit) {
+      sourceError(
+        response,
+        400,
+        "SOURCE_FILE_TOO_LARGE",
+        SOURCE_TOO_LARGE_MESSAGE,
+      );
+      return;
+    }
+  }
+
+  const sources = tokenSources(bearerToken(request));
+  const results = files.map((file) => {
+    const type = fakeSourceType(file) as SourceType;
+    const contentHash = createHash("sha256").update(file.buffer).digest("hex");
+    const existing = sources
+      .flatMap((source) =>
+        source.versions.map((version) => ({ source, version })),
+      )
+      .find((candidate) => candidate.version.contentHash === contentHash);
+
+    if (existing !== undefined) {
+      return {
+        name: file.originalName,
+        type,
+        byteSize: file.buffer.byteLength,
+        sourceId: existing.source.id,
+        versionId: existing.version.id,
+        status: existing.version.status,
+        alreadyConnected: true,
+      };
+    }
+
+    const normalizedName = normalizeFakeSourceName(file.originalName);
+    let source = sources.find(
+      (candidate) => candidate.normalizedName === normalizedName,
+    );
+
+    if (source === undefined) {
+      source = {
+        id: nextSourceId("src"),
+        normalizedName,
+        currentVersionId: "",
+        versions: [],
+      };
+      sources.unshift(source);
+    }
+
+    const mediaType = isFakeMediaType(type) ? type : null;
+    const silentMedia =
+      mediaType !== null && /silent|no-speech/i.test(file.originalName);
+    const shouldFail =
+      /fail|broken|corrupt/i.test(file.originalName) || silentMedia;
+    const status: SourceStatus = shouldFail ? "failed" : "processing";
+    const version: FakeSourceVersion = {
+      id: nextSourceId("ver"),
+      contentHash,
+      name: file.originalName,
+      type,
+      byteSize: file.buffer.byteLength,
+      status,
+      chunkCount: 0,
+      createdAt: new Date().toISOString(),
+      polls: /pending/i.test(file.originalName) ? 0 : 1,
+      processingPhase:
+        mediaType !== null && status === "processing" ? "extracting" : null,
+      mediaType,
+      durationSeconds: null,
+      errorMessage: silentMedia ? NO_SPEECH_MESSAGE : null,
+    };
+
+    source.versions.push(version);
+    source.currentVersionId = version.id;
+
+    return {
+      name: file.originalName,
+      type,
+      byteSize: file.buffer.byteLength,
+      sourceId: source.id,
+      versionId: version.id,
+      status,
+      alreadyConnected: false,
+      processingPhase: version.processingPhase ?? null,
+      mediaType,
+      durationSeconds: null,
+    };
+  });
+
+  sendJson(response, 202, { results });
+}
+
+/** POST /api/v1/sources/urls — one public page, same source contract as files. */
+async function handleConnectSourceUrl(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const body = asRecord(await readJsonBody(request));
+  const url = normalizeFakeSourceUrl(readString(body, "url"));
+
+  if (url === null) {
+    sourceError(response, 400, "INVALID_SOURCE_URL", INVALID_URL_MESSAGE);
+    return;
+  }
+
+  const hostname = new URL(url).hostname;
+
+  if (isBlockedFakeHost(hostname)) {
+    sourceError(response, 400, "BLOCKED_SOURCE_URL", BLOCKED_URL_MESSAGE);
+    return;
+  }
+
+  const page = fakePageFor(url);
+  const failed = page.kind !== "text";
+  const contentHash = createHash("sha256")
+    .update(failed ? `failed:${url}` : page.text)
+    .digest("hex");
+  const sources = tokenSources(bearerToken(request));
+  const existing = sources
+    .flatMap((source) =>
+      source.versions.map((version) => ({ source, version })),
+    )
+    .find(
+      (candidate) =>
+        candidate.version.contentHash === contentHash &&
+        candidate.version.status !== "failed",
+    );
+
+  if (existing !== undefined) {
+    sendJson(response, 202, {
+      results: [
+        {
+          name: page.title,
+          type: "txt",
+          byteSize: Buffer.byteLength(page.text, "utf8"),
+          sourceId: existing.source.id,
+          versionId: existing.version.id,
+          status: existing.version.status,
+          alreadyConnected: true,
+          url,
+        },
+      ],
+    });
+    return;
+  }
+
+  let source = sources.find(
+    (candidate) => candidate.normalizedName === url.toLowerCase(),
+  );
+
+  if (source === undefined) {
+    source = {
+      id: nextSourceId("src"),
+      normalizedName: url.toLowerCase(),
+      currentVersionId: "",
+      versions: [],
+    };
+    sources.unshift(source);
+  }
+
+  const errorMessage = failed
+    ? page.kind === "no-text"
+      ? NO_TEXT_URL_MESSAGE
+      : UNAVAILABLE_URL_MESSAGE
+    : undefined;
+  const version: FakeSourceVersion = {
+    id: nextSourceId("ver"),
+    contentHash,
+    name: page.title,
+    type: "txt",
+    byteSize: failed ? 1 : Buffer.byteLength(page.text, "utf8"),
+    status: failed ? "failed" : "processing",
+    chunkCount: 0,
+    createdAt: new Date().toISOString(),
+    polls: 1,
+    url,
+    ...(errorMessage === undefined ? {} : { errorMessage }),
+  };
+
+  source.versions.push(version);
+  source.currentVersionId = version.id;
+
+  sendJson(response, 202, {
+    results: [
+      {
+        name: page.title,
+        type: "txt",
+        byteSize: version.byteSize,
+        sourceId: source.id,
+        versionId: version.id,
+        status: version.status,
+        alreadyConnected: false,
+        url,
+      },
+    ],
+  });
+}
+
+/** Test-only control for simulated page changes and fetch failures. */
+async function handleSetFakePage(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const body = asRecord(await readJsonBody(request));
+  const url = normalizeFakeSourceUrl(readString(body, "url"));
+
+  if (url === null) {
+    sendJson(response, 400, {
+      code: "INVALID_SOURCE_URL",
+      message: INVALID_URL_MESSAGE,
+    });
+    return;
+  }
+
+  const previous = fakePageFor(url);
+  const requestedKind = readString(body, "kind");
+  const kind: FakePageKind =
+    requestedKind === "no-text" || requestedKind === "unavailable"
+      ? requestedKind
+      : "text";
+  const title = readString(body, "title").trim() || previous.title;
+  const text = typeof body.text === "string" ? body.text : previous.text;
+
+  fakePages.set(url, { title, text, kind });
+  sendJson(response, 200, { url, title, kind });
+}
+
+/** DELETE /api/v1/sources/:sourceId */
+function handleDeleteSource(
+  request: IncomingMessage,
+  response: ServerResponse,
+  sourceId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const sources = tokenSources(bearerToken(request));
+  const index = sources.findIndex((source) => source.id === sourceId);
+
+  if (index < 0) {
+    sourceError(response, 404, "SOURCE_NOT_FOUND", SOURCE_NOT_FOUND_MESSAGE);
+    return;
+  }
+
+  sources.splice(index, 1);
+  response.writeHead(204);
+  response.end();
+}
+
+/** POST /api/v1/sources/:versionId/retry — failures recover deterministically. */
+function handleRetrySourceVersion(
+  request: IncomingMessage,
+  response: ServerResponse,
+  versionId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const match = tokenSources(bearerToken(request))
+    .flatMap((source) => source.versions)
+    .find((version) => version.id === versionId);
+
+  if (match === undefined) {
+    sourceError(
+      response,
+      404,
+      "SOURCE_VERSION_NOT_FOUND",
+      SOURCE_VERSION_NOT_FOUND_MESSAGE,
+    );
+    return;
+  }
+
+  if (match.url !== undefined) {
+    // A failed URL version is re-fetched on retry, just like the real use case.
+    const page = fakePageFor(match.url);
+
+    if (page.kind !== "text") {
+      sourceError(
+        response,
+        422,
+        page.kind === "no-text"
+          ? "SOURCE_URL_NO_TEXT"
+          : "SOURCE_URL_UNAVAILABLE",
+        page.kind === "no-text" ? NO_TEXT_URL_MESSAGE : UNAVAILABLE_URL_MESSAGE,
+      );
+      return;
+    }
+
+    match.name = page.title;
+    match.byteSize = Buffer.byteLength(page.text, "utf8");
+    match.contentHash = createHash("sha256").update(page.text).digest("hex");
+    delete match.errorMessage;
+  }
+
+  match.status = "ready";
+  match.processingPhase = null;
+  match.errorMessage = null;
+  match.chunkCount = fakeChunkCount(match);
+  sendJson(response, 202, { versionId: match.id, status: "processing" });
+}
+
+function handleListExperts(
+  request: IncomingMessage,
+  response: ServerResponse,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  sendJson(response, 200, { experts: FAKE_EXPERTS });
+}
+
+/** GET /api/v1/conversations?expertId=... — empty until the first prompt. */
+function handleGetConversation(
+  request: IncomingMessage,
+  response: ServerResponse,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const url = new URL(request.url ?? "/", `http://${host}:${port}`);
+  const expertId = url.searchParams.get("expertId") ?? "";
+
+  if (FAKE_EXPERTS.every((expert) => expert.id !== expertId)) {
+    sendJson(response, 404, {
+      code: "UNKNOWN_EXPERT",
+      message: "That Expert is not available.",
+    });
+    return;
+  }
+
+  const stored = storedConversations.get(
+    conversationKey(bearerToken(request), expertId),
+  );
+
+  sendJson(response, 200, {
+    conversationId: stored?.conversationId ?? null,
+    messages: stored?.messages ?? [],
+  });
+}
+
+/** POST /api/v1/conversations/messages — a prompt containing "fail" returns 503. */
+async function handleSendMessage(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const body = asRecord(await readJsonBody(request));
+  const expertId = readString(body, "expertId").trim();
+  const prompt = readString(body, "prompt").trim();
+  const expert = FAKE_EXPERTS.find((candidate) => candidate.id === expertId);
+
+  if (expert === undefined) {
+    sendJson(response, 404, {
+      code: "UNKNOWN_EXPERT",
+      message: "That Expert is not available.",
+    });
+    return;
+  }
+
+  if (prompt === "") {
+    sendJson(response, 400, {
+      code: "VALIDATION_ERROR",
+      message: "Check your message and try again.",
+      fieldErrors: { prompt: "Enter a message before sending." },
+    });
+    return;
+  }
+
+  const mediaPlan = mediaPromptPlan(prompt, expert.name);
+
+  if (mediaPlan.outcome === "none" && prompt.toLowerCase().includes("fail")) {
+    sendJson(response, 503, {
+      code: "MODEL_UNAVAILABLE",
+      message: "The Expert could not respond right now. Try again in a moment.",
+    });
+    return;
+  }
+
+  const key = conversationKey(bearerToken(request), expertId);
+  const existing = storedConversations.get(key);
+  const stored =
+    existing ??
+    (() => {
+      const created: StoredConversation = {
+        conversationId: nextChatId("conv"),
+        messages: [],
+      };
+
+      storedConversations.set(key, created);
+
+      return created;
+    })();
+
+  const userMessage: ChatMessage = {
+    id: nextChatId("msg"),
+    role: "user",
+    content: prompt,
+    createdAt: new Date().toISOString(),
+  };
+  let expertMessage: ChatMessage;
+
+  if (mediaPlan.outcome === "media") {
+    const record = createFakeMedia(bearerToken(request), mediaPlan);
+
+    expertMessage = {
+      id: nextChatId("msg"),
+      role: "expert",
+      content: mediaPlan.reply,
+      createdAt: new Date().toISOString(),
+      media: [publicMedia(record)],
+    };
+  } else if (mediaPlan.outcome === "text") {
+    expertMessage = {
+      id: nextChatId("msg"),
+      role: "expert",
+      content: mediaPlan.reply,
+      createdAt: new Date().toISOString(),
+    };
+  } else {
+    expertMessage = groundedExpertMessage(expert, prompt, nextChatId("msg"));
+  }
+
+  stored.messages.push(userMessage, expertMessage);
+  sendJson(response, 201, {
+    conversationId: stored.conversationId,
+    userMessage,
+    expertMessage,
+  });
+}
+
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${host}:${port}`)
     .pathname;
@@ -492,6 +1999,112 @@ const server = createServer(async (request, response) => {
       code: "UNAUTHORIZED",
       message: "Your session is invalid or has expired. Sign in again.",
     });
+    return;
+  }
+
+  if (pathname === "/api/v1/experts" && request.method === "GET") {
+    handleListExperts(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/conversations" && request.method === "GET") {
+    handleGetConversation(request, response);
+    return;
+  }
+
+  if (
+    pathname === "/api/v1/conversations/messages" &&
+    request.method === "POST"
+  ) {
+    await handleSendMessage(request, response);
+    return;
+  }
+
+  const mediaStatusMatch = /^\/api\/v1\/media\/([^/]+)\/status$/.exec(pathname);
+
+  if (mediaStatusMatch !== null && request.method === "GET") {
+    handleGetMediaStatus(
+      request,
+      response,
+      decodeURIComponent(mediaStatusMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  const mediaCancelMatch = /^\/api\/v1\/media\/([^/]+)\/cancel$/.exec(pathname);
+
+  if (mediaCancelMatch !== null && request.method === "POST") {
+    handleCancelMedia(
+      request,
+      response,
+      decodeURIComponent(mediaCancelMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  const mediaRetryMatch = /^\/api\/v1\/media\/([^/]+)\/retry$/.exec(pathname);
+
+  if (mediaRetryMatch !== null && request.method === "POST") {
+    handleRetryMedia(
+      request,
+      response,
+      decodeURIComponent(mediaRetryMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  const mediaContentMatch = /^\/api\/v1\/media\/([^/]+)\/content$/.exec(
+    pathname,
+  );
+
+  if (mediaContentMatch !== null && request.method === "GET") {
+    handleGetMediaContent(
+      request,
+      response,
+      decodeURIComponent(mediaContentMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  if (pathname === "/api/v1/sources" && request.method === "GET") {
+    handleListSources(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/sources" && request.method === "POST") {
+    await handleConnectSources(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/sources/urls" && request.method === "POST") {
+    await handleConnectSourceUrl(request, response);
+    return;
+  }
+
+  if (pathname === "/__fake/pages" && request.method === "POST") {
+    await handleSetFakePage(request, response);
+    return;
+  }
+
+  const retryMatch = /^\/api\/v1\/sources\/([^/]+)\/retry$/.exec(pathname);
+
+  if (retryMatch !== null && request.method === "POST") {
+    handleRetrySourceVersion(
+      request,
+      response,
+      decodeURIComponent(retryMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  const sourceMatch = /^\/api\/v1\/sources\/([^/]+)$/.exec(pathname);
+
+  if (sourceMatch !== null && request.method === "DELETE") {
+    handleDeleteSource(
+      request,
+      response,
+      decodeURIComponent(sourceMatch[1] ?? ""),
+    );
     return;
   }
 

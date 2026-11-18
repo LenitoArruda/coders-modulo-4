@@ -1,6 +1,9 @@
 # BUSINESS.md — Negócio e produto
 
-> **Status:** hipóteses iniciais · **Atualizado em:** 2026-11-04
+> **Status:** hipóteses iniciais + catálogo de Experts, chat, fontes de arquivo, URLs públicas,
+> mídia como conhecimento, citações, entregáveis multimídia e avaliação local-first implementados
+> (fatias 012–018) ·
+> **Atualizado em:** 2026-11-18
 > **Público:** produto, engenharia e agentes que precisam entender **o que** estamos construindo.
 
 Este documento descreve o problema, a proposta de valor e o escopo do produto. Decisões ainda
@@ -45,45 +48,72 @@ responde a pedidos assumindo o papel daquela posição.
 
 ## 5. Conceitos
 
-| Termo                    | Definição                                                                                 |
-| ------------------------ | ----------------------------------------------------------------------------------------- |
-| **Expert**               | Agente de IA com papel, escopo, instruções e fontes de dados definidos (ex.: CEO Expert). |
-| **Conector**             | Integração que autentica e sincroniza dados de uma ferramenta externa.                    |
-| **Fonte de dados**       | Origem concreta de conteúdo: um documento, uma pasta, um projeto, um board etc.           |
-| **Base de conhecimento** | Conteúdo ingerido, normalizado e indexado a partir das fontes conectadas.                 |
-| **Pedido**               | Pergunta ou tarefa enviada a um Expert.                                                   |
-| **Entregável**           | Resposta, análise, resumo ou documento produzido pelo Expert.                             |
-| **Workspace**            | Espaço isolado de uma empresa/conta, com seus Experts, fontes e dados. **Hipótese.**      |
+| Termo                    | Definição                                                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Expert**               | Agente de IA com papel, escopo, instruções e fontes de dados definidos (ex.: CEO Expert).                                              |
+| **Conector**             | Integração que autentica e sincroniza dados de uma ferramenta externa.                                                                 |
+| **Fonte de dados**       | Origem concreta de conteúdo: um documento, uma pasta, um projeto, um board etc.                                                        |
+| **Base de conhecimento** | Conteúdo ingerido, normalizado e indexado a partir das fontes conectadas.                                                              |
+| **Pedido**               | Pergunta ou tarefa enviada a um Expert.                                                                                                |
+| **Conversa**             | Transcript de pedidos e respostas com um Expert, isolado por usuário autenticado.                                                      |
+| **Entregável**           | Resposta, análise, resumo ou documento produzido pelo Expert.                                                                          |
+| **Workspace**            | Espaço isolado de uma empresa/conta, com seus Experts, fontes e dados. **Hipótese — não implementado; a fatia 012 isola por usuário.** |
 
 ---
 
 ## 6. Experts iniciais
 
-| Expert         | Foco                                       | Exemplos de entregável                                                             |
-| -------------- | ------------------------------------------ | ---------------------------------------------------------------------------------- |
-| **CEO Expert** | Estratégia, negócio, finanças, priorização | Diagnóstico de mercado, plano estratégico, análise de cenário, resumo executivo    |
-| **CMO Expert** | Marketing, marca, aquisição, conteúdo      | Plano de campanha, análise de concorrência, calendário editorial, análise de funil |
-| **CTO Expert** | Tecnologia, arquitetura, segurança, time   | Avaliação de arquitetura, roadmap técnico, análise de riscos, plano de contratação |
+A fatia 012 implementa os nove Experts abaixo, nesta ordem de exibição. O catálogo (identidade,
+papel, escopo, tom e sugestões) vive na API (`EXPERT_CATALOG`) e é a fonte única consumida pela web.
+
+| Expert                               | Foco                                                    | Exemplos de entregável                                                    |
+| ------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **CTO Expert**                       | Tecnologia, arquitetura, segurança, engenharia          | Avaliação de arquitetura, roadmap técnico, análise de riscos de segurança |
+| **CMO Expert**                       | Marketing, marca, aquisição, conteúdo                   | Plano de campanha, análise de concorrência, calendário editorial          |
+| **Sales Director Expert**            | Pipeline, previsão de receita, contas-chave, negociação | Análise de deals em risco, plano de follow-up, previsão do trimestre      |
+| **Customer Success Director Expert** | Adoção, health score, retenção, expansão                | Sinais de churn, plano de recuperação, bloqueios de adoção                |
+| **Customer Hero Director Expert**    | Voz do cliente, experiência, escalonamento, histórias   | Resposta a reclamação, plano de escalonamento, histórias de sucesso       |
+| **CEO Expert**                       | Estratégia, negócio, finanças, priorização              | Diagnóstico, plano estratégico de 90 dias, resumo executivo               |
+| **CFO Expert**                       | Fluxo de caixa, orçamento, margem, captação             | Cálculo de runway, redução de custo, leitura de margem por linha          |
+| **COO Expert**                       | Operações, processos, SLAs, execução                    | Gargalos de processo, plano de ação de SLA, prioridades operacionais      |
+| **CPO Expert**                       | Descoberta, roadmap, priorização, métricas de produto   | Priorização de problemas, roadmap trimestral, temas de entrevistas        |
 
 > Novos Experts devem ser compostos por **template + instruções + fontes permitidas**, não por
-> código específico por Expert.
+> código específico por Expert. Na fatia 012 as sugestões não dependem de fontes conectadas; versões
+> que consultam fontes entram nas fatias seguintes.
 
 ---
 
 ## 7. Conectores
 
-| Conector      | Conteúdo                     | Prioridade (hipótese) |
-| ------------- | ---------------------------- | --------------------- |
-| Upload de PDF | Documentos e relatórios      | MVP                   |
-| Markdown      | Notas e documentação técnica | MVP                   |
-| Google Drive  | Arquivos e pastas            | MVP                   |
-| Notion        | Páginas e bases              | MVP                   |
-| Google Docs   | Documentos                   | Próxima fase          |
-| Google Sheets | Planilhas                    | Próxima fase          |
-| Confluence    | Páginas e spaces             | Próxima fase          |
-| Jira          | Issues, épicos e projetos    | Próxima fase          |
-| Linear        | Issues e projetos            | Próxima fase          |
-| ClickUp       | Tarefas e docs               | Próxima fase          |
+| Conector      | Conteúdo                           | Prioridade (hipótese) |
+| ------------- | ---------------------------------- | --------------------- |
+| Upload de PDF | Documentos e relatórios            | MVP                   |
+| Markdown      | Notas e documentação técnica       | MVP                   |
+| URL pública   | Documentação, artigos e changelogs | MVP                   |
+| Google Drive  | Arquivos e pastas                  | MVP                   |
+| Notion        | Páginas e bases                    | MVP                   |
+| Google Docs   | Documentos                         | Próxima fase          |
+| Google Sheets | Planilhas                          | Próxima fase          |
+| Confluence    | Páginas e spaces                   | Próxima fase          |
+| Jira          | Issues, épicos e projetos          | Próxima fase          |
+| Linear        | Issues e projetos                  | Próxima fase          |
+| ClickUp       | Tarefas e docs                     | Próxima fase          |
+
+> **Estado atual (fatia 014):** upload de PDF, TXT e Markdown e conexão de URLs públicas já estão
+> implementados na home privada. No mesmo botão flutuante a pessoa anexa arquivos ou informa um
+> link, acompanha `queued`/`processing`/`ready`/`failed`, recebe "Already connected" quando reenvia
+> o mesmo conteúdo e pode remover uma fonte. O hash do conteúdo deduplica no escopo do usuário;
+> conteúdo diferente na mesma fonte cria nova versão e a anterior fica desatualizada. Arquivos,
+> páginas, versões, chunks e vetores são removidos juntos na exclusão. Endereços internos são
+> bloqueados por política SSRF antes de qualquer busca. Google Drive e Notion seguem como hipótese
+> de MVP, não implementados nesta fatia.
+> **Estado atual (fatia 015):** a mesma lista de conexões aceita imagem (JPEG/PNG), áudio (MP3) e
+> vídeo (MP4) atrás da flag `knowledge_media_enabled`, desligada por padrão. A mídia é convertida
+> em texto localmente por OCR/transcrição e segue o pipeline de chunks, embeddings e Weaviate da
+> fatia 013, com deduplicação, status, retry e exclusão iguais. Áudio sem fala falha com
+> "No speech detected"; formatos não suportados são recusados com mensagem em inglês. As opções
+> de mídia por URL, modelos locais definitivos e limites operacionais seguem em decisão aberta.
 
 Requisitos por conector:
 
@@ -113,7 +143,33 @@ Requisitos por conector:
 4. Expert responde com análise e referências.
 5. Usuário refina o pedido ou solicita um entregável.
 
-### 8.3 Gestão
+> **Estado atual (fatias 012–018):** seleção do Expert, sugestões clicáveis, envio de prompt,
+> resposta no papel do Expert e histórico isolado por usuário funcionam. É possível conectar
+> PDF/TXT/Markdown, URLs públicas e mídia convertida em texto; chunks/embeddings são indexados no
+> Weaviate local. A recuperação de contexto e as citações inline (passos 3–4) **já estão
+> implementadas** e são controladas por `RAG_CITATIONS_ENABLED`. Entregáveis multimídia (passo 5)
+> também estão implementados, atrás de `MULTIMEDIA_DELIVERABLES_ENABLED`. Contratos e limites em
+> [AI.md](./AI.md).
+
+### 8.3 Pedido → conhecimento → entregável
+
+1. Usuário pede uma imagem ou um vídeo curto ao Expert, em linguagem natural.
+2. Expert confirma tema, formato e parâmetros antes de gerar; pedido ambíguo gera uma pergunta curta
+   e nenhum job.
+3. Se o pedido contém `[n]`, a citação `n` da última resposta do Expert é recuperada e anexada ao
+   entregável como contexto (a fatia atual ancora a citação; o envio dos bytes da fonte ao modelo é
+   follow-up).
+4. Plataforma gera o arquivo, persiste os bytes com o usuário autenticado e mostra preview inline com
+   metadados, duração/resolução quando aplicável e opção de download pelo próprio chat.
+5. Usuário pode cancelar, tentar novamente ou recarregar a conversa: o anexo permanece disponível
+   apenas para a conta que o criou.
+
+> **Estado atual (fatia 017):** fluxo implementado atrás da flag `MULTIMEDIA_DELIVERABLES_ENABLED`
+> (desligada por padrão). Imagem usa `gpt-image-2` e vídeo usa `gemini-omni-1.2-flash`; limites de
+> briefing/tamanho/duração e cota por hora protegem custo. A cobrança real do provedor de vídeo e a
+> passagem dos bytes da fonte citada ao modelo permanecem como follow-up de rollout.
+
+### 8.4 Gestão
 
 - Administrador gerencia membros, fontes e permissões do workspace.
 - Administrador configura quais fontes cada Expert pode acessar.
@@ -125,11 +181,15 @@ Requisitos por conector:
 
 **Dentro do MVP**
 
-- Autenticação e workspace (hipótese).
-- Criação de Expert a partir de templates (CEO, CMO, CTO).
-- Conexão de 2 a 3 fontes (PDF, Markdown, Google Drive ou Notion).
-- Pergunta e resposta com citações das fontes.
-- Histórico de conversas.
+- Autenticação (implementada); workspace segue como hipótese.
+- Catálogo de nove Experts com chat em persona (implementado na fatia 012).
+- Conexão de fontes de arquivo (PDF, TXT e Markdown — fatia 013) e de URLs públicas (fatia 014);
+  Google Drive e Notion seguem como hipótese de MVP.
+- Pergunta e resposta com citações das fontes (implementado na fatia 016 sobre mídia como
+  conhecimento da fatia 015).
+- Entregáveis multimídia no chat — imagem e vídeo curto — com preview, download e isolamento por
+  usuário (implementado na fatia 017, desligado por padrão).
+- Histórico de conversas isolado por usuário (implementado na fatia 012).
 - Controle básico de acesso por workspace.
 
 **Fora do MVP**
@@ -174,15 +234,17 @@ Requisitos por conector:
 
 ## 12. Riscos e questões abertas
 
-| Risco/questão                             | Impacto                                               |
-| ----------------------------------------- | ----------------------------------------------------- |
-| Alucinação ou resposta sem evidência      | Perda de confiança; mitigar com citações obrigatórias |
-| Custo de LLM e ingestão                   | Inviabiliza o modelo de negócio; medir desde o MVP    |
-| Permissões nas fontes externas            | Vazamento de dados; aplicar menor privilégio          |
-| Multi-tenancy não definido                | Retrabalho de modelo de dados e RLS                   |
-| Escopo do Expert (aconselhar vs executar) | Expectativa do usuário e complexidade                 |
-| Modelo de cobrança                        | Ainda não definido                                    |
-| Dependência de APIs de terceiros          | Rate limits e mudanças de contrato                    |
+| Risco/questão                             | Impacto                                                        |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| Alucinação ou resposta sem evidência      | Perda de confiança; mitigar com citações obrigatórias          |
+| Custo de LLM e ingestão                   | Inviabiliza o modelo de negócio; medir desde o MVP             |
+| Permissões nas fontes externas            | Vazamento de dados; aplicar menor privilégio                   |
+| Multi-tenancy não definido                | Retrabalho de modelo de dados e RLS                            |
+| Escopo do Expert (aconselhar vs executar) | Expectativa do usuário e complexidade                          |
+| Modelo de cobrança                        | Ainda não definido                                             |
+| Dependência de APIs de terceiros          | Rate limits e mudanças de contrato                             |
+| SSRF em URL informada pelo usuário        | Mitigado por bloqueio de redes internas, DNS e redirects       |
+| Termos de uso de páginas externas         | `robots.txt` segue em decisão aberta; hoje só conteúdo público |
 
 ---
 

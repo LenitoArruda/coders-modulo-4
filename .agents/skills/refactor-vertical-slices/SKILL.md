@@ -58,7 +58,7 @@ interface ──► application ──► domain
 | ---------------- | ----------------------------------------------------------------------- | --------------------------------------------- |
 | `domain`         | Entidades, value objects, invariantes, políticas, erros de domínio      | Framework, banco, HTTP, SDK, `@nestjs/*`      |
 | `application`    | Um use case por fluxo, portas, serviços internos compartilhados         | Adaptador concreto, HTTP, `@Controller`       |
-| `infrastructure` | Adaptadores que implementam portas: Supabase, SDKs, filas, HTTP clients | Regra de negócio, controller, `HttpException` |
+| `infrastructure` | Adaptadores que implementam portas: `pg`/SQL, SDKs, filas, HTTP clients | Regra de negócio, controller, `HttpException` |
 | `interface`      | Um request handler por endpoint, guards, decorators, rate limiters      | Regra de negócio, repositório, banco, SDK     |
 
 Estrutura alvo de uma slice:
@@ -70,7 +70,7 @@ apps/api/src/modules/<slice>/
 │   ├── ports/
 │   └── <flow>.use-case.ts
 ├── infrastructure/
-│   └── <vendor>-<x>.adapter.ts | supabase-<x>.repository.ts
+│   └── <vendor>-<x>.adapter.ts | postgres-<x>.repository.ts
 ├── interface/
 │   ├── request-handlers/
 │   │   └── <flow>.request-handler.ts
@@ -419,7 +419,7 @@ Escreva o consolidado em `.plans/refactor-<escopo>-report.md`.
 - Colocar `HttpException`, `Request`, `Response` ou status code dentro de use case.
 - Colocar `@Controller` ou `@UseGuards` na camada de aplicação.
 - Importar `infrastructure/` de dentro de `application/`.
-- Acessar Supabase/repositório direto do request handler.
+- Acessar o pool `pg`/repositório direto do request handler.
 - Criar porta em `infrastructure/` ou adaptador em `application/`.
 - Refatorar todas as slices em um único passo, sem testes intermediários.
 - Abrir PR antes do QA verde.

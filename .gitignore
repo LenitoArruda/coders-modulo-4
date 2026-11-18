@@ -17,6 +17,9 @@ coverage
 test-results/
 playwright-report/
 
+# Observability evaluation reports (generated locally)
+eval/reports/
+
 # Turbo
 .turbo
 

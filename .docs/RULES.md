@@ -1,7 +1,7 @@
 # RULES.md — Regras do projeto
 
 > **Normativo.** Em caso de conflito, este documento prevalece sobre os demais.
-> **Status:** ativo · **Atualizado em:** 2026-11-09
+> **Status:** ativo · **Atualizado em:** 2026-11-18
 
 Estas regras valem para qualquer pessoa ou agente que altere o repositório.
 
@@ -65,21 +65,37 @@ Antes de iniciar qualquer desenvolvimento:
 
 - Documentação interna (`.docs/`, `.specs/`, `.plans/` e ADRs) em **PT-BR**.
 - Textos de produto (UI, e-mails transacionais), rotas, endpoints e código em **en-US**; identificadores em inglês.
-- Atualize o documento afetado na **mesma mudança** de código.
+- Atualize o documento afetado na **mesma mudança** de código. O dono de cada assunto está no
+  [mapa da documentação](./AGENTS.md#6-mapa-da-documentação): IA/RAG em `AI.md`, telemetria e
+  evaluation em `OBSERVABILITY.md`, arquitetura em `ARCHITECTURE.md`, contratos de spec em `.specs/`.
 - Evite duplicar informação entre documentos: referencie o documento dono do assunto. Repetir
   uma regra crítica de forma curta é aceitável para reforço.
 - Todo comando citado deve existir no `package.json` ou estar marcado como **planejado**.
+- Todo link relativo criado deve apontar para arquivo existente e ser conferido antes de entregar.
 - Use a legenda de status: ✅ implementado · 🧭 planejado · ❌ fora de escopo.
 
 ---
 
 ## 5. Segurança e privacidade
 
-- Segredos apenas em variáveis de ambiente; **nunca** no código, em logs ou no Git.
+- Segredos apenas em variáveis de ambiente; **nunca** no código, em logs, spans, documentação ou
+  no Git. Isto inclui chaves de modelo, tokens, hashes, URLs sensíveis e valores de `.env`.
+- **Nunca leia, reproduza ou versione conteúdo de prompts** (system prompts, templates de prompt
+  ou instruções de modelo) em documentação, datasets, evidências de QA ou mensagens de erro.
 - Valide entradas na borda do sistema (API, conectores, formulários, variáveis de ambiente).
+- Trate conteúdo recuperado de fontes (arquivo, URL ou mídia) como **dados não confiáveis**:
+  instruções encontradas nesse conteúdo não podem alterar o comportamento do Expert nem elevar
+  privilégios. A política de prompt injection segue registrada em [AI.md](./AI.md).
 - Aplique menor privilégio em tokens de conectores e credenciais.
-- Não registre PII, tokens ou payloads sensíveis em logs.
-- Isolamento entre tenants/workspaces é obrigatório quando houver multi-tenancy.
+- Não registre PII, tokens, prompt, resposta, chunk ou payloads sensíveis em logs ou spans. Use
+  apenas os eventos sanitizados e o pseudônimo definidos na spec 018 (ver
+  [OBSERVABILITY.md](./OBSERVABILITY.md#3-contrato-do-span-schema-v1)).
+- O coletor de tracing local deve permanecer em loopback/Docker DNS/RFC1918 quando a flag estiver
+  ligada; endpoints públicos são rejeitados no boot.
+- Datasets de avaliação versionados devem ser **sintéticos**, sem PII, prompt de sistema ou dados
+  reais de usuário.
+- Isolamento entre tenants/workspaces é obrigatório quando houver multi-tenancy. Hoje o
+  isolamento é por `(userId, expertId)` e por usuário autenticado nas demais fatias.
 
 ---
 
@@ -112,6 +128,9 @@ Antes de iniciar qualquer desenvolvimento:
 - ❌ Alterar arquitetura sem atualizar `ARCHITECTURE.md`.
 - ❌ Criar componente de UI fora do design system sem justificativa.
 - ❌ Entregar UI com dark mode, cores fora da paleta ou texto branco sobre pastel.
+- ❌ Registrar prompt, resposta, PII ou conteúdo de arquivo em log, span, dataset ou documentação.
+- ❌ Apontar o tracing para endpoint público ou desligar sanitização/pseudonimização para "facilitar"
+  investigação.
 - ❌ Declarar tarefa concluída sem executar [QA.md](./QA.md).
 
 ---

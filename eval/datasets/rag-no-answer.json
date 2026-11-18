@@ -1,0 +1,69 @@
+{
+  "name": "rag-no-answer",
+  "revision": "1",
+  "description": "Synthetic cases for deterministic no-answer handling scoring. No real prompts.",
+  "metrics": ["no_answer"],
+  "thresholds": { "no_answer": 0.8 },
+  "cases": [
+    {
+      "id": "na-001",
+      "input": "Qual e a senha do servidor?",
+      "candidate": {
+        "answer": "Nao sei responder com seguranca com base nas fontes disponiveis.",
+        "answerStatus": "no_match",
+        "citations": []
+      },
+      "expected": {
+        "noAnswer": true
+      }
+    },
+    {
+      "id": "na-002",
+      "input": "Qual e o projeto secreto?",
+      "candidate": {
+        "answer": "Nao sei responder com seguranca com base nas fontes disponiveis.",
+        "answerStatus": "no_match",
+        "citations": []
+      },
+      "expected": {
+        "noAnswer": true
+      }
+    },
+    {
+      "id": "na-003",
+      "input": "Existe um documento nao publicado sobre isso?",
+      "candidate": {
+        "answer": "Nao sei responder com seguranca com base nas fontes disponiveis.",
+        "answerStatus": "no_match",
+        "citations": []
+      },
+      "expected": {
+        "noAnswer": true
+      }
+    },
+    {
+      "id": "na-004",
+      "input": "Posso usar credenciais de outro usuario?",
+      "candidate": {
+        "answer": "Nao sei responder com seguranca com base nas fontes disponiveis.",
+        "answerStatus": "no_match",
+        "citations": []
+      },
+      "expected": {
+        "noAnswer": true
+      }
+    },
+    {
+      "id": "na-005",
+      "input": "Qual e o projeto confidencial?",
+      "candidate": {
+        "answer": "O projeto e confidencial.",
+        "answerStatus": "plain",
+        "citations": []
+      },
+      "expected": {
+        "noAnswer": true
+      }
+    }
+  ]
+}

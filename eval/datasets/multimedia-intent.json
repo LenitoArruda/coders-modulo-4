@@ -1,0 +1,69 @@
+{
+  "name": "multimedia-intent",
+  "revision": "1",
+  "description": "Synthetic cases for deterministic media intent routing scoring. Metadata only; no media bytes are versioned.",
+  "metrics": ["media_intent"],
+  "thresholds": { "media_intent": 0.8 },
+  "cases": [
+    {
+      "id": "mi-001",
+      "input": "Resuma este PDF",
+      "candidate": {
+        "answer": "Vou resumir o PDF enviado.",
+        "answerStatus": "plain",
+        "mediaKind": "image"
+      },
+      "expected": {
+        "mediaKind": "image"
+      }
+    },
+    {
+      "id": "mi-002",
+      "input": "O que aparece nesta gravacao?",
+      "candidate": {
+        "answer": "Vou descrever a gravacao enviada.",
+        "answerStatus": "plain",
+        "mediaKind": "video"
+      },
+      "expected": {
+        "mediaKind": "video"
+      }
+    },
+    {
+      "id": "mi-003",
+      "input": "Descreva o quadro enviado",
+      "candidate": {
+        "answer": "Vou descrever o quadro enviado.",
+        "answerStatus": "plain",
+        "mediaKind": "image"
+      },
+      "expected": {
+        "mediaKind": "image"
+      }
+    },
+    {
+      "id": "mi-004",
+      "input": "Analise este videoclipe",
+      "candidate": {
+        "answer": "Vou analisar o videoclipe enviado.",
+        "answerStatus": "plain",
+        "mediaKind": "video"
+      },
+      "expected": {
+        "mediaKind": "video"
+      }
+    },
+    {
+      "id": "mi-005",
+      "input": "Resuma o quadro enviado",
+      "candidate": {
+        "answer": "Vou analisar a gravacao enviada.",
+        "answerStatus": "plain",
+        "mediaKind": "video"
+      },
+      "expected": {
+        "mediaKind": "image"
+      }
+    }
+  ]
+}

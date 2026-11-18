@@ -38,10 +38,6 @@ function ensureDocker() {
   }
 }
 
-function supabaseIsRunning() {
-  return run("bun", ["x", "supabase", "status"], { stdio: "ignore" }) === 0;
-}
-
 function up() {
   ensureDocker();
 
@@ -53,42 +49,32 @@ function up() {
 
   if (compose !== 0) {
     fail(
-      "Não foi possível subir o LGTM. Verifique se as portas 3010, 4317 e 4318 estão livres.",
+      "Não foi possível subir a infraestrutura. Verifique se as portas 5432, 8080, 3010, 4317 e 4318 estão livres.",
     );
   }
 
-  if (supabaseIsRunning()) {
-    console.log("[infra] Supabase local já está em execução.");
-  } else {
-    const supabase = run("bun", ["x", "supabase", "start"]);
-
-    if (supabase !== 0) {
-      fail(
-        "Não foi possível iniciar o Supabase local. Verifique as portas 54321-54324 e os logs acima.",
-      );
-    }
-  }
-
   console.log("[infra] Ambiente local pronto:");
-  console.log("  - Grafana:   http://localhost:3010");
-  console.log("  - OTLP gRPC: localhost:4317");
-  console.log("  - OTLP HTTP: localhost:4318");
-  console.log("  - Supabase:  http://localhost:54321");
+  console.log(
+    "  - PostgreSQL: localhost:5432 (ou POSTGRES_PORT do .env) — banco coders_modulo_4",
+  );
+  console.log(
+    "  - Weaviate:   localhost:8080 (ou WEAVIATE_PORT do .env) — banco de vetores",
+  );
+  console.log("  - Grafana:    http://localhost:3010");
+  console.log("  - OTLP gRPC:  localhost:4317");
+  console.log("  - OTLP HTTP:  localhost:4318");
+  console.log(
+    "[infra] Preencha DATABASE_URL no .env e rode: bun run db:migrate",
+  );
 }
 
 function down() {
   ensureDocker();
 
-  if (supabaseIsRunning()) {
-    run("bun", ["x", "supabase", "stop", "--no-backup"]);
-  } else {
-    console.log("[infra] Supabase local já está parado.");
-  }
-
   const compose = run("docker", ["compose", "down"]);
 
   if (compose !== 0) {
-    fail("Não foi possível derrubar o LGTM.");
+    fail("Não foi possível derrubar a infraestrutura.");
   }
 
   console.log("[infra] Ambiente local parado.");

@@ -1,6 +1,6 @@
 # DESIGN_SYSTEM.md — Design system
 
-> **Status:** implementado (base) · **Atualizado em:** 2026-11-09
+> **Status:** implementado (base) · **Atualizado em:** 2026-11-16
 > **Base:** shadcn/ui sobre Tailwind CSS · **Direção visual:** [DESIGN.md](./DESIGN.md)
 
 Este documento define **como** a UI é construída. O `DESIGN.md` define **como ela parece**.
@@ -21,7 +21,7 @@ Este documento define **como** a UI é construída. O `DESIGN.md` define **como 
 | `class-variance-authority` (`cva`) | ✅ 0.7.1                                                            |
 | Primitivos Radix (via shadcn)      | ✅ `@radix-ui/react-slot` 1.5.0                                     |
 | Ícones                             | 🧭 Lucide definido no `components.json`; pacote ainda não instalado |
-| Componentes atuais                 | ✅ `Button` em `components/ui`                                      |
+| Componentes atuais                 | ✅ `Button` (default, secondary, ghost, link) em `components/ui`    |
 
 ---
 
@@ -54,33 +54,33 @@ Tokens são **variáveis CSS semânticas** definidas em `:root` em
 `packages/ui/src/styles/globals.css`, expostas ao Tailwind via `@theme inline`. Componentes nunca
 usam hex diretamente.
 
-| Token                    | Valor     | Uso                             |
-| ------------------------ | --------- | ------------------------------- |
-| `--background`           | `#FFFFFF` | Fundo da aplicação              |
-| `--foreground`           | `#171717` | Texto principal                 |
-| `--card`                 | `#FFFFFF` | Fundo de cards                  |
-| `--card-foreground`      | `#171717` | Texto em cards                  |
-| `--popover`              | `#FFFFFF` | Fundo de popovers               |
-| `--popover-foreground`   | `#171717` | Texto em popovers               |
-| `--primary`              | `#A0C4E2` | Ação primária                   |
-| `--primary-foreground`   | `#171717` | Texto sobre a ação primária     |
-| `--secondary`            | `#CFE8EF` | Ação secundária e fundos suaves |
-| `--secondary-foreground` | `#171717` | Texto sobre secundário          |
-| `--muted`                | `#C6DBF0` | Superfícies discretas           |
-| `--muted-foreground`     | `#52525B` | Texto secundário                |
-| `--accent`               | `#85C7DE` | Hover, active e destaque        |
-| `--accent-foreground`    | `#171717` | Texto sobre accent              |
-| `--border`               | `#AED1E6` | Bordas e divisores              |
-| `--input`                | `#AED1E6` | Borda de inputs                 |
-| `--ring`                 | `#85C7DE` | Anel de foco                    |
-| `--radius`               | `0.5rem`  | Raio padrão                     |
+| Token                                     | Valor                             | Uso                                          |
+| ----------------------------------------- | --------------------------------- | -------------------------------------------- |
+| `--background` / `--foreground`           | `#FFFFFF` / `#171717`             | Fundo e texto principal                      |
+| `--surface` / `--surface-strong`          | `#F3F8FB` / `#E4EFF6`             | Faixas, painéis, hover de itens neutros      |
+| `--card` / `--card-foreground`            | `#FFFFFF` / `#171717`             | Cards                                        |
+| `--popover` / `--popover-foreground`      | `#FFFFFF` / `#171717`             | Popovers                                     |
+| `--primary` / `--primary-hover`           | `#1D4F7A` / `#163F62`             | Ação primária (texto `--primary-foreground`) |
+| `--primary-foreground`                    | `#FFFFFF`                         | Texto sobre a ação primária                  |
+| `--secondary` / `--secondary-foreground`  | `#CFE8EF` / `#171717`             | Tiles, monogramas, avatares                  |
+| `--accent` / `--accent-foreground`        | `#85C7DE` / `#171717`             | Detalhes de marca                            |
+| `--tint`                                  | `#C6DBF0`                         | Detalhes decorativos                         |
+| `--muted` / `--muted-foreground`          | `#EEF4F8` / `#52525B`             | Superfície discreta e texto secundário       |
+| `--border` / `--border-strong`            | `#D3E2EC` / `#AED1E6`             | Divisores e contornos                        |
+| `--input`                                 | `#6F94AD`                         | Borda de campos (≥ 3:1)                      |
+| `--ring`                                  | `#1D4F7A`                         | Anel de foco                                 |
+| `--success` (+ `-surface`, `-border`)     | `#14532D` / `#E8F5EC` / `#86C79A` | Sucesso                                      |
+| `--warning` (+ `-surface`, `-border`)     | `#7A4A00` / `#FFF4DC` / `#E6B85C` | Alerta                                       |
+| `--destructive` (+ `-surface`, `-border`) | `#B42318` / `#FEF3F2` / `#F1A9A2` | Erro                                         |
+| `--radius`                                | `0.5rem`                          | Raio padrão                                  |
 
 Regras:
 
-- **Nunca** use texto branco sobre `--primary`, `--secondary` ou `--accent`; use
-  `--primary-foreground`/`#171717`.
-- Cores semânticas (`success`, `warning`, `destructive`) ainda não existem. Ao criá-las, garanta
-  contraste AA e documente nesta tabela.
+- Texto branco **somente** sobre `--primary` (via `--primary-foreground`); sobre `--secondary`,
+  `--accent` e `--tint` use grafite.
+- Cores semânticas (`success`, `warning`, `destructive`) existem e são sempre usadas com ícone +
+  texto. Novos estados devem garantir contraste AA e ser documentados nesta tabela.
+- `prefers-reduced-motion: reduce` zera animações e transições em `globals.css`.
 - Não use `dark:` nem variantes de tema escuro.
 - Ao adicionar um primitivo shadcn, complete os tokens exigidos pelo componente (`popover`,
   `destructive`, `chart`, `sidebar`) mantendo a paleta definida em
@@ -130,6 +130,12 @@ Todo componente interativo deve cobrir:
 | Disabled      | Reduzir opacidade e bloquear interação        |
 | Loading       | Indicador + bloquear ação, mantendo a largura |
 | Invalid       | Borda/erro com texto e `aria-invalid`         |
+
+Composições compartilhadas do `apps/web` (`app/_components/`): `brand.tsx` (logotipo e link de
+marca), `icons.tsx` (ícones SVG decorativos com `aria-hidden`), `form-parts.tsx` (`FormAlert`
+com `role="alert"`, `StatusNotice` com `role="status"`, `FieldLabel`, `FieldHint`, `FieldError`,
+`RequiredNote`, `FormFooter`), `shared-styles.ts` (skip link, links e campos),
+`not-found-content.tsx` e `landing.tsx`.
 
 Estados de tela: **vazio**, **carregando**, **erro** e **sem permissão** devem ser desenhados,
 não improvisados.
@@ -208,7 +214,7 @@ Quando forem adicionados:
 
 ## 12. Próximos passos (ordem sugerida)
 
-1. Definir tokens semânticos de sucesso/alerta/erro.
+1. ~~Definir tokens semânticos de sucesso/alerta/erro~~ (feito na spec 011).
 2. Instalar `lucide-react` quando o primeiro ícone real for necessário.
 3. Configurar Vitest + Testing Library para o pacote `ui`.
 4. Adicionar novos primitivos apenas com uso real, cobrindo estados e acessibilidade.

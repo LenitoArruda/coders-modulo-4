@@ -44,7 +44,7 @@ apps/api/src/modules/<slice>/
 │   ├── <flow>.use-case.spec.ts
 │   └── <internal-service>.ts           # serviço interno compartilhado (opcional)
 ├── infrastructure/
-│   ├── supabase-<resource>.repository.ts
+│   ├── postgres-<resource>.repository.ts
 │   └── <vendor>-<x>.adapter.ts
 ├── interface/
 │   ├── request-handlers/
@@ -187,14 +187,14 @@ export abstract class UsersRepositoryPort {
 - **Adaptador** = implementação concreta em `infrastructure/`, ligada no módulo:
 
 ```ts
-// infrastructure/supabase-users.repository.ts
+// infrastructure/postgres-users.repository.ts
 import { Injectable } from "@nestjs/common";
 
 import { UsersRepositoryPort } from "../application/ports/users-repository.port";
 
 @Injectable()
-export class SupabaseUsersRepository extends UsersRepositoryPort {
-  // implementação com o client Supabase
+export class PostgresUsersRepository extends UsersRepositoryPort {
+  // implementação com o pool `pg` e SQL parametrizado
 }
 ```
 
@@ -234,8 +234,8 @@ O `<slice>.module.ts` é o único lugar que conhece concreto + abstrato ao mesmo
     SignUpUseCase,
     SignInUseCase,
     SignOutUseCase,
-    { provide: UsersRepositoryPort, useClass: SupabaseUsersRepository },
-    { provide: SessionsRepositoryPort, useClass: SupabaseSessionsRepository },
+    { provide: UsersRepositoryPort, useClass: PostgresUsersRepository },
+    { provide: SessionsRepositoryPort, useClass: PostgresSessionsRepository },
   ],
 })
 export class AuthModule {}

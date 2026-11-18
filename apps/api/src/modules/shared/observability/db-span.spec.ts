@@ -53,11 +53,11 @@ function installFakeTracer(): RecordedSpan[] {
 describe("withDbSpan", () => {
   it("deve abrir um span CLIENT com tabela e operação e devolver o resultado", async () => {
     const spans = installFakeTracer();
-    const result = { data: { id: "1" }, error: null };
+    const result = { rows: [{ id: "1" }], rowCount: 1 };
 
     const returned = await withDbSpan(
       { table: "users", operation: "SELECT" },
-      Promise.resolve(result),
+      () => Promise.resolve(result),
     );
 
     expect(returned).toBe(result);
@@ -74,19 +74,18 @@ describe("withDbSpan", () => {
     expect(spans[0]?.ended).toBe(true);
   });
 
-  it("deve marcar o span como erro quando o resultado traz error, sem registrar a mensagem", async () => {
+  it("deve marcar o span como erro com o SQLSTATE, sem registrar a mensagem", async () => {
     const spans = installFakeTracer();
-    const result = {
-      data: null,
-      error: { code: "23505", message: "duplicate key ada@example.com" },
-    };
+    const error = Object.assign(new Error("duplicate key ada@example.com"), {
+      code: "23505",
+    });
 
-    const returned = await withDbSpan(
-      { table: "users", operation: "INSERT" },
-      Promise.resolve(result),
-    );
+    await expect(
+      withDbSpan({ table: "users", operation: "INSERT" }, () =>
+        Promise.reject(error),
+      ),
+    ).rejects.toThrow("duplicate key ada@example.com");
 
-    expect(returned).toBe(result);
     expect(spans[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
     expect(spans[0]?.attributes["db.response.status_code"]).toBe("23505");
     expect(spans[0]?.attributes["error.type"]).toBe("23505");
@@ -97,26 +96,27 @@ describe("withDbSpan", () => {
   it("deve usar o código 'unknown' quando o erro não tem código", async () => {
     const spans = installFakeTracer();
 
-    await withDbSpan(
-      { table: "sessions", operation: "UPDATE" },
-      Promise.resolve({ data: null, error: {} }),
-    );
+    await expect(
+      withDbSpan({ table: "sessions", operation: "UPDATE" }, () =>
+        Promise.reject(new Error("connection refused")),
+      ),
+    ).rejects.toThrow("connection refused");
 
     expect(spans[0]?.attributes["db.response.status_code"]).toBe("unknown");
+    expect(spans[0]?.attributes["error.type"]).toBe("unknown");
   });
 
   it("deve marcar erro, repassar a exceção e encerrar o span quando a query lança", async () => {
     const spans = installFakeTracer();
 
     await expect(
-      withDbSpan(
-        { table: "auth_tokens", operation: "SELECT" },
+      withDbSpan({ table: "auth_tokens", operation: "SELECT" }, () =>
         Promise.reject(new TypeError("fetch failed")),
       ),
     ).rejects.toThrow("fetch failed");
 
     expect(spans[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
-    expect(spans[0]?.attributes["error.type"]).toBe("TypeError");
+    expect(spans[0]?.attributes["error.type"]).toBe("unknown");
     expect(spans[0]?.ended).toBe(true);
   });
 });

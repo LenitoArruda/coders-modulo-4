@@ -1,10 +1,12 @@
 # DEVELOPMENT.md — Padrões de desenvolvimento
 
-> **Status:** ativo · **Atualizado em:** 2026-11-09
+> **Status:** ativo · **Atualizado em:** 2026-11-18
 > **Aplica-se a:** qualquer alteração em `apps/` ou `packages/`.
 
 Este documento define **como** escrever código neste repositório. Para regras de processo e
 entrega, consulte [RULES.md](./RULES.md). Para estrutura e stack, [ARCHITECTURE.md](./ARCHITECTURE.md).
+Para contratos e limites de IA/RAG/mídia, consulte [AI.md](./AI.md); para telemetria e avaliação,
+[OBSERVABILITY.md](./OBSERVABILITY.md).
 
 ---
 
@@ -35,12 +37,12 @@ interface ──► application ──► domain
              infrastructure
 ```
 
-| Camada           | Contém                                                    | Não pode                               |
-| ---------------- | --------------------------------------------------------- | -------------------------------------- |
-| `domain`         | Entidades, value objects, regras e serviços de domínio    | Importar framework, banco, HTTP ou SDK |
-| `application`    | Casos de uso, portas, orquestração                        | Conhecer implementações concretas      |
-| `infrastructure` | Repositórios, Supabase, filas, eventos, clientes externos | Conter regra de negócio                |
-| `interface`      | Controllers, DTOs, presenters, validação de entrada       | Acessar banco diretamente              |
+| Camada           | Contém                                                 | Não pode                               |
+| ---------------- | ------------------------------------------------------ | -------------------------------------- |
+| `domain`         | Entidades, value objects, regras e serviços de domínio | Importar framework, banco, HTTP ou SDK |
+| `application`    | Casos de uso, portas, orquestração                     | Conhecer implementações concretas      |
+| `infrastructure` | Repositórios (`pg`), filas, eventos, clientes externos | Conter regra de negócio                |
+| `interface`      | Controllers, DTOs, presenters, validação de entrada    | Acessar banco diretamente              |
 
 Regras:
 
@@ -91,13 +93,33 @@ mesma estrutura.
 - Erros de domínio/aplicação são traduzidos para HTTP **na interface**: cada handler mapeia o erro
   do seu caso de uso e o guard traduz `InvalidSessionError` em `401` com o contrato único da
   sessão; ausência, expiração, revogação e assinatura inválida são indistinguíveis na resposta.
-- Adaptadores convertem erros externos (jose, PostgREST, Mailtrap) sem vazar detalhes; falha de e-mail
-  não derruba a sessão já criada.
+- Adaptadores convertem erros externos (jose, `pg`/SQLSTATE, Mailtrap/Resend) sem vazar detalhes;
+  falha de e-mail não derruba a sessão já criada.
+- O provedor de e-mail é escolhido por `NODE_ENV` (`production` → Resend; demais → Mailtrap) e a
+  composição do `EmailSenderPort` fica em `auth/infrastructure/create-email-sender.ts`.
 - Toda rota vive sob `/api/v1`; caminhos fora do prefixo respondem 404 com o mesmo contrato.
 - Testes de integração são nomeados pelo fluxo (`get-current-user.integration.spec.ts`,
   `confirm-account.integration.spec.ts`), usam os fakes de repositório/e-mail e o adaptador `jose`
-  **real** para tokens; não há banco de teste nesta fatia (o banco local é coberto por QA manual +
-  pgTAP).
+  **real** para tokens; não há banco de teste nesta fatia (o schema local é coberto pelos testes
+  SQL de `db/tests/` executados com `bun run db:test`).
+
+### 3.2 Banco de dados — convenções
+
+- **Acesso:** `pg` com SQL parametrizado (`$1`, `$2`, …) e um pool global (`DatabaseModule`) — sem
+  ORM ou query builder (ADR 0016). Nunca interpole valores na string SQL.
+- **Repositórios:** cada adaptador em `infrastructure/` implementa uma porta de `application/` e
+  envolve a query em `withDbSpan` (span CLIENT `SELECT|INSERT|UPDATE|DELETE <tabela>`).
+- **Erros:** converta SQLSTATE em erro estável via `database-error.ts`; nunca logue a mensagem
+  bruta, que pode conter PII. `23505` (unique violation) vira `DuplicateEmailError` no cadastro.
+- **Migrações:** SQL versionado em `db/migrations/NNNN_<slug>.sql`, aplicado em ordem por
+  `bun run db:migrate` (`scripts/db.mjs`), com `pg_advisory_lock`, transação por arquivo e registro
+  em `schema_migrations`. Uma migração aplicada não é editada; crie a próxima.
+- **Testes de schema:** SQL em `db/tests/NNN_<slug>.test.sql`, executados por `bun run db:test`
+  dentro de `BEGIN`/`ROLLBACK`. Use `DO $$ ... RAISE EXCEPTION ... $$` para asserções.
+- **RLS:** habilitado nas tabelas de domínio, sem policies públicas. A API é o único cliente do
+  banco e acessa com o usuário do Compose; não existem papéis `anon`/`authenticated`/`service_role`.
+- **Dados locais:** descartáveis. Para recriar o schema do zero, derrube o volume do Compose e
+  rode `bun run db:migrate`.
 
 ---
 
@@ -207,19 +229,33 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 
 ## 9. Observabilidade
 
-- Logs estruturados em JSON, com nível (`debug`, `info`, `warn`, `error`).
-- Inclua `requestId`/`correlationId` para rastrear fluxos.
-- **Nunca** logue tokens (JWT, cookie, `auth_tokens`), senhas, e-mails completos ou payloads
-  sensíveis; use `userId`/`sessionId` como contexto.
-- Métricas para ingestão, latência, erros e custo de LLM.
-- Traces para chamadas externas e processamento assíncrono.
+- Logs estruturados em JSON, com nível (`debug`, `info`, `warn`, `error`), escritos no console e
+  emitidos via OTel. Campos fixos: `timestamp`, `level`, `service`, `message` e atributos
+  primitivos (sem objetos aninhados ou `Error`).
+- O `requestId` é gerado ou lido de `x-request-id` pelo middleware HTTP e devolvido no header de
+  resposta; ele aparece no log `HTTP request completed` e no filtro de erros. **Hoje não há**
+  injeção automática de `requestId`/`correlationId` em todos os logs nem unificação com o
+  `traceId` OTel ou com o `traceId` dos spans locais (spec 018) — ver
+  [OBSERVABILITY.md](./OBSERVABILITY.md#6-limites-conhecidos-e-dívida-técnica).
+- **Nunca** logue tokens (JWT, cookie, `auth_tokens`), senhas, e-mails completos, prompt,
+  resposta, chunk ou conteúdo de arquivo; use `userId`, `sessionId` ou o pseudônimo HMAC quando
+  aplicável.
+- Métricas existentes: `http.server.request.duration`, `http.server.requests` e as métricas
+  padrão de runtime/OTel. Métricas de domínio (ingestão, tokens, custo de LLM, mídia, fila) são
+  🧭 planejadas: hoje esses sinais existem apenas como atributos de log/span.
+- Traces: OTel nativo (HTTP + spans manuais de banco `<OPERAÇÃO> <tabela>`) e, separadamente,
+  spans locais tipo LangSmith da spec 018, desligados por padrão. Spans de casos de uso de chat,
+  RAG e mídia em OTel são 🧭 planejados.
 - Stack atual: **Grafana LGTM** (imagem `grafana/otel-lgtm`, com Loki, Grafana, Tempo e
-  Prometheus) recebendo OTLP em `4317`/`4318`.
+  Prometheus) recebendo OTLP em `4317`/`4318`, coletor `postgres-metrics` e dashboard **API
+  Overview** gerado por `observability/gen-dashboard.mjs`.
 - A API emite logs, métricas e traces via OpenTelemetry desde a fundação. Novos serviços seguem
-  o mesmo padrão.
+  o mesmo padrão; use `withDbSpan` para operações de banco e preserve a política de sanitização.
 - Logs OTel são emitidos com `logs` de `@opentelemetry/api` (1.10+), que compartilha o provider
   global registrado pelo `NodeSDK`. Não use o pacote separado `@opentelemetry/api-logs` — ele
   mantém outro global e os logs não chegam ao coletor.
+- Ao mudar nomes de campos, métricas ou queries, atualize também o gerador de dashboard e a seção
+  de inventário em [OBSERVABILITY.md](./OBSERVABILITY.md#2-inventário-e-pipeline-de-telemetria).
 
 ---
 
@@ -228,10 +264,13 @@ O `tsconfig` base já ativa `strict` e `noUncheckedIndexedAccess`.
 - Segredos apenas em variáveis de ambiente; valide no boot.
 - `.env` nunca é commitado.
 - Autenticação e autorização em toda rota protegida.
-- Isole dados por workspace/tenant; com Supabase, use **RLS**.
+- Isole dados pelo usuário autenticado; quando existir workspace/tenant, use **RLS** (decisão em
+  aberto em [ARCHITECTURE.md](./ARCHITECTURE.md#7-decisões-em-aberto)).
 - Tokens de conectores criptografados e com menor privilégio.
-- Sanitize entradas e evite injeção (SQL, prompt, HTML).
-- Em IA: trate conteúdo externo como **não confiável** (prompt injection).
+- Valide e restrinja entradas; evite injeção (SQL, prompt injection, HTML).
+- Em IA: trate conteúdo externo (arquivo, URL, mídia, histórico) como **não confiável**;
+  instruções nele não podem alterar a persona, as ferramentas ou as permissões do Expert. Detalhes
+  em [AI.md](./AI.md#8-segurança-de-ia).
 
 ---
 
@@ -283,3 +322,26 @@ Consulte o checklist completo em [QA.md](./QA.md#8-definition-of-done-dod).
 
 Resumo: plano atualizado, lint/tipos/build verdes, testes quando houver infraestrutura, UI
 acessível e responsiva, documentação sincronizada e relatório final entregue.
+
+---
+
+## 15. Observabilidade local (spec 018)
+
+- A instrumentação está desligada por default (`LANGSMITH_TRACING_ENABLED=false`). Para
+  experimentar localmente, use apenas as variáveis documentadas em `.env.example` e o coletor
+  fake dos testes; nunca aponte para um endpoint cloud.
+- Rode `bun run obs:eval` antes de alterar prompts/modelos. O relatório por métrica e o `--baseline`
+  são o gate determinístico disponível nesta fatia; códigos de saída `0`/`1`/`2` são descritos em
+  [OBSERVABILITY.md](./OBSERVABILITY.md#4-evaluation-offline).
+- Para rodar os testes de instrumentação, use `bunx vitest run` dentro de `apps/api`. O runner
+  `bun test` não lida bem com os decorators do Nest e com `vi.hoisted` destes testes.
+- `docker-compose.langsmith.yml` é opcional e depende de imagem licenciada; não altere o Compose
+  padrão nem tente "simular" LangSmith com imagens inventadas.
+- Nenhuma migration foi necessária: traces não são persistidos em PostgreSQL.
+- O campo de custo emitido é `estimatedCostUsd` (não `estimatedCost`). `createMediaSpanMetadata()`
+  e `createSourceSpanMetadata()` existem e são testados, mas **não são chamados** nos fluxos reais
+  de mídia/fontes — conectá-los é follow-up (ver
+  [OBSERVABILITY.md](./OBSERVABILITY.md#6-limites-conhecidos-e-dívida-técnica)).
+- A fila do `HttpTraceSink` é um array em memória **sem limite e sem backpressure**; não a
+  descreva como fila limitada. Não há métrica de profundidade ou drops — apenas o log
+  `obs.trace.dropped`.

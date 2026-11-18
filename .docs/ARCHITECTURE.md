@@ -1,24 +1,32 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha implementados — produto não implementado · **Atualizado em:** 2026-11-11
+> **Status:** specs `000`–`018` entregues (018 no modo local-first; stack LangSmith licenciada
+> bloqueada) · **Atualizado em:** 2026-11-18
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
-engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md).
+engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md); para o detalhamento de IA/RAG/mídia,
+[AI.md](./AI.md); para telemetria e avaliação, [OBSERVABILITY.md](./OBSERVABILITY.md).
 
 ---
 
 ## 1. Visão geral
 
 Monorepo **Turborepo** com **Bun**, contendo aplicações Next.js, uma API NestJS e pacotes
-compartilhados. A fundação já entrega web, API e Supabase local; o produto será uma plataforma
-de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
+compartilhados. A fundação entrega web, API e PostgreSQL local; o catálogo de Experts e o chat em
+persona (012), a ingestão de fontes de arquivo (013), URL (014) e mídia (015), a recuperação
+vetorial com citações inline (016), os entregáveis multimídia (017) e a observabilidade/avaliação
+local-first (018) estão implementados. O produto é uma plataforma de Experts
+(ver [BUSINESS.md](./BUSINESS.md)), com:
 
-- **Web app** para interação com Experts e gestão de conectores.
+- **Web app** para interação com Experts, conexão de arquivos locais e URLs públicas, e gestão de conectores.
 - **API** dedicada para regras de negócio, ingestão e orquestração de agents.
-- **Supabase/Postgres** como banco PostgreSQL e storage; a **autenticação é própria da API**
-  (JWT emitido pela API; sem Supabase Auth).
-- **Conectores externos** para trazer dados de Notion, Google Drive, Jira, PDF etc.
+- **PostgreSQL 18** como banco relacional; a **autenticação é própria da API** (JWT emitido pela
+  API, sem provedor externo).
+- **Weaviate local** como banco de vetores da base de conhecimento, na porta HTTP 8080.
+- **Fontes de conhecimento implementadas:** arquivo (PDF/TXT/Markdown), URL pública e mídia
+  convertida em texto. Conectores de Notion/Google Drive/Jira são 🧭 planejados (ver
+  [BUSINESS.md](./BUSINESS.md#7-conectores)).
 
 ---
 
@@ -34,11 +42,18 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 │   ├── eslint-config/           # Configurações ESLint compartilhadas
 │   └── typescript-config/       # tsconfig base/nextjs/react-library
 ├── scripts/
-│   └── infra.mjs                # Orquestra Compose (LGTM) + Supabase CLI
-├── supabase/
-│   ├── config.toml
-│   └── migrations/
-├── docker-compose.yml           # LGTM: Grafana + OTel Collector + Loki/Tempo/Prometheus
+│   ├── infra.mjs                # Orquestra o Compose (PostgreSQL + LGTM + Weaviate)
+│   ├── db.mjs                   # Executor de migrações e testes SQL
+│   ├── k6.mjs                   # Executa cenários de carga
+│   └── obs-eval.ts              # CLI de evaluation offline (spec 018)
+├── db/
+│   ├── migrations/              # Migrações versionadas (.sql)
+│   └── tests/                   # Testes de schema em SQL
+├── observability/               # Dashboards, gerador, coletor Postgres e LGTM built-ins
+├── eval/datasets/               # Datasets sintéticos de avaliação de IA
+├── load-tests/                  # Cenários k6 e seed de carga
+├── docker-compose.yml           # PostgreSQL 18 + LGTM + Weaviate
+├── docker-compose.langsmith.yml # Override opcional (profile `langsmith`, licenciado)
 ├── .plans/                      # Planos de tarefas (<numero>-<slug>-plan.md)
 ├── .specs/                      # Specs de feature (<numero>-<slug>.md)
 ├── .docs/                       # Documentação do projeto
@@ -48,14 +63,14 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 └── bun.lock
 ```
 
-| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                              |
-| ---------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação e troca de senha na porta 3000 |
-| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, contrato de erro, env, CORS, logs e OTel na porta 3333     |
-| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                        |
-| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                      |
-| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                |
-| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                |
+| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                                                                                                                                                                             |
+| ---------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação, troca de senha, chat com Experts, painel de fontes de arquivo/URL/mídia, citações inline e painel de origem na porta 3000                                                    |
+| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, catálogo de Experts, conversas com LangGraph, fontes de arquivo/URL/mídia com dedup/chunks/embeddings/Weaviate, recuperação vetorial com citações, contrato de erro, env, CORS, logs e OTel na porta 3333 |
+| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                                                                                                                                                                       |
+| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                                                                                                                                                                     |
+| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                                                                                                                                                               |
+| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                                                                                                                                                               |
 
 ---
 
@@ -74,10 +89,16 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 | Design system               | shadcn/ui (configurado em `packages/ui`) | —                |
 | API                         | NestJS                                   | 12.3.3           |
 | JWT de sessão               | jose (HS256)                             | 6.2.17           |
-| Acesso ao banco (servidor)  | `@supabase/supabase-js` (PostgREST)      | 2.119.0          |
-| E-mail transacional         | SDK `mailtrap` (API de envio)            | 6.2.0            |
+| Acesso ao banco (servidor)  | `pg` (SQL parametrizado)                 | 8.23.1           |
+| Orquestração de LLM         | LangChain.js + LangGraph                 | 1.4.1 / 1.7.5    |
+| Modelo (fatia 012)          | ChatOpenAI `gpt-4o-mini`                 | 1.8.4            |
+| Ingestão de arquivos        | `pdf-parse` (PDF) + decodificação UTF-8  | 2.4.5            |
+| Upload multipart            | `multer` (`@types/multer`)               | 2.5.0 (2.3.0)    |
+| Banco de vetores local      | Weaviate via REST/GraphQL (`fetch`)      | 1.40.5           |
+| Embeddings (fatia 013)      | OpenAI `text-embedding-3-small`          | 1536 dimensões   |
+| E-mail transacional         | Mailtrap SDK (dev) + Resend HTTP API     | 6.2.0 / —        |
 | Hash de senha               | `node:crypto` scrypt (ADR 0014)          | —                |
-| Banco local                 | Supabase CLI (PostgreSQL 15)             | 3.0.0            |
+| Banco local                 | PostgreSQL via Docker Compose            | 18               |
 | Testes unitários/integração | Vitest + Supertest                       | 5.1.0 / 7.3.1    |
 | Testes E2E                  | Playwright                               | 1.65.0           |
 | Observabilidade             | OpenTelemetry SDK + Grafana LGTM         | 0.301.0 / 0.39.0 |
@@ -88,14 +109,14 @@ de Experts (ver [BUSINESS.md](./BUSINESS.md)), com:
 
 ### 3.2 Stack alvo (planejada ou em avaliação)
 
-| Camada                   | Tecnologia        | Estado          |
-| ------------------------ | ----------------- | --------------- |
-| Datas                    | date-fns          | 🧭              |
-| Tabelas                  | TanStack Table    | 🧭              |
-| Gráficos                 | TanStack Charts   | 🧭              |
-| Infra de produção        | Vercel + Supabase | 🧭              |
-| Lint/format alternativos | OXLint + OXFmt    | 🔍 em avaliação |
-| Contratos compartilhados | `packages/shared` | 🧭              |
+| Camada                   | Tecnologia                     | Estado          |
+| ------------------------ | ------------------------------ | --------------- |
+| Datas                    | date-fns                       | 🧭              |
+| Tabelas                  | TanStack Table                 | 🧭              |
+| Gráficos                 | TanStack Charts                | 🧭              |
+| Infra de produção        | Vercel + PostgreSQL gerenciado | 🧭              |
+| Lint/format alternativos | OXLint + OXFmt                 | 🔍 em avaliação |
+| Contratos compartilhados | `packages/shared`              | 🧭              |
 
 > **Atenção:** a stack alvo **não está instalada**. Não importe date-fns, TanStack ou
 > `packages/shared` sem antes adicioná-los ao `package.json` e atualizar esta tabela.
@@ -118,7 +139,7 @@ interface → application → domain
 | ---------------- | ------------------------------------------------------ | ----------------------- |
 | `domain`         | Entidades, value objects, serviços e regras de domínio | Nada externo            |
 | `application`    | Casos de uso, orquestração, portas/interfaces          | `domain`                |
-| `infrastructure` | Repositórios, Supabase, filas, eventos, clientes HTTP  | `application`, `domain` |
+| `infrastructure` | Repositórios (`pg`), filas, eventos, clientes HTTP     | `application`, `domain` |
 | `interface`      | Controllers, DTOs, presenters, validação de entrada    | `application`           |
 
 Regras:
@@ -138,23 +159,43 @@ apps/api/src/
 │   ├── auth/
 │   │   ├── domain/              # Session, SessionOrigin, AuthUser, SignUpInput, erros de auth
 │   │   ├── application/         # Casos de uso (inclui GetCurrentUserUseCase), templates, portas
-│   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios Supabase, Mailtrap
+│   │   ├── infrastructure/      # jose, scrypt, tokens opacos, repositórios `pg`, Mailtrap/Resend
 │   │   └── interface/           # request handlers (1 por endpoint), guard, rate limiter, testes de integração
 │   │       └── request-handlers/ # um handler por endpoint (sign-up, sign-in, sign-out, /me, confirm, forgot, reset)
+│   ├── experts/
+│   │   ├── domain/              # catálogo imutável de 9 Experts (identidade, papel, escopo, tom, sugestões)
+│   │   ├── application/         # ListExpertsUseCase
+│   │   └── interface/           # GET /api/v1/experts (autenticado)
+│   ├── conversations/
+│   │   ├── domain/              # Conversation, ConversationMessage, PromptSource, erros de domínio
+│   │   ├── application/         # GetConversationUseCase, SendMessageUseCase, portas de repositório e responder
+│   │   ├── infrastructure/      # repositório `pg`, adapter LangGraph/ChatOpenAI
+│   │   └── interface/           # GET /conversations, POST /conversations/messages + integração
+│   ├── citations/
+│   │   ├── domain/              # Citation, RetrievalResult, politicas de dedupe/contexto/sanitizacao
+│   │   ├── application/         # RetrieveContextUseCase, ComposeCitedAnswerUseCase, RefreshCitationsUseCase + portas
+│   │   ├── infrastructure/      # embedding de query, Weaviate GraphQL e metadados de fontes via `pg`
+│   │   └── interface/           # sem endpoints; consumida pela slice conversations
+│   ├── sources/
+│   │   ├── domain/              # Source, SourceVersion, Chunk, Document, políticas de arquivo/URL e hash
+│   │   ├── application/         # conectar arquivo/URL, listar, processar, excluir e retry; portas de extrator/embedding/vetor/repositório/fetch
+│   │   ├── infrastructure/      # repositório `pg`, `pdf-parse`, fetch HTTP seguro, OpenAIEmbeddings e Weaviate REST
+│   │   └── interface/           # GET/POST /sources, POST /sources/urls, DELETE /sources/:id, POST /sources/:versionId/retry
 │   ├── hello/
 │   │   ├── domain/
 │   │   ├── application/
 │   │   └── interface/
-│   └── shared/                  # config, logging, observability, interface (contrato de erro)
+│   └── shared/                  # config, database (pool `pg`), logging, observability, interface
 ├── test/fakes/                  # repositórios, e-mail e token em memória
 ├── app.module.ts
 ├── app-setup.ts
 └── main.ts
 ```
 
-Novos domínios (`experts`, `connectors`, `documents`, `conversations`) seguem o mesmo formato,
-criando `infrastructure/` quando houver implementação concreta. `auth` é a referência de um slice
-completo com as quatro camadas.
+Os domínios `experts` e `conversations` (spec 012), `sources` (specs 013–015) e `citations`
+(spec 016) seguem o mesmo formato; novos domínios (`connectors`, `documents`, `knowledge`) devem
+seguí-lo, criando `infrastructure/` quando houver implementação concreta. `auth`, `conversations`,
+`sources` e `citations` são as referências de slices completos, com `citations` sem endpoints próprios.
 
 Regras:
 
@@ -185,15 +226,17 @@ Regras de dependência entre pacotes:
 
 ### 4.4 Modelo de dados de autenticação
 
-O schema de auth é criado em `supabase/migrations/` e é de uso **exclusivo da API**; o navegador
-não acessa essas tabelas (RLS habilitado, nenhuma policy para `anon`/`authenticated`). A API
-opera com a credencial de servidor (`service_role`).
+O schema de auth é criado em `db/migrations/` e é de uso **exclusivo da API**; o navegador não
+acessa essas tabelas (RLS habilitado, nenhuma policy pública). A API acessa o banco como o usuário
+`postgres` do Compose, via pool `pg` e SQL parametrizado (ADR 0016).
 
-| Tabela        | Papel                                                                                            |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `users`       | Conta da pessoa: nome, e-mail normalizado e único, hash de senha e confirmação de e-mail         |
-| `auth_tokens` | Tokens opacos de uso único para confirmação de e-mail e reset de senha, persistidos só como hash |
-| `sessions`    | Registro server-side das sessões emitidas pela API, com expiração e revogação                    |
+| Tabela          | Papel                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`         | Conta da pessoa: nome, e-mail normalizado e único, hash de senha e confirmação de e-mail                                                    |
+| `auth_tokens`   | Tokens opacos de uso único para confirmação de e-mail e reset de senha, persistidos só como hash                                            |
+| `sessions`      | Registro server-side das sessões emitidas pela API, com expiração e revogação                                                               |
+| `conversations` | Uma conversa por `(user_id, expert_id)`; dono e Expert da troca (spec 012)                                                                  |
+| `messages`      | Mensagens `user`/`expert` de uma conversa, com conteúdo, data/hora e campos opcionais `citations`, `retrieval` e `answer_status` (spec 016) |
 
 Regras centrais:
 
@@ -204,7 +247,9 @@ Regras centrais:
   `used_at`; apenas `token_hash` é persistido.
 - `sessions` usa `origin` (`sign_up_confirmation` ou `sign_in`), `expires_at` e `revoked_at`;
   sessão ativa é a que tem `revoked_at` nulo e `expires_at` no futuro.
-- `users`, `auth_tokens` e `sessions` usam UUID e `ON DELETE CASCADE` a partir do usuário.
+- `users`, `auth_tokens`, `sessions` e `conversations` usam UUID e `ON DELETE CASCADE` a partir do usuário; `messages` cascateia a partir de `conversations`.
+- `conversations` tem `unique (user_id, expert_id)` e `expert_id` restrito aos nove IDs do catálogo; toda leitura filtra por `user_id`.
+- `messages` tem `role check ('user','expert')`, conteúdo de 1 a 16000 caracteres e índice `(conversation_id, created_at, id)`. RLS habilitado sem policies, como nas tabelas de auth.
 
 O detalhamento de campos e constraints está em `.specs/001-auth-schema.md`. A fatia 002 entrega a
 infraestrutura de sessão descrita na §4.5, a fatia 004 o sign-up e a fatia 005 a confirmação
@@ -231,9 +276,9 @@ web (server)                         api
 | `CreateSessionUseCase`                                   | Cria a sessão, revoga as anteriores, assina o JWT e dispara o e-mail de nova sessão     |
 | `ValidateSessionUseCase`                                 | Valida o JWT e confirma sessão ativa + dono antes de liberar a requisição               |
 | `SessionTokenPort` / `jose`                              | Assina e valida HS256 com `JWT_SECRET`; claims `sub`, `sid`, `iat`, `exp`               |
-| `SessionsRepositoryPort` / Supabase                      | Persiste, consulta e revoga sessões via PostgREST com `service_role`                    |
-| `UsersRepositoryPort` / Supabase                         | Carrega os dados básicos da pessoa autenticada                                          |
-| `EmailSenderPort` / Mailtrap                             | Envia o template en-US de nova sessão pela API do Mailtrap                              |
+| `SessionsRepositoryPort` / `pg`                          | Persiste, consulta e revoga sessões com SQL parametrizado                               |
+| `UsersRepositoryPort` / `pg`                             | Carrega os dados básicos da pessoa autenticada                                          |
+| `EmailSenderPort` / Mailtrap ou Resend                   | Envia o template en-US de nova sessão pelo provedor ativo (`NODE_ENV`)                  |
 | `SessionGuard` + `@CurrentUser()`                        | Extrai o Bearer, aplica o contrato de 401 e injeta a pessoa na rota                     |
 | `GetCurrentUserRequestHandler` + `GetCurrentUserUseCase` | Atende `GET /auth/me` com o `AuthUser` já resolvido pelo guard, sem reler o repositório |
 | `ErrorContractFilter` (`APP_FILTER`)                     | Serializa `{ code, message, fieldErrors? }` sem stack/SQL/detalhes internos             |
@@ -266,23 +311,23 @@ pessoa. Juntas, as duas rotas fecham a jornada iniciada em `/auth/sign-up`.
 /auth/sign-up (web) ── Server Action ──► POST /api/v1/auth/sign-up
                                              │ SignUpInput + rate limit por IP
                                              └─► SignUpUseCase
-                                                   ├─ users (Postgres, service_role)
+                                                   ├─ users (PostgreSQL, `pg`)
                                                    ├─ auth_tokens (apenas token_hash)
                                                    ├─ scrypt (password_hash)
-                                                   └─ API Mailtrap
+                                                   └─ provedor de e-mail ativo
 ```
 
-| Peça                                  | Responsabilidade                                                                                                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SignUpInput`                         | Valida/normaliza os cinco campos e devolve mensagens en-US por campo                                                                        |
-| `SignUpUseCase`                       | Cria conta não confirmada, reenvia confirmação ou sinaliza conflito                                                                         |
-| `PasswordHasherPort` / scrypt         | Hash forte da senha, sem dependência nativa (ADR 0014)                                                                                      |
-| `OpaqueTokenPort` / `node:crypto`     | 32 bytes aleatórios no link; SHA-256 em hex persistido em `token_hash`                                                                      |
-| `AuthTokensRepositoryPort` / Supabase | Cria o token e invalida os pendentes do mesmo usuário/purpose                                                                               |
-| `UsersRepositoryPort` / Supabase      | Busca por e-mail normalizado e cria a conta com `email_confirmed_at` nulo                                                                   |
-| `email-layout`                        | Layout HTML compartilhado dos e-mails: light-only, paleta e tokens de `DESIGN.md`, tabelas + estilos inline, botão único e link de fallback |
-| `confirmation-email`                  | Template en-US "Confirm your account" com expiração de 24 h                                                                                 |
-| `SignUpRateLimiter`                   | Janela deslizante em memória por IP, limites configuráveis por env                                                                          |
+| Peça                              | Responsabilidade                                                                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SignUpInput`                     | Valida/normaliza os cinco campos e devolve mensagens en-US por campo                                                                        |
+| `SignUpUseCase`                   | Cria conta não confirmada, reenvia confirmação ou sinaliza conflito                                                                         |
+| `PasswordHasherPort` / scrypt     | Hash forte da senha, sem dependência nativa (ADR 0014)                                                                                      |
+| `OpaqueTokenPort` / `node:crypto` | 32 bytes aleatórios no link; SHA-256 em hex persistido em `token_hash`                                                                      |
+| `AuthTokensRepositoryPort` / `pg` | Cria o token e invalida os pendentes do mesmo usuário/purpose                                                                               |
+| `UsersRepositoryPort` / `pg`      | Busca por e-mail normalizado e cria a conta com `email_confirmed_at` nulo                                                                   |
+| `email-layout`                    | Layout HTML compartilhado dos e-mails: light-only, paleta e tokens de `DESIGN.md`, tabelas + estilos inline, botão único e link de fallback |
+| `confirmation-email`              | Template en-US "Confirm your account" com expiração de 24 h                                                                                 |
+| `SignUpRateLimiter`               | Janela deslizante em memória por IP, limites configuráveis por env                                                                          |
 
 Regras:
 
@@ -309,7 +354,7 @@ Regras:
                                                              └─ CreateSessionUseCase (sign_up_confirmation)
                                                                   ├─ sessions (revoga as anteriores)
                                                                   ├─ JWT HS256
-                                                                  └─ API Mailtrap (e-mail de nova sessão)
+                                                                  └─ provedor de e-mail ativo (e-mail de nova sessão)
 ```
 
 | Peça                                  | Responsabilidade                                                                  |
@@ -367,7 +412,7 @@ dummy real quando a conta não existe. Só depois de senha correta checa a confi
                                                └─ CreateSessionUseCase (sign_in)
                                                     ├─ sessions (nova + revoga as anteriores)
                                                     ├─ JWT HS256
-                                                    └─ API Mailtrap (e-mail de nova sessão)
+                                                    └─ provedor de e-mail ativo (e-mail de nova sessão)
 ◄── { accessToken, tokenType, expiresIn, user } ── Server Action grava cookie HttpOnly
     e redireciona para o returnTo sanitizado (ou /app)
 ```
@@ -397,7 +442,7 @@ com o link `/auth/reset-password?token=...` (a troca de senha é descrita na se�
                                                            ├─ users (busca por e-mail normalizado)
                                                            ├─ auth_tokens (purpose password_reset, apenas token_hash)
                                                            ├─ create-then-revoke (invalidateUnusedExcept)
-                                                           └─ API Mailtrap
+                                                           └─ provedor de e-mail ativo
 ```
 
 | Peça                          | Responsabilidade                                                              |
@@ -500,13 +545,336 @@ Regras:
   `/auth/confirm` processa o token mesmo com sessão ativa e, sem token, envia pessoa autenticada
   para `/app` e visitante para `/auth/sign-in`; `/auth/forgot-password` e
   `/auth/reset-password` permanecem acessíveis.
-- A raiz `/` não renderiza produto: redireciona para `/app` com sessão e para `/auth/sign-in`
-  sem sessão.
+- A raiz `/` redireciona para `/app` com sessão e, sem sessão, renderiza a landing pública
+  (estática, em `app/_components/landing.tsx`). Rotas desconhecidas fora de `/auth` e `/app` caem
+  em `app/not-found.tsx`.
 - 404 de rotas inexistentes é resolvido dentro do layout do grupo (catch-all + `not-found.tsx`),
   para manter o shell público ou privado.
 - O guard é uma camada de experiência; a autorização real continua na API, que valida o Bearer em
   toda rota protegida.
 - Textos de UI e metadados são **en-US** (`html lang="en-US"`); a documentação interna é PT-BR.
+
+### 4.10 Provedor de e-mail transacional
+
+O provedor é escolhido por `NODE_ENV` na configuração (`loadEnv`) e a composição do
+`EmailSenderPort` fica centralizada em `auth/infrastructure/create-email-sender.ts`:
+
+| `NODE_ENV` efetivo      | Provedor | Variáveis exigidas                                     |
+| ----------------------- | -------- | ------------------------------------------------------ |
+| `production`            | Resend   | `RESEND_API_KEY` + `MAIL_FROM_EMAIL`/`MAIL_FROM_NAME`  |
+| ausente, vazio ou outro | Mailtrap | `MAILTRAP_API_TOKEN` + `MAIL_FROM_*`; sandbox opcional |
+
+Regras:
+
+- `NODE_ENV` é opcional; ausente/vazio assume `dev`. A comparação normaliza espaços e
+  capitalização, então `Production` seleciona Resend.
+- A validação exige apenas as variáveis do provedor ativo; variáveis do provedor inativo são
+  ignoradas.
+- Resend usa a API HTTP oficial (`https://api.resend.com/emails`) via `fetch` nativo; Mailtrap usa
+  o SDK `mailtrap`, com sandbox opcional em não produção.
+- O boot registra `nodeEnv` e `emailProvider`, nunca chaves ou conteúdo de e-mail.
+
+### 4.11 Catálogo de Experts e chat (fatia 012)
+
+A primeira feature de produto entrega nove Experts selecionáveis e um chat em persona, com histórico
+isolado por usuário autenticado (sem workspace). O catálogo é **conteúdo versionado na API** e a
+web o consome no servidor; não há duplicação em `packages/ui` nem no bundle do cliente.
+
+```text
+/app (web, server) ──► GET /api/v1/experts ────────► ListExpertsUseCase (catálogo em EXPERT_CATALOG)
+       │              GET /api/v1/conversations ──► GetConversationUseCase ─► conversations/messages
+       │              POST /conversations/messages ► SendMessageUseCase ────► ExpertResponderPort
+       ▼                                                                        │
+  ExpertChat (client) ◄──── Server Actions ◄──────── { userMessage, expertMessage } (LangGraph/ChatOpenAI)
+```
+
+| Peça                                      | Responsabilidade                                                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `EXPERT_CATALOG`                          | Fonte única de identidade, papel, escopo, tom e sugestões, na ordem CTO, CMO, Sales, CS, Customer Hero, CEO, CFO, COO, CPO |
+| `ListExpertsUseCase`                      | Devolve o catálogo imutável em `GET /api/v1/experts`                                                                       |
+| `GetConversationUseCase`                  | Devolve o transcript de um Expert para o usuário autenticado ou estado vazio                                               |
+| `SendMessageUseCase`                      | Valida o Expert, chama o modelo e persiste a troca; falha do modelo não grava mensagem parcial                             |
+| `ConversationsRepositoryPort` / `pg`      | CRUD de `conversations`/`messages`, sempre filtrado por `user_id`, com `withDbSpan`                                        |
+| `ExpertResponderPort` / LangGraph         | `StateGraph` com um nó `respond`; `SystemMessage` imutável por Expert e prompt do usuário como dado                        |
+| `SessionGuard` + `@CurrentUser()`         | Reutilizados de `auth`; nenhum token chega ao cliente                                                                      |
+| `chat-actions.ts` / `fetchApiWithSession` | Server Actions web que repassam o cookie `HttpOnly` como Bearer e mapeiam erros para texto en-US                           |
+
+Regras:
+
+- Um prompt vazio ou acima de `EXPERT_PROMPT_MAX_LENGTH` (padrão 4000) é rejeitado antes de chamar o modelo; o textarea valida localmente para feedback imediato.
+- `OPENAI_API_KEY` é opcional no boot; sem chave, o envio responde `503 MODEL_UNAVAILABLE` com mensagem acionável, sem detalhes técnicos. O retry preserva o prompt.
+- Sugestões clicáveis enviam exatamente o texto exibido (`source: "suggestion"`); telemetria registra só o identificador do Expert.
+- Telemetria `expert.chat` registra identificadores, duração e desfecho — nunca conteúdo de prompt ou resposta.
+- A UI é en-US, light-only, responsiva em 360/768/1280 px, com `aria-live` no transcript e `role="alert"` nos erros; header/perfil/logout permanecem intactos.
+
+### 4.12 Fontes de conhecimento por arquivo (fatia 013)
+
+A home privada passa a ter um botão flutuante (FAB) que abre um painel de fontes conectadas. O
+processo de ingestão é assíncrono do ponto de vista da interface: o upload registra a versão como
+`processing` e responde `202`; o processamento em segundo plano extrai texto, gera chunks e
+embeddings, grava vetores no Weaviate e só então marca a versão como `ready`.
+
+```text
+/app (web, server) ── Server Action (multipart) ──► POST /api/v1/sources
+        │                                             │ ConnectSourcesUseCase
+        │                                             ├─ SHA-256 + normalized_name → Source/SourceVersion
+        │                                             ├─ source_files (bytea)
+        │                                             └─ ProcessSourceVersionUseCase (background)
+        │                                                    ├─ pdf-parse / UTF-8 → chunkText
+        │                                                    ├─ OpenAIEmbeddings (text-embedding-3-small)
+        │                                                    └─ Weaviate KnowledgeChunk (REST)
+        ▼
+KnowledgeSources (client) ◄── Server Actions ◄── GET/DELETE/POST retry /api/v1/sources
+```
+
+| Peça                                     | Responsabilidade                                                                                                                      |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `sources/domain/source.ts`               | Contrato compartilhado `Source`, `SourceVersion`, `Chunk`, `Document` e `SourceSummary` reutilizado pelas fatias 3 a 7                |
+| `source-file-policy.ts`                  | Tipos aceitos, limites, `safeFileName`, normalização, SHA-256 e chunking determinístico                                               |
+| `ConnectSourcesUseCase`                  | Dedup por hash no escopo do usuário, agrupamento por nome normalizado, versionamento e submit assíncrono                              |
+| `ProcessSourceVersionUseCase`            | Extrai, faz chunks, gera embeddings, grava vetores e marca `ready`; falha parcial persiste `failed`                                   |
+| `DeleteSourceUseCase`                    | Remove vetores, arquivo original, versões e chunks do usuário; retry limpa vetores parciais antes de reprocessar                      |
+| `PostgresSourcesRepository`              | SQL parametrizado com `withDbSpan`, `user_id` em toda consulta; tabelas `sources`, `source_versions`, `source_files`, `source_chunks` |
+| `DocumentTextExtractorAdapter`           | PDF via `pdf-parse`; TXT/Markdown com `TextDecoder` fatal (conteúdo vazio ou inválido não vira `ready`)                               |
+| `OpenAIEmbeddingGeneratorAdapter`        | `OpenAIEmbeddings`, `text-embedding-3-small`, 1536 dimensões; chave injetada do servidor via `loadEnv().openaiApiKey`                 |
+| `WeaviateRestVectorStoreAdapter`         | Collection `KnowledgeChunk`, `vectorizer: none`, cosine, IDs determinísticos; REST/GraphQL na porta 8080 (sem gRPC)                   |
+| `source-actions.ts` / `KnowledgeSources` | Server Actions e painel com estados vazio, `processing`, `ready`, `failed`, duplicado, retry e remoção                                |
+
+Endpoints autenticados (`SessionGuard`):
+
+| Rota                                    | Resposta                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `GET /api/v1/sources`                   | `200 { sources: SourceSummary[] }` (somente versão atual de cada fonte) |
+| `POST /api/v1/sources`                  | `202 { results: ConnectedSourceResult[] }`; multipart `files` (até 5)   |
+| `DELETE /api/v1/sources/:sourceId`      | `204` sem corpo                                                         |
+| `POST /api/v1/sources/:versionId/retry` | `202 { versionId, status: "processing" }`                               |
+
+Regras:
+
+- Deduplicação é por SHA-256 do conteúdo bruto **no escopo de `user_id`**; o nome normalizado apenas
+  agrupa versões. O índice único parcial `(user_id, content_hash) where status <> 'failed'`
+  transforma corrida concorrente em “Already connected” sem duplicar versão ou vetor.
+- O arquivo original fica em `source_files.bytes` (`bytea`), sem caminho de filesystem nem nova
+  variável de ambiente. Versões antigas e seus vetores são retidos até a exclusão da fonte; a
+  versão anterior deixa de ser a atual e é sinalizada como desatualizada para a fatia 5.
+- `POST /sources` valida tipo, tamanho e quantidade na borda antes de persistir. O web replica a
+  validação no Server Action e define `experimental.serverActions.bodySizeLimit: "64mb"` para
+  cobrir cinco arquivos de até 10 MB mais overhead multipart.
+- Limites provisórios: `MAX_SOURCE_FILE_BYTES = 10 MB` e `MAX_FILES_PER_UPLOAD = 5`, centralizados
+  no domínio e espelhados no web. Limites definitivos, retenção e metas numéricas seguem em aberto.
+- Telemetria `knowledge.sources` registra apenas `userId`, IDs opacos, desfecho, duração e
+  `chunkCount`. Nunca conteúdo, nome de arquivo, hash, trecho extraído ou valor de chave de API.
+- Conteúdo de documento é tratado como dado não confiável: o chunker apenas divide texto; nenhuma
+  instrução dentro do arquivo altera regras do Expert, do chat ou da plataforma.
+- As suítes usam fakes (`InMemorySourcesRepository`, extrator/embedding/vetor em memória) e um
+  servidor HTTP local para o adaptador Weaviate. A chave real não é usada nos testes.
+
+### 4.13 Fontes de conhecimento por URL (fatia 014)
+
+O mesmo painel passa a aceitar uma URL pública. A fatia reaproveita integralmente o contrato e o
+pipeline da fatia 013: a página buscada vira um `SourceVersion` do tipo `txt`, com marcador MIME
+privado `text/plain+url`, e segue para chunks, embeddings e vetores sem tipo paralelo de fonte.
+
+```text
+/app (web, server) ── Server Action (JSON) ──► POST /api/v1/sources/urls
+        │                                       │ ConnectSourceUrlUseCase
+        │                                       ├─ normalizeSourceUrl + SSRF policy
+        │                                       ├─ HttpWebPageFetcherAdapter (DNS + redirects)
+        │                                       └─ ConnectSourcesUseCase (SHA-256 do texto extraído)
+        ▼
+KnowledgeSources (client) ◄── Server Actions ◄── GET/DELETE/POST retry /api/v1/sources
+```
+
+| Peça                        | Responsabilidade                                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `source-url-policy.ts`      | Normalização (http/https, hosts, fragmentos, parâmetros de rastreamento, 255 caracteres), bloqueio SSRF e extração de título/texto |
+| `WebPageFetcherPort`        | Porta de busca com `allowPrivateHosts` apenas em testes; timeout, limite de bytes, redirecionamentos e retries configuráveis       |
+| `HttpWebPageFetcherAdapter` | `fetch` com validação de DNS e de cada hop, 8 s, 2 MB, 3 redirecionamentos e 1 retry; nunca registra URL, página ou hash           |
+| `ConnectSourceUrlUseCase`   | Busca, dedup/versionamento pelo pipeline 013 e persistência de versão `failed` com mensagem acionável quando a busca não termina   |
+| `RetrySourceVersionUseCase` | Para versões de URL, refaz a busca antes de reprocessar; falha de busca permanece `failed`                                         |
+| `source-actions.ts`         | `connectSourceUrlAction`: JSON com token apenas no servidor; expõe apenas códigos públicos e mensagens en-US                       |
+| `KnowledgeSources`          | Campo “Add a URL”, estados `processing`/`ready`/`failed`, “Already connected”, retry, remoção e linha com URL normalizada e título |
+
+Endpoint adicional autenticado:
+
+| Rota                        | Resposta                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `POST /api/v1/sources/urls` | `202 { results: ConnectedSourceResult[] }`; JSON `{ url }`; falhas de busca viram versão `failed` |
+
+Regras:
+
+- `sources.normalized_name` é a URL normalizada em minúsculas; `source_versions.original_name`
+  guarda a URL para retry; `source_files.content` guarda o texto extraído. Nenhuma nova migração.
+- Deduplicação continua sendo SHA-256 do conteúdo extraído no escopo de `user_id`. O hash de uma
+  busca falha usa placeholder e é excluído da dedup.
+- SSRF: apenas http/https sem credenciais; bloqueio de loopback, privados, link-local, metadados,
+  special-use e hostnames internos; DNS e cada redirecionamento são validados antes da conexão.
+- `SOURCE_OPENAI_API_KEY` permanece no servidor. Logs e telemetria `knowledge.sources` registram
+  apenas `userId`, IDs opacos, código de erro, desfecho, duração e `chunkCount` — nunca URL,
+  conteúdo da página, hash ou chave.
+- O texto externo é tratado como não confiável e nunca altera regras de Expert/chat/plataforma.
+- E2E usa um fake API com catálogo de páginas controlável por teste; nenhuma rede externa é
+  necessária e os limites de timeout/redirecionamento seguem decisão aberta com Engenharia.
+
+### 4.14 Mídia como conhecimento (fatia 015)
+
+A fatia 015 estende o pipeline da 013 com imagem (JPEG/PNG), áudio (MP3) e vídeo (MP4). A mídia
+é convertida em texto localmente (OCR ou transcrição) e esse texto segue o mesmo caminho de
+chunking, embedding e vetores `KnowledgeChunk`, sem pipeline paralelo. A flag de rollout
+`knowledge_media_enabled` (padrão `false`) controla a exposição das novas opções no web.
+
+```text
+/app (flag ligada) ── Server Action ──► POST /api/v1/sources  (allowMedia)
+        │                                   │ ConnectSourcesUseCase
+        │                                   ├─ MIME + extensão + magic bytes + limites por tipo
+        │                                   ├─ SHA-256 → Source/SourceVersion (mediatype, duração, proveniência)
+        │                                   └─ ProcessSourceVersionUseCase (background)
+        │                                          ├─ MediaTextExtractorPort (OCR/transcrição local)
+        │                                          │      ├─ extracting → "No speech detected" → failed
+        │                                          ├─ chunking → embedding → Weaviate (sourceId)
+        │                                          └─ ready (+ fases em processing)
+        ▼
+KnowledgeSources ◄── listagem com status 013 + progresso/erro legíveis em en-US
+```
+
+| Peça                             | Responsabilidade                                                                                                                                                            |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SourceType` estendido           | `image \| audio \| video` somados a `pdf \| txt \| md`; `sourceTypeFor` permanece documental, `sourceTypeForUpload`/`mediaTypeFor` tratam mídia                             |
+| `media-file-policy.ts`           | Magic bytes (JPEG `FF D8 FF`, PNG assinatura completa, MP3 `ID3`/sync MPEG, MP4 `ftyp` no offset 4), limites 25/50/200 MB, duração máxima 60 min                            |
+| `MediaTextExtractorPort`         | Contrato `extract(file, type, durationSeconds?)` → texto + `method`/`modelVersion`/`durationSeconds`                                                                        |
+| `LocalMediaTextExtractorAdapter` | `execFile` de comandos OCR/transcrição configurados no servidor (`{file}`/`{output}`), diretório temporário removido em `finally`; sem chamada a OpenAI/Gemini              |
+| `ProcessSourceVersionUseCase`    | Atualiza fases `extracting`/`chunking`/`embedding` dentro de `processing`, persiste proveniência e limpa vetores parciais em falha                                          |
+| `0004_knowledge_media.sql`       | Migração aditiva: novos valores de `type`, colunas opcionais de mídia e constraint `media_type is not null and type = media_type`; sem migração de dados                    |
+| `flags.ts` / `source-actions.ts` | Flag lida somente no servidor (env ou cookie `knowledge_media_enabled=1`), parâmetro `allowMedia` do cliente descartado e reaplicado no servidor                            |
+| `KnowledgeSources`               | Seletor Image/Audio/Video, `accept` dinâmico, duração opcional, `aria-live` para fases e erro; rótulos/selectors da 013 (`knowledge-source-files`, “Add files”) preservados |
+
+Regras:
+
+- O status público continua `queued|processing|ready|failed`; `extracting|chunking|embedding` são
+  detalhes opcionais de progresso, nunca novos valores de status da API.
+- Validação na borda e no domínio: MIME + extensão + magic bytes + tamanho por tipo antes de
+  persistir; limite de duração também no cliente e no servidor. Tipos não suportados recebem
+  mensagem en-US específica e nenhuma fonte é criada.
+- Transcrição/OCR vazia marca a versão como `failed` com **"No speech detected"**, sem gravar
+  vetores; falhas de comando/provedor local são blocos parciais com mensagem acionável em en-US.
+- Dedup é o SHA-256 da 013 no escopo do usuário: reenvio do mesmo arquivo reaproveita a versão e
+  não duplica chunks/vetores; retry usa o mesmo `sourceId`.
+- Telemetria `media.*` registra apenas IDs opacos, tipo, fases, durações e desfecho. Nunca nome de
+  arquivo, hash, comando, texto extraído ou chave.
+- `next.config.js` usa `bodySizeLimit: "1gb"` para cobrir o limite de 200 MB por vídeo; a chave de
+  embedding continua exclusivamente no servidor via `SOURCE_OPENAI_API_KEY`.
+- Modelos/formatos adicionais, OCR de frames e limites definitivos seguem como decisões abertas na
+  spec; nenhum arquivo da fatia 014 (URLs) foi alterado.
+
+### 4.15 Recuperação, citações e painel de fontes (fatia 5 / spec 016)
+
+O slice `citations` liga o chat da fatia 012 à base vetorial da fatia 013. Ele não expõe rotas:
+`SendMessageUseCase` e `GetConversationUseCase` o consomem por portas. A flag
+`RAG_CITATIONS_ENABLED` (padrão `false`) controla a recuperação; com ela desligada, o chat é
+idêntico ao da fatia 012 e nenhum campo novo é gravado. O histórico com citações continua legível
+mesmo após desligar a flag.
+
+```text
+POST /conversations/messages ─► SendMessageUseCase
+        │                          ├─ RetrieveContextUseCase (embed → Weaviate → metadados)
+        │                          ├─ ExpertResponderPort (prompt aterrado, fontes como dados)
+        │                          └─ ComposeCitedAnswerUseCase ([n] validado → mensagem)
+        ▼
+GET /conversations ───────────► GetConversationUseCase ─► RefreshCitationsUseCase
+        ▼
+CitedContent/CitationPanel (web): citação clicável + painel lateral, fechável com Esc
+```
+
+| Peça                                  | Responsabilidade                                                                                                                                     |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `citations/domain/citation.ts`        | Contrato `Citation`, `RetrievalMetadata`, `GroundingContext`, `GroundedAnswer` e estados `plain`, `with_source`, `no_match`, `retrieval_unavailable` |
+| `citation-policy.ts`                  | Dedupe por `chunkId`, limiar, orçamento de caracteres, bloco de dados não confiáveis e remoção de `[n]` fora do intervalo injetado                   |
+| `QueryEmbeddingPort` / OpenAI adapter | Embedding da pergunta com `text-embedding-3-small`; chave apenas no servidor                                                                         |
+| `KnowledgeRetrievalPort` / Weaviate   | GraphQL `nearVector` em `KnowledgeChunk`, filtro obrigatório `userId`, `limit = topK` e timeout de 4 s                                               |
+| `CitationSourceMetadataPort` / `pg`   | Nome, tipo, versão atual, `isStale` e `sourceRemoved`; sem conteúdo de arquivo ou caminho absoluto                                                   |
+| `RetrieveContextUseCase`              | Orquestra recuperação, dedupe, seleção por relevância e metadados; falha vira `unavailable`                                                          |
+| `ComposeCitedAnswerUseCase`           | Sanitiza a resposta do modelo contra os trechos efetivamente injetados                                                                               |
+| `RefreshCitationsUseCase`             | Recalcula `isStale`/`sourceRemoved` ao ler o histórico, preservando o texto da citação                                                               |
+| `CitedContent` / `CitationPanel`      | Renderiza `[n]` como botões acessíveis, abre nome/tipo/localização/trecho e fecha com `Esc`                                                          |
+
+Configurações centrais: `RAG_TOP_K = 5`, `RAG_THRESHOLD = 0.35` (certainty do Weaviate),
+`RAG_MAX_CONTEXT_CHARS = 6000` e `RAG_MAX_HISTORY_MESSAGES = 6`. A migração aditiva
+`0005_rag_citations.sql` acrescenta `citations`, `retrieval` e `answer_status` a `messages`, sem
+alterar mensagens antigas e sem migração descendente executada. Nenhum arquivo da slice `sources`
+foi alterado: o contrato `KnowledgeChunk` é reusado e tipos novos de fonte são tolerados.
+
+Regras:
+
+- Toda consulta ao vetorial e aos metadados usa o `user_id` autenticado; não há workspace.
+- Trechos recuperados são dados não confiáveis em bloco delimitado; instruções dentro deles nunca
+  alteram papel, tom ou regras de citação do Expert.
+- Citação fora de `[1..k]` é removida; fonte inexistente não é inventada. A ordem das citações
+  segue a relevância da recuperação.
+- Sem trecho acima do limiar, a resposta diz que não encontrou base e não mostra citações.
+- Falha do Weaviate gera aviso en-US acionável, resposta básica sem citações e botão
+  "Retry search"; falha do modelo continua `503 MODEL_UNAVAILABLE`, sem detalhes técnicos e sem
+  persistência parcial.
+- Fonte antiga é sinalizada como "Outdated source"; fonte removida mantém o texto e desabilita o
+  botão com "Source removed".
+- Telemetria `rag.*` registra IDs opacos, contagens, duração e desfecho; nunca prompt, trecho,
+  chave de API, hash de conteúdo ou token de sessão.
+
+---
+
+### 4.16 Entregáveis multimídia (fatia 017)
+
+O slice `media` gera imagens e vídeos curtos a partir de um briefing em inglês enviado ao chat.
+Ele segue o padrão das fatias anteriores: domínio puro, casos de uso, portas e adaptadores. A
+flag `MULTIMEDIA_DELIVERABLES_ENABLED` (padrão `false`) controla a API; no web, a mesma variável
+ou o cookie de sessão `multimedia_deliverables_enabled=1` controla a interface. Com a flag off, o
+chat permanece idêntico ao da fatia 016.
+
+```text
+POST /conversations/messages ─► SendMessageUseCase ─► RequestMediaGenerationUseCase
+          │                         │                      ├─ detectMediaIntent (en-US)
+          │                         │                      ├─ InMemoryMediaQuota (por userId)
+          │                         │                      ├─ MediaGeneratorRouter
+          │                         │                      │    ├─ OpenAI Images (gpt-image-2)
+          │                         │                      │    └─ Gemini video (gemini-omni-1.2-flash)
+          │                         │                      └─ PostgresMediaRepository (bytea)
+          │                         └─ mensagem expert com messages.media
+          ▼
+GET /media/:id/status ────────► GetMediaStatusUseCase ─► attachment público
+POST /media/:id/cancel ───────► CancelMediaGenerationUseCase ─► fila aborta + quota devolvida
+POST /media/:id/retry ────────► RetryMediaGenerationUseCase ─► até 3 tentativas
+GET /media/:id/content ───────► DownloadMediaUseCase ─► bytes com headers de download seguro
+          ▲
+          └── web: /app/media/:id/content (Server Route autenticada, proxy para a API)
+```
+
+| Peça                                            | Responsabilidade                                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `media/domain/media.ts`                         | Tipos, limites, mensagens en-US, detecção de intenção e prompt do provedor                         |
+| `RequestMediaGenerationUseCase`                 | Valida briefing/tipo/tópico, aplica cota de 10 imagens e 2 vídeos por hora e enfileira o job       |
+| `ProcessMediaGenerationUseCase`                 | Executa o gerador com `AbortController`, persiste bytes e publica `ready` ou `failed`              |
+| `InMemoryMediaJobQueue` / `InMemoryMediaQuota`  | Estado volátil de jobs e cotas; reinício do processo é follow-up de persistência                   |
+| `OpenAIImageGenerator` / `GeminiVideoGenerator` | Adaptadores HTTP com chaves apenas no servidor; tamanhos 1024², retrato e paisagem; 4/6/8 s a 720p |
+| `PostgresMediaRepository`                       | `generated_media` com `bytea`, metadados, `message_id` e cascade por mensagem/usuário              |
+| `MediaAttachmentView`                           | `<img>`/`<video>`, metadados, `aria-live`, polling, Download, Try again e Cancel                   |
+| `/app/media/[mediaId]/content`                  | Proxy autenticado; `Cache-Control: private, no-store` e `X-Content-Type-Options: nosniff`          |
+
+Regras de produto e segurança:
+
+- Isolamento é sempre por `user_id` autenticado; não há workspace nesta fatia.
+- Briefing acima de 2.000 caracteres ou arquivo acima de 20 MB recebe sugestão en-US sem chamar
+  provedor. Sem tipo ou sem tópico, o Expert faz uma única pergunta curta e nenhum job é criado.
+- `[n]` resolve a citação `n` da última mensagem do Expert (fatia 016) e é anexado ao entregável;
+  envio dos bytes da fonte ao modelo é follow-up.
+- Estados: `queued → generating → ready | failed | cancelled`. Jobs órfãos viram `failed` na leitura
+  após 10 minutos; tentativas são persistidas e limitadas a 3.
+- Erros de provedor, prompts e detalhes de chave nunca chegam a logs, respostas ou telemetria; o
+  usuário vê apenas mensagens estáveis em en-US.
+- Migration aditiva `0006_multimedia_deliverables.sql` cria `generated_media` e `messages.media`
+  sem migração de dados nem down-migration. Política de retenção e job de limpeza ficam como
+  follow-up.
+- O modelo de vídeo da spec (`gemini-omni-1.1-flash`) foi substituído por
+  `gemini-omni-1.2-flash`; ambos os modelos são configuráveis por ambiente. A validação de uma
+  chamada real de vídeo depende de billing/API Google habilitados e não foi executada nesta fatia.
 
 ---
 
@@ -521,7 +889,7 @@ apps/web (Next.js)
   ▼
 apps/api (NestJS)
   ├── AuthN/AuthZ ──────────────► Postgres (auth própria: users, auth_tokens, sessions)
-  │                               └─► SMTP Mailtrap (e-mail de nova sessão)
+  │                               └─► Mailtrap/Resend (e-mail de nova sessão)
   ├── Casos de uso
   │     ├── Conectores ─────────► Notion / Google / Jira / ...
   │     ├── Ingestão ───────────► Postgres + Storage (documentos e chunks)
@@ -548,7 +916,20 @@ Fluxo resumido:
 > (`POST /api/v1/auth/sign-in`, `/auth/sign-in`, `returnTo` seguro), o sign-out
 > (`POST /api/v1/auth/sign-out`, `204`, revoga a sessão atual e invalida o JWT imediatamente) e o
 > esqueleto de navegação (`/auth/*` público, `/app/*` privado com shell e guard, raiz
-> redirecionando por sessão). O schema de auth veio na fatia 001.
+> redirecionando por sessão), o catálogo de Experts (`GET /api/v1/experts`), o chat em persona com
+> LangGraph/`gpt-4o-mini` (`GET /api/v1/conversations` e `POST /api/v1/conversations/messages`) e
+> o histórico isolado por usuário. A fatia 013 acrescenta o FAB/painel de fontes, o upload
+> multipart de PDF/TXT/Markdown, deduplicação por hash, chunks, embeddings e gravação no Weaviate
+> local (`KnowledgeChunk`), com listagem, retry e exclusão isolados por usuário. A fatia 014
+> acrescenta a conexão de URLs públicas ao mesmo painel, com validação SSRF e o mesmo pipeline de
+> indexação. A fatia 015 acrescenta imagem, áudio e vídeo convertidos em texto por
+> OCR/transcrição local e indexados pelo mesmo pipeline, atrás da flag
+> `knowledge_media_enabled` (desligada por padrão). O schema de auth veio na fatia 001, o de
+> conversas na fatia 012 e o de fontes na fatia 013, com colunas opcionais de mídia na migração 0004. A fatia 016 passou a consultar os vetores no chat, com recuperação, contexto e citações
+> inline controlados por `RAG_CITATIONS_ENABLED`; a 017 acrescentou geração assíncrona de
+> imagem/vídeo com cota por hora e anexos no chat, controlada por
+> `MULTIMEDIA_DELIVERABLES_ENABLED`; a 018 acrescentou spans locais sanitizados e evaluation
+> offline (spec 018). Detalhes em [AI.md](./AI.md) e [OBSERVABILITY.md](./OBSERVABILITY.md).
 
 ---
 
@@ -558,47 +939,111 @@ Cada decisão abaixo possui um registro correspondente em [`.adrs/`](../.adrs/RE
 contexto, alternativas e consequências. Decisões ainda em aberto permanecem na §7 até serem
 tomadas.
 
-| Decisão                                     | Motivo                                                                            | Estado                                       |
-| ------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
-| Monorepo com Turborepo + Bun                | Compartilhar código, cache e execução paralela                                    | ✅                                           |
-| Next.js App Router no front-end             | Server Components, streaming e SEO                                                | ✅                                           |
-| API separada em NestJS                      | Isolar domínio, ingestão e orquestração do front                                  | ✅                                           |
-| Supabase local via CLI                      | Ambiente reproduzível sem instalação global                                       | ✅                                           |
-| Auth própria na API (sem Supabase Auth)     | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação           | ✅ (schema + sessão + sign-up + recuperação) |
-| Hash de senha com scrypt nativo             | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                | ✅                                           |
-| Sessão com JWT HS256 + registro server-side | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`         | ✅                                           |
-| Cookie `HttpOnly` com ponte `Bearer` no web | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API            | ✅                                           |
-| Sessão única com create-then-revoke         | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)          | ✅ (follow-up)                               |
-| Namespace `/api/v1`                         | Versionar a API e manter contrato estável desde a primeira rota                   | ✅                                           |
-| Grupos `/auth/*` público e `/app/*` privado | Separar fluxo de auth da área privada, com guard server-side e layouts próprios   | ✅                                           |
-| Contrato de erro global `{ code, message }` | Respostas previsíveis para o web sem stack, SQL ou detalhes internos              | ✅                                           |
-| Arquitetura em camadas + vertical slices    | Baixo acoplamento e evolução por domínio                                          | ✅ (auth, hello)                             |
-| Request handler 1:1 por endpoint            | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015) | ✅                                           |
-| Light theme único                           | Direção visual definida em `DESIGN.md`                                            | ✅                                           |
-| Tailwind CSS + shadcn/ui em `packages/ui`   | Base visual compartilhada e tokens únicos                                         | ✅                                           |
-| TypeScript `strict`                         | Segurança de tipos no monorepo                                                    | ✅                                           |
-| OpenTelemetry + Grafana LGTM desde o dia 0  | Diagnosticar ingestão e respostas de IA                                           | ✅                                           |
-| Vitest + Playwright + Supertest             | Unitário, E2E e API                                                               | ✅                                           |
-| LGTM all-in-one via Compose                 | Menos configuração e versões fixadas                                              | ✅                                           |
-| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`, indisponível por padrão no Docker Desktop    | ✅                                           |
-| PostgreSQL local em `15`                    | Workaround de ambiente; a versão alvo será decidida antes de produção             | ✅                                           |
+| Decisão                                      | Motivo                                                                                  | Estado                                      |
+| -------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Monorepo com Turborepo + Bun                 | Compartilhar código, cache e execução paralela                                          | ✅                                          |
+| Next.js App Router no front-end              | Server Components, streaming e SEO                                                      | ✅                                          |
+| API separada em NestJS                       | Isolar domínio, ingestão e orquestração do front                                        | ✅                                          |
+| PostgreSQL 18 via Docker Compose             | Ambiente reproduzível sem instalação global nem stack proprietária                      | ✅                                          |
+| Auth própria na API (sem provedor externo)   | Controlar sessão única, tokens opacos e e-mails no domínio da aplicação                 | ✅ (schema + fluxos 004–008)                |
+| Acesso ao banco com `pg` + SQL parametrizado | Sem ORM/query builder; SQL explícito e migrações versionadas (ADR 0016)                 | ✅                                          |
+| Hash de senha com scrypt nativo              | Hash forte sem dependência nativa, com custo versionado (ADR 0014)                      | ✅                                          |
+| Sessão com JWT HS256 + registro server-side  | Revogação imediata, sessão única e claims mínimos `sub`/`sid`/`iat`/`exp`               | ✅                                          |
+| Cookie `HttpOnly` com ponte `Bearer` no web  | Token fora do JavaScript; o servidor do Next lê o cookie e chama a API                  | ✅                                          |
+| Sessão única com create-then-revoke          | Preserva o invariante sob concorrência sem transação no banco (ADR 0013)                | ✅ (follow-up)                              |
+| Namespace `/api/v1`                          | Versionar a API e manter contrato estável desde a primeira rota                         | ✅                                          |
+| Grupos `/auth/*` público e `/app/*` privado  | Separar fluxo de auth da área privada, com guard server-side e layouts próprios         | ✅                                          |
+| Contrato de erro global `{ code, message }`  | Respostas previsíveis para o web sem stack, SQL ou detalhes internos                    | ✅                                          |
+| Arquitetura em camadas + vertical slices     | Baixo acoplamento e evolução por domínio                                                | ✅ (todas as slices 001–018)                |
+| Request handler 1:1 por endpoint             | Um handler e um caso de uso por fluxo, com erro traduzido na interface (ADR 0015)       | ✅                                          |
+| Light theme único                            | Direção visual definida em `DESIGN.md`                                                  | ✅                                          |
+| Tailwind CSS + shadcn/ui em `packages/ui`    | Base visual compartilhada e tokens únicos                                               | ✅                                          |
+| TypeScript `strict`                          | Segurança de tipos no monorepo                                                          | ✅                                          |
+| OpenTelemetry + Grafana LGTM desde o dia 0   | Diagnosticar ingestão e respostas de IA                                                 | ✅                                          |
+| Vitest + Playwright + Supertest              | Unitário, E2E e API                                                                     | ✅                                          |
+| LGTM all-in-one via Compose                  | Menos configuração e versões fixadas                                                    | ✅                                          |
+| Migrações versionadas com executor próprio   | SQL versionado, transacional e concurrency-safe sem CLI de terceiros (ADR 0016)         | ✅                                          |
+| Catálogo de Experts na API (fonte única)     | Web consome o catálogo no servidor; sem duplicação no cliente ou em `packages/ui`       | ✅                                          |
+| Histórico por `(user_id, expert_id)`         | Isolamento por usuário autenticado, sem workspace, com `unique` e RLS                   | ✅                                          |
+| LangChain.js + LangGraph para responder      | Orquestração do modelo atrás de `ExpertResponderPort`, isolada da aplicação             | ✅                                          |
+| `OPENAI_API_KEY` opcional no boot            | Ausência gera `503 MODEL_UNAVAILABLE` só no envio; boot e testes seguem determinísticos | ✅                                          |
+| Dedup de fontes por SHA-256 por usuário      | Reenvio idêntico não cria versão, chunk ou vetor; índice único cobre concorrência       | ✅                                          |
+| Arquivo original em `bytea`                  | Exclusão atômica com a fonte, sem diretório compartilhado ou nova env var               | ✅                                          |
+| Weaviate local com vectorizer `none`         | Vetores vêm do `text-embedding-3-small`; distância cosine e IDs determinísticos         | ✅                                          |
+| Adaptador Weaviate por REST/GraphQL          | Compose expõe apenas a porta HTTP 8080; cliente v3 exigiria gRPC 50051                  | ✅                                          |
+| Limites provisórios 10 MB / 5 arquivos       | Validação centralizada no domínio e ecoada no web; definição final segue em aberto      | ✅ (follow-up)                              |
+| URL como fonte `txt` com marcador MIME       | Reusa o contrato 013 sem migração; hash do texto extraído e retry refaz a busca         | ✅                                          |
+| Política SSRF centralizada no domínio        | Validação antes do fetch, no DNS e em cada redirecionamento; host privado nunca buscado | ✅                                          |
+| Mídia como conhecimento via OCR/transcrição  | Reaproveita o pipeline de chunks/embeddings sem novo contrato de fonte                  | ✅                                          |
+| RAG com citações por similaridade vetorial   | Respostas verificáveis, com `topK`/limiar configuráveis e painel de fontes              | ✅ (flag `RAG_CITATIONS_ENABLED`)           |
+| Entregáveis multimídia assíncronos           | Geração de imagem/vídeo com job persistido, cota e anexo no chat                        | ✅ (flag `MULTIMEDIA_DELIVERABLES_ENABLED`) |
+| Tracing local-first com sanitização          | Observar chat/RAG sem enviar prompt, PII ou segredo a serviço externo                   | ✅ (spec 018; stack licenciada 🔍)          |
+| Pseudonimização HMAC de usuário em spans     | Correlacionar por usuário sem expor identidade                                          | ✅                                          |
+| Evaluation offline determinística            | Gate local antes de mudanças de prompt/modelo, sem chamada externa                      | ✅ (`bun run obs:eval`)                     |
+| Dashboard LGTM gerado por script             | Renovação reproduzível de painéis a partir de uma única fonte                           | ✅ (`observability/gen-dashboard.mjs`)      |
 
 ---
 
 ## 7. Decisões em aberto
 
-| Tema                 | Pergunta                                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| Deploy da API        | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render). |
-| OXLint/OXFmt         | Migrar do ESLint/Prettier atual ou manter?                                                     |
-| Multi-tenancy        | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                     |
-| `packages/shared`    | Quais contratos realmente serão compartilhados entre web e api?                                |
-| Versão do PostgreSQL | O ambiente local usa `15`; qual versão será adotada em produção?                               |
-| Supabase Analytics   | Reabilitar expondo a Docker API em `2375` ou manter a telemetria apenas no LGTM?               |
+| Tema                  | Pergunta                                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Deploy da API         | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render).              |
+| OXLint/OXFmt          | Migrar do ESLint/Prettier atual ou manter?                                                                  |
+| Multi-tenancy         | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                                  |
+| `packages/shared`     | Quais contratos realmente serão compartilhados entre web e api?                                             |
+| PostgreSQL gerenciado | Qual provedor (Neon, RDS, Cloud SQL) será usado em produção?                                                |
+| Limites de upload     | Tamanho máximo por arquivo e quantidade por envio definitivos (hoje 10 MB / 5, provisórios).                |
+| Retenção de fontes    | Por quanto tempo manter arquivo original, versões antigas, chunks e embeddings após a conexão.              |
+| Metas de ingestão     | Latência e custo máximos aceitáveis por arquivo e por página processados.                                   |
+| Limites de URL        | Timeout, tamanho máximo de resposta e redirecionamentos definitivos (hoje 8 s / 2 MB / 3).                  |
+| Robots e termos       | Verificar `robots.txt` antes de buscar páginas externas? Hoje apenas conteúdo público é buscado.            |
+| Correlação de IDs     | Unificar `requestId` HTTP, `traceId` OTel e `traceId` dos spans locais em um único identificador navegável? |
+| Alertas e SLOs        | Quais regras provisionar (5xx, p95, `obs.trace.dropped`, deadlocks) e qual janela/orçamento?                |
+| Métricas de domínio   | Nomes e donos para chat, RAG, tokens, custo, mídia e profundidade da fila de traces.                        |
+| LangSmith licenciado  | Versão/imagem, backend, retenção de traces e conteúdo (ou não) de prompt/resposta em spans.                 |
+| Fila do sink local    | Limite, backpressure e política de descarte para `HttpTraceSink` (hoje array sem limite).                   |
+| Filtro do dashboard   | Alinhar `postgresql_database_name` do gerador ao `POSTGRES_DB` do Compose.                                  |
 
 ---
 
-## 8. Como manter este documento
+## 8. Observabilidade local-first (spec 018)
+
+A fatia 018 adiciona a slice `apps/api/src/modules/observability` seguindo as camadas do
+projeto: contrato de span no domínio, `TraceEmitter` na aplicação e adaptadores HTTP/no-op na
+infraestrutura. A direção de dependência permanece `interface → application → domain`, com a
+infraestrutura implementando a porta `TraceSinkPort`.
+
+- **Instrumentação por injeção opcional** (`@Optional()`) em `SendMessageUseCase`,
+  `RetrieveContextUseCase` e `LangGraphExpertResponder`: assinaturas existentes preservadas e flag
+  desligada por padrão. Nenhuma rota, controller ou contrato de API foi alterado.
+- **Correlação:** um `traceId` local por requisição liga os spans raiz, de recuperação e de geração.
+  `conversationId`/`messageId` entram quando disponíveis, senão recebem `missing`. Esse ID **não**
+  é o `traceId` OTel nem o `requestId` HTTP; a unificação é decisão em aberto (§7).
+- **Privacidade:** `userPseudonym` é HMAC-SHA256 com sal server-side; sanitização recursiva remove
+  chaves proibidas antes do sink. Prompt, resposta e PII nunca entram no payload.
+- **Resiliência:** emissão assíncrona em array em memória, com flush por tamanho/tempo; falha do
+  coletor gera `obs.trace.dropped` em log e nunca propaga para o fluxo do usuário. A fila não tem
+  limite nem backpressure e não expõe métrica de profundidade — ver
+  [OBSERVABILITY.md](./OBSERVABILITY.md#6-limites-conhecidos-e-dívida-técnica).
+- **Contrato de custo:** o campo emitido é `estimatedCostUsd`. Os builders
+  `createMediaSpanMetadata()` e `createSourceSpanMetadata()` existem e são testados, mas ainda não
+  são chamados nos fluxos reais de mídia/fontes.
+- **Configuração local-only:** endpoint cloud, protocolo não HTTP(S) e URL com credenciais são
+  rejeitados no boot quando `LANGSMITH_TRACING_ENABLED=true`.
+- **Evaluation:** scorer puro e determinístico em `domain/evaluation.ts`, CLI em
+  `scripts/obs-eval.ts` e datasets sintéticos versionados em `eval/datasets/`. Não há chamada a
+  modelo externo nem persistência em banco.
+- **Infraestrutura:** `docker-compose.langsmith.yml` é um override opcional, protegido pelo profile
+  `langsmith`, que exige imagem Enterprise licenciada. Não é usado por `bun run infra:up`.
+  Stack real, Studio e validação ao vivo permanecem bloqueados nesta fatia (Docker daemon
+  indisponível e imagem licenciada ausente).
+
+Detalhes operacionais em [OBSERVABILITY.md](./OBSERVABILITY.md).
+
+---
+
+## 9. Como manter este documento
 
 Atualize `ARCHITECTURE.md` na mesma mudança que:
 

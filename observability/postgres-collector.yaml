@@ -1,13 +1,13 @@
-# Coleta métricas do Postgres local (Supabase) e envia por OTLP para o LGTM.
-# O banco fica em outra rede do Docker, então é acessado pela porta publicada no host.
+# Coleta métricas do PostgreSQL do Compose e envia por OTLP para o LGTM.
+# O coletor roda na mesma rede Docker do banco e conecta pelo nome do serviço.
 receivers:
   postgresql:
-    endpoint: host.docker.internal:54322
+    endpoint: postgres:5432
     transport: tcp
-    username: postgres
+    username: ${env:POSTGRES_USER}
     password: ${env:POSTGRES_PASSWORD}
     databases:
-      - postgres
+      - ${env:POSTGRES_DB}
     collection_interval: 15s
     tls:
       insecure: true
@@ -35,7 +35,7 @@ processors:
   resource:
     attributes:
       - key: service.name
-        value: supabase-postgres
+        value: coders-modulo-4-postgres
         action: upsert
   batch: {}
 

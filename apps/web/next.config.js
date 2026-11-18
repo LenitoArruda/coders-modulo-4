@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // Up to five 200 MB media files plus multipart metadata travel through the
+    // Server Action before the API revalidates the payload.
+    serverActions: { bodySizeLimit: "1gb" },
+  },
   transpilePackages: ["@repo/ui"],
   allowedDevOrigins: ["127.0.0.1"],
   logging: {

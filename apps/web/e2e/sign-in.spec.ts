@@ -10,9 +10,10 @@ import {
   E2E_SIGN_IN_DOMAIN,
   E2E_SIGN_IN_PASSWORD,
 } from "./support/fake-session";
+import { WEB_URL } from "./support/ports";
 
 const SIGN_IN_PATH = "/auth/sign-in";
-const BASE_URL = "http://127.0.0.1:3000";
+const BASE_URL = WEB_URL;
 
 const INVALID_MESSAGE = "Invalid email or password.";
 const NOT_CONFIRMED_MESSAGE = "Please confirm your email before signing in.";
@@ -312,6 +313,10 @@ test.describe("returnTo", () => {
 
 test.describe("single session", () => {
   test("segundo dispositivo invalida o primeiro", async ({ browser }) => {
+    // Two sign-ins plus three navigations share the 30 s default test budget
+    // with fully parallel workers and cold `next dev` compiles.
+    test.setTimeout(90_000);
+
     const email = uniqueEmail("single");
     const first = await newSignedInContext(browser, email);
     const second = await newSignedInContext(browser, email);
@@ -334,14 +339,17 @@ test.describe("single session", () => {
 });
 
 test.describe("root and auth pages with a session", () => {
-  test("raiz com sessão vai para /app e sem sessão para o sign-in", async ({
+  test("raiz com sessão vai para /app e sem sessão mostra a landing", async ({
     browser,
   }) => {
     const signedOut = await browser.newContext({ baseURL: BASE_URL });
     const signedOutPage = await signedOut.newPage();
 
     await signedOutPage.goto("/");
-    await expect(signedOutPage).toHaveURL(/\/auth\/sign-in$/);
+    await expect(signedOutPage).toHaveURL(/\/$/);
+    await expect(
+      signedOutPage.getByRole("heading", { level: 1 }),
+    ).toContainText("team of AI experts");
     await signedOut.close();
 
     const { context, page } = await newSignedInContext(

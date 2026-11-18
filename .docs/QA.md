@@ -1,6 +1,6 @@
 # QA.md — Qualidade e verificação
 
-> **Status:** ativo · **Atualizado em:** 2026-11-10
+> **Status:** ativo · **Atualizado em:** 2026-11-18
 > **Use antes de declarar qualquer tarefa concluída.**
 
 Este documento é a fonte de verdade sobre **como verificar** mudanças. Se um comando citado
@@ -14,7 +14,8 @@ aqui não existir no `package.json`, ele está marcado como 🧭 planejado.
 | ----------------------- | ----------------------------------- |
 | Node.js                 | >= 24                               |
 | Bun                     | 1.4.4                               |
-| Docker Desktop          | em execução (Supabase e LGTM)       |
+| Docker Desktop          | em execução (PostgreSQL e LGTM)     |
+| Weaviate local          | `127.0.0.1:8080` (spec 013)         |
 | Dependências instaladas | `bun install`                       |
 | Navegador do Playwright | `bun x playwright install chromium` |
 
@@ -37,23 +38,25 @@ Execute na raiz do monorepo:
 | `bun run test`        | Testes unitários e de integração da API e do web (Vitest)    |
 | `bun run test:watch`  | Vitest em modo watch (API e web)                             |
 | `bun run test:e2e`    | Smoke E2E do web (Playwright)                                |
-| `bun run infra:up`    | Sobe LGTM (Compose) e Supabase local                         |
-| `bun run infra:down`  | Para Supabase e LGTM (idempotente)                           |
-| `bun run db:migrate`  | Aplica migrações pendentes no Supabase local                 |
-| `bun run db:test`     | Executa os testes pgTAP de `supabase/tests/` no banco local  |
+| `bun run infra:up`    | Sobe LGTM (Compose) e PostgreSQL 18                          |
+| `bun run infra:down`  | Para PostgreSQL e LGTM (idempotente)                         |
+| `bun run db:migrate`  | Aplica migrações pendentes no PostgreSQL local               |
+| `bun run db:test`     | Executa os testes SQL de `db/tests/` no banco local          |
 
-> `bun run db:test` exige o Supabase local ativo (`bun run infra:up`) e as migrações aplicadas
-> (`bun run db:migrate`). Ele usa `supabase test db`, que roda cada arquivo de `supabase/tests/`
-> com pgTAP em uma transação com `rollback`.
+> `bun run db:test` exige o PostgreSQL ativo (`bun run infra:up`) e as migrações aplicadas
+> (`bun run db:migrate`). Ele roda cada arquivo de `db/tests/` dentro de `BEGIN`/`ROLLBACK` usando
+> `scripts/db.mjs`, sem depender de extensões externas de teste.
 
 > Use sempre `bun run <script>`. `bun build` e `bun test` são comandos nativos do Bun e **não**
 > executam os scripts do `package.json`.
 
 > A API exige `JWT_SECRET` com no mínimo 32 caracteres no boot (veja `.env.example`); sem ele, a
-> API não inicia. Os testes não dependem do `.env`: `apps/api/src/test/setup-env.ts` define as
-> variáveis mínimas (incluindo `JWT_SECRET`, `SESSION_TTL_SECONDS`,
-> `CONFIRMATION_TOKEN_TTL_SECONDS`, `RESET_TOKEN_TTL_SECONDS` e as dos rate limits de sign-up,
-> sign-in, forgot-password e reset-password).
+> API não inicia. O provedor de e-mail é escolhido por `NODE_ENV` (`production` → Resend; demais →
+> Mailtrap), e só as variáveis do provedor ativo são exigidas. Os testes não dependem do `.env`:
+> `apps/api/src/test/setup-env.ts` define `NODE_ENV=test` e as variáveis mínimas (incluindo
+> `JWT_SECRET`, `MAILTRAP_API_TOKEN`, `SESSION_TTL_SECONDS`, `CONFIRMATION_TOKEN_TTL_SECONDS`,
+> `RESET_TOKEN_TTL_SECONDS` e as dos rate limits de sign-up, sign-in, forgot-password e
+> reset-password).
 >
 > O E2E do web (`bun run test:e2e`) sobe uma **API fake** local em `127.0.0.1:3434`
 > (`apps/web/e2e/support/fake-api-server.ts`) e aponta `API_BASE_URL` do web para ela. Assim os
@@ -68,9 +71,21 @@ Execute na raiz do monorepo:
 > reset-password, o token `reset-token:<nome>:<único>` vale uma única vez e, ao ser usado, troca a
 > senha de `<nome>@signin.example.com` e revoga as sessões dela (a senha antiga passa a falhar);
 > `rate-limited-reset-token` responde `429`, qualquer outro token responde `INVALID_RESET_TOKEN` e
-> a senha é validada antes do token, como na API real. Não deixe um
-> `bun run dev` antigo ocupando a porta 3000 antes do E2E, pois o Playwright reutiliza o servidor
-> existente em modo local.
+> a senha é validada antes do token, como na API real. A fake também implementa
+> `GET/POST /api/v1/sources`, `POST /api/v1/sources/urls`, `DELETE /api/v1/sources/:sourceId` e
+> `POST /api/v1/sources/:versionId/retry`, com estado isolado por token: dedup por SHA-256, nomes
+> com `fail`/`broken`/`corrupt` entram como `failed` e voltam a `ready` no retry, e `pending`
+> permanece `processing` até o polling. Para URLs, `POST /__fake/pages` (somente teste) define o
+> título, o texto e o estado da página (`text`, `no-text`, `unavailable`), permitindo simular
+> conteúdo alterado e falha de busca sem acessar a rede. URLs internas e esquemas não http/https
+> são recusados com `BLOCKED_SOURCE_URL`/`INVALID_SOURCE_URL`. Na fatia 015 a fake também aceita
+> imagem/áudio/vídeo quando a requisição traz `allowMedia`, simulando extração
+> (`extracting` → `chunking` → `embedding`), reaproveitamento por hash, "No speech detected",
+> retry e exclusão; cenários de mídia ligam a flag com o cookie `knowledge_media_enabled=1` no
+> contexto do navegador, sem alterar a config global. No chat, os prefixos determinísticos `cite:`,
+> `stale:`, `removed:`, `nomatch:` e `vector-down:` ativam os cenários de citação da spec 016;
+> prompts sem prefixo preservam o modo fatia 012. Não deixe um `bun run dev` antigo ocupando a
+> porta 3000 antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
 
 ### 2.1 Comando do OpenCode
 
@@ -145,7 +160,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] RLS/isolamento por tenant quando aplicável.
 - [ ] Nenhuma perda de dados.
 - [ ] Seed/dados de teste documentados.
-- [ ] `bun run db:migrate` aplica a migração e `bun run db:test` passa com os testes pgTAP.
+- [ ] `bun run db:migrate` aplica a migração e `bun run db:test` passa com os testes SQL.
 
 ### 5.4 Conectores e integrações
 
@@ -172,7 +187,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 
 ### 5.7 Infraestrutura e observabilidade
 
-- [ ] `bun run infra:up` sobe LGTM e Supabase e o Grafana responde em `http://localhost:3010`.
+- [ ] `bun run infra:up` sobe PostgreSQL e LGTM e o Grafana responde em `http://localhost:3010`.
 - [ ] `bun run db:migrate` aplica migrações pendentes e é idempotente.
 - [ ] `bun run infra:down` para os serviços e funciona quando já estão parados.
 - [ ] Nenhum container em loop de reinício (`docker ps` estável).
@@ -256,7 +271,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] E2E cobre sucesso/cookie/URL sem token, inválido, `409`, `429`, link sem token, sessão ativa,
       foco visível e 360/768/1280 px sem rolagem horizontal.
 - [ ] E-mails transacionais seguem `DESIGN.md` (light-only, paleta, texto grafite sobre o botão pastel, 1 ação primária, link de fallback) e não têm rolagem horizontal em 360 px.
-- [ ] Logs do Mailtrap (`https://mailtrap.io/sending/email_logs`): e-mails "Confirm your account" e "New session on your account" inspecionados
+- [ ] Em dev, logs do Mailtrap (`https://mailtrap.io/sending/email_logs`): e-mails "Confirm your account" e "New session on your account" inspecionados
       no QA manual, com data/hora e alerta de senha no segundo.
 - [ ] `CONFIRMATION_TOKEN_TTL_SECONDS` controla a expiração (padrão 86400) e os limites de rate
       limit vêm do env; logs incluem operação/`userId`, sem e-mail, senha ou token.
@@ -292,7 +307,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] `/auth/sign-in` substitui o placeholder, usa en-US, light-only, labels, `aria-describedby`
       e link "Forgot password?" para `/auth/forgot-password`.
 - [ ] Credenciais válidas → sessão `sign_in`, cookie `HttpOnly`/`SameSite=Lax`, redirect para `/app`
-      ou para o `returnTo` seguro e e-mail "New session on your account" no Mailtrap.
+      ou para o `returnTo` seguro e e-mail "New session on your account" no provedor ativo.
 - [ ] Senha errada, e-mail inexistente ou e-mail malformado → `401` com a mesma mensagem; corpo
       vazio/malformado → `400`; conta não confirmada com a senha certa → `403`.
 - [ ] Segundo dispositivo revoga o primeiro (JWT antigo → `401`, `/app` redireciona para sign-in).
@@ -307,7 +322,7 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
       `autocomplete="new-password"`, foco visível e erros com `aria-describedby` e `role="alert"`.
 - [ ] Token válido + senha e confirmação válidas → `200`, hash atualizado (nunca a senha em
       claro), token consumido, outros tokens `password_reset` invalidados, **todas** as sessões
-      revogadas e e-mail "Your password has been changed" en-US nos logs do Mailtrap
+      revogadas e e-mail "Your password has been changed" en-US nos logs do provedor ativo
       com orientação para solicitar novo reset.
 - [ ] Após o sucesso o web mostra a confirmação, redireciona para `/auth/sign-in?reset=success` e o
       sign-in exibe "Your password has been updated. Sign in with your new password."
@@ -328,6 +343,120 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] E2E cobre fluxo completo, URL limpa, `Referrer-Policy`, link inválido/ausente, segundo uso,
       sessão antiga invalidada, validação, `429`, foco visível, light-only e 360/768/1280 px sem
       rolagem horizontal.
+
+### 5.15 Provedor de e-mail por ambiente
+
+- [ ] `NODE_ENV` ausente ou vazio → `dev`, provedor Mailtrap e `NODE_ENV` não é obrigatório.
+- [ ] `NODE_ENV` diferente de `production` (ex.: `dev`, `development`, `test`, `staging`) → Mailtrap.
+- [ ] `NODE_ENV=production` → Resend, inclusive com espaços/capitalização normalizados.
+- [ ] Mailtrap ativo: `MAILTRAP_API_TOKEN` ausente falha no boot citando a variável; `RESEND_API_KEY`
+      não é exigida.
+- [ ] Resend ativo: `RESEND_API_KEY` ausente falha no boot citando a variável; `MAILTRAP_API_TOKEN`
+      não é exigida.
+- [ ] `MAIL_FROM_EMAIL`/`MAIL_FROM_NAME` são compartilhados e o remetente chega igual nos dois
+      provedores.
+- [ ] `MAILTRAP_SANDBOX`/`MAILTRAP_SANDBOX_ID` continuam válidos só com Mailtrap ativo; variáveis
+      inválidas do provedor inativo são ignoradas.
+- [ ] Os quatro e-mails (confirmação, nova sessão, recuperação e senha alterada) mantêm assunto,
+      conteúdo e destinatário no provedor ativo.
+- [ ] O boot loga `nodeEnv` e `emailProvider`, sem chaves, tokens ou conteúdo de e-mail.
+- [ ] `.env.example` separa os blocos de Mailtrap e Resend e não contém segredos reais.
+
+### 5.16 Fontes de conhecimento por arquivo (fatia 013)
+
+- [ ] FAB na home privada abre/fecha o painel, expõe `aria-expanded`/`aria-controls` e tem alvo ≥ 44 px.
+- [ ] Lista mostra nome, tipo, tamanho, versão, quantidade de chunks e status; estado vazio orienta o upload.
+- [ ] Upload de PDF/TXT/Markdown responde `202` com versão `processing`; polling leva a `ready`.
+- [ ] Conteúdo idêntico do mesmo usuário responde “Already connected” sem nova versão, chunk ou vetor.
+- [ ] Mesmo conteúdo em usuário diferente cria fonte distinta (isolamento por `user_id`).
+- [ ] Tipo não suportado, arquivo vazio, acima de 10 MB e mais de 5 arquivos são recusados com
+      mensagem en-US; `.env.example` e `docker-compose.yml` não são alterados.
+- [ ] Mesmo nome normalizado com conteúdo diferente cria nova `SourceVersion`; a anterior deixa de
+      ser a atual e é sinalizada como desatualizada.
+- [ ] Falha de extração/embedding/vetor persiste `failed`, nunca `ready`; `POST /:versionId/retry`
+      limpa vetores parciais e permite reprocessar.
+- [ ] Dois envios simultâneos do mesmo hash: índice único parcial deixa uma versão válida e o
+      conflito vira “Already connected”.
+- [ ] `DELETE /:sourceId` responde `204` e remove arquivo (`bytea`), versões, chunks e vetores;
+      conversas do usuário permanecem.
+- [ ] Logs/telemetria `knowledge.sources` e o cliente não contêm conteúdo, nome de arquivo, hash,
+      chave de API ou token de sessão.
+- [ ] E2E cobre FAB, upload misto, dedup, versionamento, pendente, inválido, retry, remoção,
+      isolamento, teclado/foco e 360/768/1280 px sem rolagem horizontal.
+
+### 5.17 Fontes de conhecimento por URL (fatia 014)
+
+- [ ] Campo “Add a URL” tem rótulo, dica em inglês, `inputmode="url"` e mensagem para URL vazia.
+- [ ] `POST /api/v1/sources/urls` com JSON `{ url }` responde `202` com `name`, `url`, `status`,
+      `versionId` e `alreadyConnected`; o token segue apenas no Server Action.
+- [ ] Normalização remove fragmento e parâmetros de rastreamento, minúscula o host e limita 255
+      caracteres; a URL exibida na lista é a normalizada.
+- [ ] URL pública com texto aparece `processing` e depois `ready`, com título, endereço, versão e
+      chunks; texto extraído vira `source_files.content` e o hash é SHA-256 desse texto.
+- [ ] Mesma URL com mesmo conteúdo responde “Already connected” sem nova versão, chunk ou vetor.
+- [ ] Duas URLs diferentes com o mesmo texto geram apenas uma fonte válida para o usuário.
+- [ ] Conteúdo alterado na mesma URL cria nova `SourceVersion`; a anterior fica desatualizada.
+- [ ] Esquema não http/https, credenciais, host interno/loopback/metadados e redirect para rede
+      privada são recusados antes de qualquer conexão; E2E cobre `ftp://` e `127.0.0.1`.
+- [ ] Fetch com timeout, resposta > 2 MB, sem texto, 5xx transitório e redirects acima de 3 vira
+      versão `failed` com mensagem acionável; o retry refaz a busca e pode chegar a `ready`.
+- [ ] Isolamento por `user_id` cobre registro e vetores; exclusão remove URL, versões, chunks e
+      vetores e preserva conversas.
+- [ ] Logs/telemetria e cliente não contêm URL, trecho de página, hash, `SOURCE_OPENAI_API_KEY` ou
+      token de sessão.
+- [ ] E2E cobre URL válida, normalização, dedup por URL/conteúdo, mudança de conteúdo, recusa
+      interna, falha e retry, isolamento, remoção, teclado/foco e 360/768/1280 px sem scroll horizontal.
+
+---
+
+### 5.18 Mídia como conhecimento (fatia 015)
+
+- [ ] Flag `knowledge_media_enabled` desligada por padrão: sem Image/Audio/Video no painel e suíte
+      da 013 permanece verde (o E2E liga a flag com cookie no contexto, não na config global).
+- [ ] PNG/JPEG válidos viram `processing` → `ready` com texto de OCR; MP3/MP4 com fala viram
+      transcrição fatiada e vetores no Weaviate com o mesmo `source_id` da fonte.
+- [ ] `type` inválido, extensão/MIME/magic bytes divergentes, tamanho acima de 25/50/200 MB e
+      duração acima de 60 min são recusados com mensagem en-US e nenhuma fonte é criada.
+- [ ] Reenvio do mesmo arquivo responde “Already connected” e não duplica chunk/vetor; outro
+      usuário com o mesmo arquivo vê apenas a sua fonte.
+- [ ] Áudio/vídeo sem fala falha com **“No speech detected”** e não grava vetores; falha de
+      extração mostra mensagem acionável e “Try again” reinicia o mesmo `sourceId`.
+- [ ] Listagem mantém status público da 013 e mostra fases `extracting`/`chunking`/`embedding`
+      como detalhe; exclusão remove arquivo, versões, chunks e vetores sem apagar histórico de chat.
+- [ ] Navegação por teclado e leitor de tela alcançam seletor, input, progresso e erro (`aria-live`);
+      rótulos e ordem de foco da 013 (`knowledge-source-files`, “Add files”) permanecem intactos.
+- [ ] Logs e telemetria `media.*` não contêm nome de arquivo, hash, comando, transcrição ou chave;
+      `.env` não é lido, exibido ou versionado.
+
+### 5.19 Recuperação e citações (fatia 5 / spec 016)
+
+- [ ] `RAG_CITATIONS_ENABLED=false` por padrão: chat, sugestões, histórico e respostas sem campo
+      de citação continuam idênticos à fatia 012.
+- [ ] Com flag ligada e trecho relevante, a resposta traz `[n]` válido, `citations[]`,
+      `retrieval` e `answer_status = with_source`.
+- [ ] Marcadores fora de `[1..k]` são removidos; citações inválidas não viram fonte no painel.
+- [ ] Sem trecho acima de `RAG_THRESHOLD`, a resposta diz que não encontrou base, não mostra
+      citações e grava `answer_status = no_match`.
+- [ ] `RAG_TOP_K`, `RAG_THRESHOLD`, `RAG_MAX_CONTEXT_CHARS` e `RAG_MAX_HISTORY_MESSAGES` são
+      validados na configuração e limitam custo/latência.
+- [ ] Busca Weaviate usa `KnowledgeChunk`, filtro por `user_id` autenticado e timeout de 4 s;
+      nenhuma fonte de outro usuário é retornada.
+- [ ] Tipos de fonte novos ou desconhecidos são tolerados pelo contrato de vetor, sem alterar a
+      slice 013.
+- [ ] `isStale` e `sourceRemoved` são recalculados na leitura do histórico; a fonte removida
+      mantém o texto e desabilita o botão com "Source removed".
+- [ ] Citações são botões com `aria-label` descritivo e foco visível; o painel lateral mostra
+      nome, tipo, localização e trecho exato, e fecha com `Esc`.
+- [ ] Falha do vetorial produz aviso en-US acionável, resposta básica sem citações e
+      "Retry search"; nenhuma citação é inventada.
+- [ ] Falha do modelo continua `503 MODEL_UNAVAILABLE`, sem detalhes técnicos e sem mensagem
+      parcial persistida.
+- [ ] Documentos e prompts são tratados como dados não confiáveis; instruções neles não alteram
+      papel, tom ou política de citação do Expert.
+- [ ] E2E cobre abrir/fechar painel, persistência após reload, fonte antiga, fonte removida,
+      sem correspondência, retry do vetorial e prompt sem fontes.
+- [ ] Logs/telemetria `rag.*` contêm só IDs opacos, contagens, duração e desfecho; sem prompt,
+      trecho, chave de API, hash de conteúdo ou token de sessão.
 
 ---
 
@@ -409,18 +538,364 @@ Requisitos:
 
 ## 10. Lacunas conhecidas
 
-| Lacuna                                      | Impacto                                                                                                                              |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Nenhum CI                                   | Verificação depende do ambiente local                                                                                                |
-| Commitlint apenas local                     | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                    |
-| Produto não implementado                    | Apenas a rota de hello world e a fundação existem                                                                                    |
-| Sem Vitest/Testing Library no pacote `ui`   | Componentes compartilhados não têm testes unitários                                                                                  |
-| Supabase Analytics desabilitado             | `vector` exige Docker API em `2375`; a telemetria da app usa o LGTM                                                                  |
-| PostgreSQL local em `15`                    | Workaround de ambiente; alinhar com a versão alvo antes de produção                                                                  |
-| OXLint/OXFmt não adotados                   | ESLint + Prettier seguem como padrão nesta entrega                                                                                   |
-| Skills locais em `.agents/` não versionadas | A edição de `implement-me`/`breakdown-specs`/`create-spec`/`refine-spec` fica restrita à máquina; a política durável está em `.docs` |
-| Rate limit em memória                       | Limites de sign-up e confirmação são locais ao processo; store compartilhado é follow-up                                             |
-| Sem refresh de sessão                       | Sign-out implementado em `POST /api/v1/auth/sign-out`; a sessão ainda só é renovada por novo sign-in                                 |
-| Sessão única sem atomicidade no banco       | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                             |
+| Lacuna                                       | Impacto                                                                                                                            |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Nenhum CI                                    | Verificação depende do ambiente local                                                                                              |
+| Commitlint apenas local                      | Como não há CI, mensagens só são validadas pelo hook `commit-msg`                                                                  |
+| Stack LangSmith licenciada não validada      | Studio, traces ao vivo e persistência dependem de imagem Enterprise; a validação entregue é local-first/offline (spec 018)         |
+| Sem Vitest/Testing Library no pacote `ui`    | Componentes compartilhados não têm testes unitários                                                                                |
+| Migrações sem rollback automático            | `scripts/db.mjs` aplica em transação, mas não gera `down`; reverter exige nova migração                                            |
+| PostgreSQL local em `18`                     | Versão do Compose; o provedor gerenciado de produção segue em aberto (ADR 0016)                                                    |
+| OXLint/OXFmt não adotados                    | ESLint + Prettier seguem como padrão nesta entrega                                                                                 |
+| Skills versionadas, disponibilidade variável | `implement-me`, `breakdown-specs` etc. estão em `.agents/skills/`; se o cliente não as carregar, use a política durável em `.docs` |
+| Rate limit em memória                        | Limites de sign-up, confirmação, forgot/sign-in/reset são locais ao processo; store compartilhado é follow-up                      |
+| Sem refresh de sessão                        | Sign-out implementado em `POST /api/v1/auth/sign-out`; a sessão ainda só é renovada por novo sign-in                               |
+| Sessão única sem atomicidade no banco        | A garantia é da aplicação (create-then-revoke); RPC transacional é follow-up do ADR 0013                                           |
 
 Ao resolver uma lacuna, atualize esta tabela e o documento relacionado.
+
+---
+
+## 11. Evidências da spec 013 (2026-11-18)
+
+Executadas na raiz do monorepo, em `spec/013`, com `OPENAI_API_KEY` disponível apenas no ambiente
+do servidor e sem chamada real à OpenAI durante os testes:
+
+| Comando                               | Resultado                                                                     |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| `bun run lint`                        | ok (todos os pacotes)                                                         |
+| `bun run types:check`                 | ok (todos os pacotes)                                                         |
+| `bun run test`                        | ok — API: 64 arquivos / 421 testes; web: 11 arquivos / 137 testes             |
+| Subconjunto `sources` da API (Vitest) | ok — 6 arquivos / 35 testes                                                   |
+| `bun run build`                       | ok — 2 tarefas Turbo (`api`, `web`), 13,64 s                                  |
+| `bun run test:e2e`                    | ok — 136 testes, ~2,5 min, incluindo os 13 cenários de fontes de conhecimento |
+
+Cobertura adicional da fatia 013:
+
+- Adaptador Weaviate validado contra servidor HTTP local (REST/GraphQL na porta 8080), sem gRPC.
+- Extrator, embeddings e repositório validados com fakes; nenhum documento real foi enviado e nenhum
+  valor de chave foi lido, exibido ou registrado.
+- Fake API do E2E implementa `GET/POST /api/v1/sources`, `DELETE /api/v1/sources/:sourceId` e
+  `POST /api/v1/sources/:versionId/retry`, com isolamento por token e dedup por SHA-256.
+- Telemetria `knowledge.sources` limitada a IDs opacos, `operation`, `outcome`, `durationMs`,
+  `chunkCount`, `userId` e códigos genéricos de erro; sem conteúdo, nome de arquivo, hash, token ou
+  chave de API.
+
+Limitação registrada:
+
+- `bun run db:migrate` foi executado uma vez e falhou com `ECONNREFUSED 127.0.0.1:5433`; não foi
+  repetido e nenhum comando destrutivo de banco foi executado. A migração aditiva
+  `0003_knowledge_sources.sql` e o teste `003_knowledge_sources.test.sql` foram entregues, mas a
+  aplicação local do schema não foi confirmada.
+- `bun run db:test` não foi autorizado para esta entrega e não foi executado. A validação real com
+  PostgreSQL, Weaviate e OpenAI segue como follow-up de integração.
+
+---
+
+## 12. Evidências da spec 014 (2026-11-18)
+
+Executadas na raiz do monorepo, em `spec/014`, após `bun install --frozen-lockfile` (544 pacotes),
+sem ler valores de `.env` e sem chamada real à OpenAI durante os testes:
+
+| Comando                                   | Resultado                                                                                                                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`                            | ok — 3 tarefas (1 em cache), 1m2,692s                                                                                                                                                 |
+| `bun run types:check`                     | ok — 3 tarefas (1 em cache), 1m33,203s                                                                                                                                                |
+| `bun run test`                            | ok — API: 66 arquivos / 442 testes; web: 11 arquivos / 147 testes; 4m33,172s                                                                                                          |
+| `bun run build`                           | ok — 2 tarefas Turbo, 31,807s                                                                                                                                                         |
+| `bun run test:e2e` (`apps/web`, 1 worker) | 147 testes: 144 passaram na execução completa; 3 testes antigos expiraram por timeout do Next dev e passaram isoladamente (3/3). Os 11 cenários de URL passaram na execução completa. |
+
+Cobertura adicional da fatia 014:
+
+- Política de URL testada por unidade (normalização, esquemas, faixas de IP, metadados, redirects,
+  extração) e adaptador HTTP validado contra servidor local, com `allowPrivateHosts` apenas em teste.
+- Fake API do E2E estendida com `POST /api/v1/sources/urls`, `POST /__fake/pages`, dedup por conteúdo,
+  retry com refetch e isolamento por token; cliente nunca recebe URL de origem, texto, hash ou chave.
+- Nenhuma migração nova: a página é persistida como `txt` com marcador `text/plain+url` no esquema 013.
+
+Limitação registrada:
+
+- `bun run infra:up` falhou porque o Docker não está instalado ou em execução; `bun run db:migrate`
+  encontrou `ECONNREFUSED 127.0.0.1:5433` e a porta 5432 recusou a autenticação. Nenhum comando
+  destrutivo de banco foi executado; validação real com PostgreSQL/Weaviate segue como follow-up.
+
+## 13. Evidências da spec 015 (2026-11-18)
+
+Executada no worktree `C:\Users\Gamer\Desktop\pos graduacao\PROJETOS\spec-015`, branch `spec/015`,
+sem ler, exibir ou versionar `.env`. O banco de validação ficou isolado em `127.0.0.1:55433`.
+
+| Comando                           | Resultado                                                                           |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `bun run db:migrate`              | ok — 4 migrações aplicadas; rerun final: "nenhuma migração pendente"                |
+| `bun run db:test`                 | ok — 4 arquivos (`001`, `002`, `003`, `004_knowledge_media.test.sql`)               |
+| `bun run lint`                    | ok — todos os pacotes                                                               |
+| `bun run types:check`             | ok — todos os pacotes                                                               |
+| `bun run test`                    | ok — API 67 arquivos / 442 testes; web 12 arquivos / 142 testes                     |
+| `bun run build`                   | ok — `api` + `web`, 10,83 s                                                         |
+| Playwright (146 testes, 1 worker) | ok — 146/146 aprovados em 4,6 min, com portas isoladas 3015 (web) e 3435 (fake API) |
+
+A suíte E2E completa foi executada com o mesmo Playwright, os mesmos 146 cenários e o mesmo código
+do gate `bun run test:e2e`, mas com portas isoladas porque outras worktrees (`spec/014`, `spec/016`)
+usavam simultaneamente as portas padrão 3000/3434. O comando equivalente executado foi:
+
+```text
+bun x playwright test --config=playwright.isolated.config.ts --workers=1
+```
+
+O arquivo de configuração isolado e a cópia temporária dos cenários foram removidos após a execução;
+nenhum arquivo de `playwright.config.ts`, da 014 ou das specs 016–018 foi alterado.
+
+Tentativas anteriores de `bun run test:e2e` nas portas padrão foram invalidadas por
+`reuseExistingServer` ao reaproveitar servidores `next dev`/fake API de outras worktrees em
+execução concorrente, produzindo `ERR_CONNECTION_REFUSED` e timeouts sem relação com a fatia 015.
+A execução isolada acima cobre integralmente os 10 cenários de mídia e a regressão da 013,
+incluindo os seletores e rótulos preservados (`knowledge-source-files`, "Add files", mensagens
+padrão e ordem de tabulação).
+
+Cobertura E2E da fatia 015:
+
+- flag desligada esconde Image/Audio/Video; ligada por cookie expõe os controles;
+- PNG, MP3 e MP4 passam por `processing` até `ready` e são indexados;
+- reenvio idêntico informa "Already connected" sem duplicar;
+- formato não suportado lista todos os formatos aceitos;
+- áudio sem fala falha com "No speech detected" e oferece "Try again";
+- isolamento por usuário autenticado, navegação por teclado e 360/768/1280 px sem rolagem horizontal.
+
+Commit local principal: `3d29102 feat: connect image, audio and video as knowledge sources`
+(sem push, merge ou alterações na branch principal).
+
+---
+
+## 14. Evidências de integração 014 + 015 (2026-11-18)
+
+Merges na principal: `b16f183` (014), `b9b4d89` (015) e `02e8320` (correção de contratos após o
+merge). Os 11 conflitos entre 014 e 015 eram aditivos e foram combinados: tipo de arquivo com
+`displayName` e `durationSeconds`, INSERT de versão com 11 parâmetros, mapeamento de erros URL e
+mídia, DI com fetcher HTTP e extrator local, rótulos `TYPE_LABELS` e campos da fake API.
+
+| Comando               | Resultado                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| `bun run lint`        | ok — 3 tarefas                                                  |
+| `bun run types:check` | ok — 3 tarefas, após `02e8320`                                  |
+| `bun run test`        | ok — API 69 arquivos / 463 testes; web 12 arquivos / 152 testes |
+| `bun run build`       | ok — `api` + `web`                                              |
+| `bun run test:e2e`    | ok — 157/157 testes em 5,5 min, portas padrão 3000/3434         |
+| `bun run db:migrate`  | bloqueado — Docker indisponível; `ECONNREFUSED 127.0.0.1:5433`  |
+
+As migrações `0001`–`0004` e seus testes SQL foram validados no worktree da 015 com banco isolado
+(§13). A validação real na principal segue como follow-up assim que o Docker estiver disponível.
+Nenhuma chave, token, URL sensível, hash ou conteúdo de arquivo foi registrado em logs ou docs.
+
+## 15. Evidências da spec 016 (2026-11-18)
+
+Executadas na raiz do monorepo, na branch `spec/016`:
+
+| Comando               | Resultado                                                                  |
+| --------------------- | -------------------------------------------------------------------------- |
+| `bun run db:migrate`  | ok — 5 migrações aplicadas; `0005_rag_citations.sql` confirmada            |
+| `bun run db:test`     | ok — 4 arquivos SQL passaram                                               |
+| `bun run lint`        | ok — 3 tarefas Turbo                                                       |
+| `bun run types:check` | ok — 3 tarefas Turbo                                                       |
+| `bun run test`        | ok — API: 69 arquivos / 441 testes; web: 12 arquivos / 141 testes          |
+| `bun run build`       | ok — 2 tarefas Turbo; Next.js compilado                                    |
+| `bun run test:e2e`    | ok — 142 testes aprovados em ~3,3 min, incluindo os 6 cenários de citações |
+
+Cobertura adicional da fatia 016:
+
+- Unitários API: dedupe/ordenação/limiar, prompt com trechos como dados não confiáveis,
+  sanitização de `[n]`, `no_match`, `unavailable`, isolamento por usuário, flag desligada e
+  persistência de citações/metadados.
+- Integração HTTP: citações e metadados na resposta, recálculo de `isStale` ao reler o histórico,
+  degradação do vetorial e fallback sem correspondência.
+- Adaptadores: consulta GraphQL com filtro `userId`, validação de payload e timeout local;
+  metadados de fonte via SQL parametrizado, sem conteúdo ou caminho absoluto.
+- Web/E2E: painel com nome/tipo/localização/trecho, fechamento com `Esc`, sobrevivência após
+  reload, fonte antiga, fonte removida, sem correspondência, retry e prompt sem fontes.
+- `RAG_CITATIONS_ENABLED` permanece `false` em `.env.example`; nenhuma chave, token, prompt,
+  trecho ou valor de `.env` foi lido, exibido ou registrado. A API fake do E2E usa prefixos
+  determinísticos e não depende de OpenAI, Weaviate, PostgreSQL ou credenciais reais.
+
+QA manual equivalente (executado via Playwright/HTTP determinístico, ambiente Chromium
+headless-shell):
+
+| Cenário                     | Ação/esperado                                                                                          | Resultado |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ | --------- |
+| Citação válida              | Enviar `cite:` → abrir `[1]` → painel mostra nome, `txt · Page 7`, trecho exato → `Esc` fecha o painel | ok        |
+| Persistência e fonte antiga | Enviar `stale:` → "Outdated source" → recarregar → aviso e citação permanecem                          | ok        |
+| Fonte removida              | Enviar `removed:` → botão desabilitado e "Source removed" → recarregar → estado permanece              | ok        |
+| Sem correspondência         | Enviar `nomatch:` → mensagem sem base e nenhum botão de fonte                                          | ok        |
+| Vetorial indisponível       | Enviar `vector-down:` → aviso acionável → "Retry search" reapresenta o prompt                          | ok        |
+| Regressão fatia 012         | Prompt comum → resposta padrão sem bloco de fontes                                                     | ok        |
+| Falha do modelo             | Responder sem chave/erro → `503 MODEL_UNAVAILABLE`, sem detalhe técnico e sem escrita parcial          | ok        |
+
+Pendências de qualidade que permanecem como follow-up (fora desta fatia): avaliação humana da
+precisão das citações e medição de p95 em ambiente com OpenAI/Weaviate reais; o flag de rollout
+deve ser habilitado em produção somente após essa avaliação.
+
+---
+
+## 16. Evidências de integração da onda 2 (2026-11-18)
+
+Merges na principal: `b16f183` (014), `b9b4d89` (015), `02e8320` (correção de contratos),
+`c561cb8` (registro de QA) e `eee1cd5` (016). A migration da 016 foi renomeada para
+`0005_rag_citations.sql` e seu teste para `005_rag_citations.test.sql` para não colidir com
+`0004_knowledge_media.sql` da 015; nomes antigos não chegaram a ser aplicados em banco compartilhado.
+
+| Comando               | Resultado                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| `bun run lint`        | ok — 3 tarefas                                                  |
+| `bun run types:check` | ok — 3 tarefas                                                  |
+| `bun run test`        | ok — API 74 arquivos / 483 testes; web 12 arquivos / 156 testes |
+| `bun run build`       | ok — `api` + `web`                                              |
+| `bun run test:e2e`    | ok — 163/163 testes em 4,1 min, portas padrão 3000/3434         |
+| `bun run db:migrate`  | bloqueado — Docker fora e 5432 recusou as credenciais do `.env` |
+
+As migrações `0001`–`0005` e seus testes SQL foram validados nos worktrees da 015 e da 016 com
+bancos isolados (§13 e §15). A validação real na principal segue como follow-up quando o Docker
+estiver disponível. Nenhuma chave, token, URL sensível, prompt, trecho, hash ou conteúdo de arquivo
+foi registrado em logs ou documentação.
+
+---
+
+## 17. Evidências de integração da spec 018 (2026-11-18)
+
+Merge `ae91965` na principal, a partir do commit `5e2ad77` da branch `spec/018`. Sem conflitos.
+A slice `observability` é local-first: flag desligada por padrão, coletor fake/no-op, emissão
+assíncrona que nunca quebra chat/RAG, pseudonimização HMAC e sanitização recursiva de PII. Nenhuma
+migração e nenhuma dependência nova.
+
+| Comando               | Resultado                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| `bun run lint`        | ok — 3 tarefas                                                  |
+| `bun run types:check` | ok — 3 tarefas                                                  |
+| `bun run test`        | ok — API 87 arquivos / 593 testes; web 12 arquivos / 156 testes |
+| `bun run build`       | ok — `api` + `web`                                              |
+| `bun run obs:eval`    | ok — 4/4 datasets, limiar 0,8                                   |
+| `bun run test:e2e`    | ok — 163/163 testes em 6,0 min, portas padrão 3000/3434         |
+
+Não validado: Studio, traces ao vivo e evaluation contra LangSmith real, bind de rede do override
+e alertas do painel. Motivo: daemon Docker indisponível e imagem self-hosted do LangSmith é
+Enterprise/licenciada; o compose opcional exige `LANGSMITH_IMAGE` e `LANGSMITH_API_KEY` externos.
+Critérios correspondentes permanecem marcados como não validados na spec/plan da 018.
+
+---
+
+## 18. Evidências da fatia 018 — observabilidade local (worktree `spec/018`)
+
+Executado em 2026-11-18 na worktree isolada, com PATH explícito para Bun/Node. Nenhuma migration
+foi adicionada: traces não são persistidos em PostgreSQL.
+
+| Comando                                                                                                                            | Resultado                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `bun run lint`                                                                                                                     | ok — 3 tarefas                                                                |
+| `bun run types:check`                                                                                                              | ok — 3 tarefas                                                                |
+| `bun run test`                                                                                                                     | ok — API 87 arquivos / 593 testes; web em cache                               |
+| `bunx vitest run src/modules/observability/domain/evaluation.spec.ts src/modules/observability/application/evaluation-cli.spec.ts` | ok — 2 arquivos / 29 testes                                                   |
+| `bun run build`                                                                                                                    | ok — `api` + `web`                                                            |
+| `bun run obs:eval`                                                                                                                 | ok — 4/4 datasets aprovados, exit code 0                                      |
+| `bun run test:e2e` (web, portas isoladas 3018/3438)                                                                                | ok — 163/163 testes em 4,8 min                                                |
+| `bun run db:migrate`                                                                                                               | bloqueado — `connect ECONNREFUSED 127.0.0.1:5433` (sem Postgres local)        |
+| `bun run db:test`                                                                                                                  | bloqueado — `connect ECONNREFUSED 127.0.0.1:5433`                             |
+| Stack LangSmith self-hosted / Studio / evaluation ao vivo                                                                          | bloqueado — daemon Docker indisponível e imagem Enterprise licenciada ausente |
+
+Detalhes do bloqueio externo:
+
+- `docker info` e `docker version` não responderam; o caminho alternativo `.exe` não foi
+  reconhecido como comando. Sem daemon não há como subir o self-hosted, o Studio nem validar a
+  ingestão de spans pelo coletor real.
+- A imagem self-hosted do LangSmith é Enterprise/licenciada. `docker-compose.langsmith.yml` foi
+  entregue como template opcional (profile `langsmith`) que exige `LANGSMITH_IMAGE` e
+  `LANGSMITH_API_KEY` fornecidos externamente; nenhuma tag inventada foi usada como default.
+- Em vez de configuração "validada" fictícia, a fatia entrega sinks e evaluation testados contra
+  coletor local fake, com degradação graciosa e erro explícito para endpoints cloud.
+
+Para permitir E2E isolado por worktree, as portas do Playwright passaram a ser configuráveis por
+`E2E_WEB_PORT`/`E2E_FAKE_API_PORT` (defaults 3000/3434). Nesta execução foram usadas 3018/3438;
+os defaults e os fluxos 012–016 permanecem intactos.
+
+Nenhum valor de `.env`, chave, token, URL sensível, hash, prompt, resposta ou conteúdo de arquivo
+foi registrado em logs, relatórios ou documentação.
+
+## 19. Evidências da spec 017 (2026-11-18)
+
+Executadas no worktree isolado `spec-017`, branch `spec/017`, sem merge/push e sem alterar as
+specs/worktrees de 014–018.
+
+| Comando                                                         | Resultado                                                                         |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `bun run db:migrate`                                            | bloqueado — Postgres/Docker indisponível (`ECONNREFUSED 127.0.0.1:5433`)          |
+| `bun run db:test`                                               | bloqueado — mesma causa; nenhuma validação SQL foi inventada                      |
+| `bun run lint`                                                  | ok — 3 tarefas Turbo                                                              |
+| `bun run types:check`                                           | ok — 3 tarefas Turbo                                                              |
+| `bun run test`                                                  | ok — API: 78 arquivos / 517 testes; web: 13 arquivos / 156 testes                 |
+| `bun run build`                                                 | ok — `api` + `web`; rota `/app/media/[mediaId]/content` compilada                 |
+| `bunx playwright test --config=playwright.multimedia.config.ts` | ok — 5/5 cenários da spec 017 em 46,4 s, portas isoladas 3017 (web) e 3437 (fake) |
+
+Cobertura adicional da fatia 017:
+
+- API: detecção de intenção, limites, cota por usuário, cancelamento com devolução de cota, retry
+  até 3 tentativas, jobs órfãos, download isolado, citação anexada, env e adapters OpenAI/Gemini
+  contra servidor HTTP local. Integração cobre flag on/off e ciclo `queued → ready`.
+- Web: flag por env/cookie, ações de status/cancel/retry, componente com polling, preview,
+  metadados, `aria-live`, Try again/Cancel e proxy autenticado de download com headers seguros.
+- E2E determinístico: geração de imagem com preview e download autenticado, pedido ambíguo sem
+  job, cancelamento sem download, retry de falha e isolamento entre contas. A API fake usa bytes
+  locais e transições controladas; nenhuma chamada paga foi feita.
+- A suíte E2E padrão não foi reexecutada nas portas 3000/3434 para não colidir com worktrees
+  paralelos; a regressão é coberta pelos gates unitários/integração e pela evidência da spec 016.
+- O arquivo temporário `apps/web/playwright.multimedia.config.ts` foi removido após a execução.
+- Billing/API Google e a chamada real de vídeo não foram validados; são follow-up de rollout.
+  Nenhuma chave, token, URL sensível, prompt, trecho, hash, bytes ou valor de `.env` foi lido,
+  exibido ou registrado.
+
+---
+
+## 20. Evidências finais do range 012–018 (2026-11-18)
+
+Merge de fechamento `4f74265` na principal, combinando 017 e 018. Conflitos resolvidos sem
+descartar funcionalidade: emissão de traces e geração de mídia coexistem no `SendMessageUseCase`;
+`ConversationsModule` importa `MediaModule` e `ObservabilityModule`; `env.ts` mantém os dois
+blocos de configuração; as seções de evidências foram renumeradas. A suíte E2E da 017 passou a
+usar `WEB_URL`/`FAKE_API_URL` de `apps/web/e2e/support/ports.ts` em vez das portas fixas
+3017/3437 do worktree.
+
+| Comando               | Resultado                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| `bun run lint`        | ok — 3 tarefas                                                  |
+| `bun run types:check` | ok — 3 tarefas                                                  |
+| `bun run test`        | ok — API 91 arquivos / 627 testes; web 13 arquivos / 156 testes |
+| `bun run build`       | ok — `api` + `web`                                              |
+| `bun run obs:eval`    | ok — 4/4 datasets                                               |
+| `bun run test:e2e`    | ok — 168/168 testes em 5,0 min, portas padrão 3000/3434         |
+| `bun run db:migrate`  | bloqueado — Docker fora; 5432 recusou as credenciais do `.env`  |
+
+As migrações `0001`–`0006` e seus testes SQL foram validados nos worktrees com bancos isolados.
+Não foram registrados chaves, tokens, URLs sensíveis, prompts, respostas, hashes, trechos ou bytes
+de arquivo em logs, relatórios ou documentação.
+
+---
+
+## 21. Índice navegável spec → plano → evidência
+
+Todas as specs `000`–`018` têm `Status: done`. As seções `11`–`20` registram as evidências
+datadas de `013`–`018`; para `000`–`012`, a evidência está no próprio plano (quando registrada) e
+no histórico de commits da spec.
+
+| Spec                                                   | Plano                                                                                                                                   | Evidência de QA / observação                                                                         |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `000-foundation`                                       | [plano](../.plans/000-foundation-plan.md)                                                                                               | §11 "Resultado da execução" do plano                                                                 |
+| `001-auth-schema` … `003-auth-routes`                  | [001](../.plans/001-auth-schema-plan.md), [002](../.plans/002-auth-session-plan.md), [003](../.plans/003-auth-routes-plan.md)           | QA manual nos planos; breakdown em [`.plans/001-auth-breakdown.md`](../.plans/001-auth-breakdown.md) |
+| `004-auth-sign-up` … `006-auth-sign-in`                | [004](../.plans/004-auth-sign-up-plan.md), [005](../.plans/005-auth-confirm-account-plan.md), [006](../.plans/006-auth-sign-in-plan.md) | Orquestração [002–008](../.plans/002-008-orchestration.md)                                           |
+| `007-auth-forgot-password` … `008-auth-reset-password` | [007](../.plans/007-auth-forgot-password-plan.md), [008](../.plans/008-auth-reset-password-plan.md)                                     | QA manual 2026-11-10 no plano 007; orquestração 002–008                                              |
+| `009-postgres-nativo`                                  | [plano](../.plans/009-postgres-nativo-plan.md)                                                                                          | §11 "Resultados do QA (2026-11-12)" do plano                                                         |
+| `010-email-provider-by-node-env`                       | [plano](../.plans/010-email-provider-by-node-env-plan.md)                                                                               | "Gates automatizados" no plano                                                                       |
+| `011-ui-redesign`                                      | [plano](../.plans/011-ui-redesign-plan.md)                                                                                              | Evidências de UI no plano; direção visual em [DESIGN.md](./DESIGN.md)                                |
+| `012-expert-chat`                                      | [plano](../.plans/012-expert-chat-plan.md)                                                                                              | §9 "Histórico" do plano; [breakdown 012–018](../.plans/012-expert-platform-breakdown.md)             |
+| `013-knowledge-files`                                  | [plano](../.plans/013-knowledge-files-plan.md)                                                                                          | §11 desta seção                                                                                      |
+| `014-knowledge-url`                                    | [plano](../.plans/014-knowledge-url-plan.md)                                                                                            | §12 e §14                                                                                            |
+| `015-knowledge-media`                                  | [plano](../.plans/015-knowledge-media-plan.md)                                                                                          | §13 e §14                                                                                            |
+| `016-rag-citations`                                    | [plano](../.plans/016-rag-citations-plan.md)                                                                                            | §15 e §16                                                                                            |
+| `017-multimedia-deliverables`                          | [plano](../.plans/017-multimedia-deliverables-plan.md)                                                                                  | §19 e §20                                                                                            |
+| `018-langsmith-local`                                  | [plano](../.plans/018-langsmith-local-plan.md)                                                                                          | §17, §18 e §20; detalhes em [OBSERVABILITY.md](./OBSERVABILITY.md)                                   |
+
+Para revisar ou reabrir uma spec, use `refine-spec` e registre a divergência na spec e neste índice.

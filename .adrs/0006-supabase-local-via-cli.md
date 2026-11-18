@@ -1,8 +1,12 @@
 # ADR 0006 — Supabase local via CLI com PostgreSQL 15
 
-> **Status:** aceito · **Data:** 2026-11-05
+> **Status:** substituído · **Data:** 2026-11-05
 > **Decisores:** Engenharia
-> **Substitui:** — · **Substituído por:** —
+> **Substitui:** — · **Substituído por:** [ADR 0016](./0016-postgres-nativo.md)
+
+> **Nota (2026-11-12):** esta decisão foi substituída. O Supabase foi removido do repositório em
+> favor de PostgreSQL 18 nativo via Docker Compose, com `pg` e SQL parametrizado. O registro fica
+> preservado como histórico; a decisão vigente está no ADR 0016.
 
 ## Contexto
 
@@ -45,5 +49,5 @@ não exposta por padrão no Docker Desktop; a observabilidade da aplicação usa
 ## Referências
 
 - [ARCHITECTURE.md](../.docs/ARCHITECTURE.md#7-decisões-em-aberto)
-- [`supabase/config.toml`](../supabase/config.toml)
 - [`scripts/infra.mjs`](../scripts/infra.mjs)
+- [ADR 0016 — PostgreSQL nativo com `pg` e migrações próprias](./0016-postgres-nativo.md) (decisão vigente)

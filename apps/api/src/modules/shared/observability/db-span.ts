@@ -7,23 +7,29 @@ export type DbSpanTarget = {
   operation: DbOperation;
 };
 
-/** Shape shared by every supabase-js (PostgREST) response. */
-type DbResult = { error: { code?: string } | null };
-
 const TRACER_NAME = "coders-modulo-4-api";
 
+function errorCode(error: unknown): string | undefined {
+  if (error instanceof Error) {
+    const code = (error as Error & { code?: unknown }).code;
+
+    return typeof code === "string" ? code : undefined;
+  }
+
+  return undefined;
+}
+
 /**
- * Runs a PostgREST query inside a CLIENT span so database calls show up in
- * traces and span metrics (e.g. `SELECT users`).
+ * Runs a `pg` query inside a CLIENT span so database calls show up in traces
+ * and span metrics (e.g. `SELECT users`).
  *
- * supabase-js reports failures through `result.error` instead of throwing, so
- * the span is marked as an error from that field. Only the table, the
- * operation and the PostgREST error code are recorded: never filter values or
- * the raw error message, which can echo row data (PII).
+ * `pg` rejects the promise on failure, so the span is marked as an error with
+ * the SQLSTATE. Only the table, the operation and the SQLSTATE are recorded:
+ * never filter values or the raw error message, which can echo row data (PII).
  */
-export function withDbSpan<T extends DbResult>(
+export function withDbSpan<T>(
   { table, operation }: DbSpanTarget,
-  query: PromiseLike<T>,
+  query: () => Promise<T>,
 ): Promise<T> {
   return trace.getTracer(TRACER_NAME).startActiveSpan(
     `${operation} ${table}`,
@@ -38,21 +44,11 @@ export function withDbSpan<T extends DbResult>(
     },
     async (span) => {
       try {
-        const result = await query;
-
-        if (result.error !== null) {
-          const code = result.error.code ?? "unknown";
-          span.setAttribute("db.response.status_code", code);
-          span.setAttribute("error.type", code);
-          span.setStatus({ code: SpanStatusCode.ERROR });
-        }
-
-        return result;
+        return await query();
       } catch (error) {
-        span.setAttribute(
-          "error.type",
-          error instanceof Error ? error.name : "unknown",
-        );
+        const code = errorCode(error) ?? "unknown";
+        span.setAttribute("db.response.status_code", code);
+        span.setAttribute("error.type", code);
         span.setStatus({ code: SpanStatusCode.ERROR });
         throw error;
       } finally {

@@ -1,6 +1,6 @@
 # DESIGN.md — Direção visual
 
-> **Status:** ativo · **Atualizado em:** 2026-11-09
+> **Status:** ativo · **Atualizado em:** 2026-11-16
 > **Implementação:** consulte [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) para tokens e componentes.
 
 Define a identidade visual do produto. Vale para **toda** interface, incluindo telas
@@ -33,31 +33,40 @@ administrativas, estados vazios, erros e e-mails transacionais.
 
 ### 3.1 Cores de marca
 
-| Token            | Hex       | Uso                                                     |
-| ---------------- | --------- | ------------------------------------------------------- |
-| `pale-sky`       | `#CFE8EF` | Fundos suaves, itens selecionados, estados informativos |
-| `pale-sky-2`     | `#C6DBF0` | Superfícies secundárias e cards                         |
-| `pale-sky-3`     | `#AED1E6` | Bordas, divisores e contornos                           |
-| `powder-blue`    | `#A0C4E2` | Cor primária: botões, realces e foco                    |
-| `sky-blue-light` | `#85C7DE` | Hover, active, links e indicadores                      |
+A paleta pastel-azul continua sendo a base reconhecível; a ação primária passou a usar um azul
+profundo com contraste AA para suportar texto branco. Os pastéis ficam para superfícies, tiles
+e apoio visual (sempre com texto grafite).
 
-### 3.2 Neutros de base
+| Token           | Hex       | Uso                                                           |
+| --------------- | --------- | ------------------------------------------------------------- |
+| `primary`       | `#1D4F7A` | Ação primária, links e foco (texto branco: contraste ≈ 8,6:1) |
+| `secondary`     | `#CFE8EF` | Tiles, monogramas e avatares (texto grafite)                  |
+| `tint`          | `#C6DBF0` | Detalhes decorativos de marca (ex.: numeral do 404)           |
+| `accent`        | `#85C7DE` | Detalhe do logotipo e indicadores                             |
+| `surface`       | `#F3F8FB` | Faixas de seção, painel de marca e fundo da área privada      |
+| `border`        | `#D3E2EC` | Divisores e contornos de superfícies                          |
+| `border-strong` | `#AED1E6` | Contornos de itens interativos/cartões em destaque            |
+| `input`         | `#6F94AD` | Borda de campos (contraste ≥ 3:1 sobre branco)                |
 
-| Token              | Hex       | Uso                         |
-| ------------------ | --------- | --------------------------- |
-| `background`       | `#FFFFFF` | Fundo principal             |
-| `foreground`       | `#171717` | Texto principal             |
-| `muted-foreground` | `#52525B` | Texto secundário (baseline) |
+### 3.2 Neutros e estados
+
+| Token              | Hex       | Uso                                      |
+| ------------------ | --------- | ---------------------------------------- |
+| `background`       | `#FFFFFF` | Fundo principal                          |
+| `foreground`       | `#171717` | Texto principal                          |
+| `muted-foreground` | `#52525B` | Texto secundário                         |
+| `success`          | `#14532D` | Texto/ícone de sucesso (fundo `#E8F5EC`) |
+| `warning`          | `#7A4A00` | Texto/ícone de alerta (fundo `#FFF4DC`)  |
+| `destructive`      | `#B42318` | Texto/ícone de erro (fundo `#FEF3F2`)    |
 
 ### 3.3 Regras de uso
 
-- **Texto sobre pastel é sempre grafite (`#171717`), nunca branco.** Pastéis claros não têm
-  contraste suficiente com branco.
-- Use **uma** cor de destaque por tela. O restante deve ser neutro.
-- Não crie gradientes, neon ou cores fora da paleta sem aprovação.
-- Cores semânticas (sucesso, alerta, erro) ainda não foram definidas; use as da paleta com
-  ícone + texto e registre a necessidade em `DESIGN_SYSTEM.md`.
+- **Texto sobre pastel é sempre grafite, nunca branco.** Texto branco só sobre `primary`.
+- Use **uma** cor de destaque por tela: o azul `primary` na ação principal. O restante é neutro.
+- Não crie gradientes, neon ou cores fora dos tokens sem aprovação.
+- Estados semânticos usam os tokens acima **sempre com ícone + texto**, nunca só cor.
 - Contraste mínimo: **4.5:1** para texto e **3:1** para elementos de UI (WCAG AA).
+- Nenhum hex solto em páginas e componentes; use as variáveis de `globals.css`.
 
 ---
 
@@ -94,7 +103,7 @@ Regras:
 
 - **Grid base:** 4px.
 - **Escala:** 4, 8, 12, 16, 24, 32, 48, 64, 96.
-- **Raios:** 8px para controles, 12px para cards, `full` para pills e avatares.
+- **Raios:** 8px para controles, 12px para cards, `full` para avatares e marcadores.
 - **Sombras:** discretas e poucas. Prefira **borda** a sombra para separar superfícies.
 - **Densidade:** generosa. Espaço em branco é parte do design.
 
@@ -130,6 +139,15 @@ Regras:
 ---
 
 ## 8. Conteúdo e tom
+
+- **Landing pública (`/`):** conteúdo estático em en-US vindo apenas de `BUSINESS.md` (proposta,
+  Experts, fontes do MVP, como funciona). Sem métricas, clientes, preços ou promessas inventadas.
+  CTAs são links reais para `/auth/sign-up` e `/auth/sign-in`.
+- **Telas de auth:** painel de marca ao lado do formulário no desktop; no mobile só a barra de
+  marca, com o formulário primeiro.
+- **Área privada:** identidade da conta (avatar com iniciais, nome, e-mail) e sign out sempre
+  visíveis; próximos passos aparecem como "Coming soon", sem inventar features.
+- **Identidade:** logotipo de três barras (um time de Experts lendo os mesmos dados) + nome.
 
 - Textos de interface, telas de autenticação e e-mails transacionais em **en-US**; claros e diretos.
   A documentação interna continua em PT-BR.

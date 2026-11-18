@@ -1,6 +1,4 @@
 import { Module } from "@nestjs/common";
-import { createClient } from "@supabase/supabase-js";
-import { MailtrapClient } from "mailtrap";
 
 import { loadEnv } from "../shared/config/env";
 
@@ -35,18 +33,15 @@ import {
   SIGN_IN_RATE_LIMIT_WINDOW_SECONDS,
   SIGN_UP_RATE_LIMIT_MAX,
   SIGN_UP_RATE_LIMIT_WINDOW_SECONDS,
-  MAIL_FROM,
-  MAILTRAP_CLIENT,
-  SUPABASE_CLIENT,
   WEB_ORIGIN,
 } from "./auth.tokens";
+import { createEmailSender } from "./infrastructure/create-email-sender";
 import { CryptoOpaqueTokenAdapter } from "./infrastructure/crypto-opaque-token.adapter";
 import { JoseSessionTokenAdapter } from "./infrastructure/jose-session-token.adapter";
 import { ScryptPasswordHasherAdapter } from "./infrastructure/scrypt-password-hasher.adapter";
-import { MailtrapEmailSender } from "./infrastructure/mailtrap-email.sender";
-import { SupabaseAuthTokensRepository } from "./infrastructure/supabase-auth-tokens.repository";
-import { SupabaseSessionsRepository } from "./infrastructure/supabase-sessions.repository";
-import { SupabaseUsersRepository } from "./infrastructure/supabase-users.repository";
+import { PostgresAuthTokensRepository } from "./infrastructure/postgres-auth-tokens.repository";
+import { PostgresSessionsRepository } from "./infrastructure/postgres-sessions.repository";
+import { PostgresUsersRepository } from "./infrastructure/postgres-users.repository";
 import { ConfirmationRateLimiter } from "./interface/confirmation-rate-limiter";
 import { ForgotPasswordRateLimiter } from "./interface/forgot-password-rate-limiter";
 import { ConfirmAccountRequestHandler } from "./interface/request-handlers/confirm-account.request-handler";
@@ -131,42 +126,22 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
       useFactory: () => loadEnv().resetPasswordRateLimitWindowSeconds,
     },
     { provide: WEB_ORIGIN, useFactory: () => loadEnv().webOrigin },
-    {
-      provide: SUPABASE_CLIENT,
-      useFactory: () => {
-        const env = loadEnv();
-
-        return createClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
-      },
-    },
-    {
-      provide: MAILTRAP_CLIENT,
-      useFactory: () =>
-        new MailtrapClient({ token: loadEnv().mailtrapApiToken }),
-    },
-    {
-      provide: MAIL_FROM,
-      useFactory: () => {
-        const env = loadEnv();
-
-        return { email: env.mailFromEmail, name: env.mailFromName };
-      },
-    },
     JoseSessionTokenAdapter,
     { provide: SessionTokenPort, useExisting: JoseSessionTokenAdapter },
-    { provide: SessionsRepositoryPort, useClass: SupabaseSessionsRepository },
-    { provide: UsersRepositoryPort, useClass: SupabaseUsersRepository },
+    { provide: SessionsRepositoryPort, useClass: PostgresSessionsRepository },
+    { provide: UsersRepositoryPort, useClass: PostgresUsersRepository },
     {
       provide: AuthTokensRepositoryPort,
-      useClass: SupabaseAuthTokensRepository,
+      useClass: PostgresAuthTokensRepository,
     },
     ScryptPasswordHasherAdapter,
     { provide: PasswordHasherPort, useExisting: ScryptPasswordHasherAdapter },
     CryptoOpaqueTokenAdapter,
     { provide: OpaqueTokenPort, useExisting: CryptoOpaqueTokenAdapter },
-    { provide: EmailSenderPort, useClass: MailtrapEmailSender },
+    {
+      provide: EmailSenderPort,
+      useFactory: () => createEmailSender(loadEnv()),
+    },
     CreateSessionUseCase,
     RequestPasswordResetUseCase,
     SignUpUseCase,
@@ -183,8 +158,9 @@ import { SignUpRateLimiter } from "./interface/sign-up-rate-limiter";
     ValidateSessionUseCase,
     SessionGuard,
   ],
-  // Exported so integration specs can sign JWTs through
-  // `moduleRef.get(SessionTokenPort)`; it is the module's only public provider.
-  exports: [SessionTokenPort],
+  // `SessionTokenPort` lets integration specs sign JWTs. `SessionGuard` and its
+  // dependency are exported so other slices can protect endpoints with the same
+  // session without re-wiring the auth infrastructure.
+  exports: [SessionTokenPort, SessionGuard, ValidateSessionUseCase],
 })
 export class AuthModule {}

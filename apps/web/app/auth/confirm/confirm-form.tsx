@@ -14,6 +14,8 @@ import {
   AUTH_SIGN_UP_PATH,
 } from "../../../lib/auth/route-rules";
 import { AuthLink } from "../_components/auth-card";
+import { ClockIcon } from "../../_components/icons";
+import { FormAlert, StatusNotice } from "../../_components/form-parts";
 
 import { confirmAction } from "./actions";
 
@@ -60,17 +62,12 @@ export function ConfirmForm({ token }: ConfirmFormProps) {
 
   if (state.status === "success") {
     return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="rounded-md border border-border bg-secondary p-4 text-secondary-foreground"
-      >
-        <p className="text-base font-medium">Your email is confirmed.</p>
-        <p className="mt-2 leading-relaxed">
+      <StatusNotice title="Your email is confirmed.">
+        <p className="leading-relaxed">
           Taking you to your account.{" "}
           <AuthLink href={APP_HOME_PATH}>Go to your account</AuthLink>.
         </p>
-      </div>
+      </StatusNotice>
     );
   }
 
@@ -79,40 +76,48 @@ export function ConfirmForm({ token }: ConfirmFormProps) {
       ref={formRef}
       action={formAction}
       aria-busy={isPending}
-      className="space-y-5 text-sm text-foreground"
+      className="space-y-6"
     >
       <input type="hidden" name={CONFIRM_TOKEN_FIELD} value={token} />
 
       {state.status === "error" ? (
         <>
-          <div
-            ref={summaryRef}
-            role="alert"
-            tabIndex={-1}
-            className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800"
-          >
-            {state.message}
-          </div>
-          <p className="text-muted-foreground">
+          <FormAlert ref={summaryRef}>{state.message}</FormAlert>
+          <p className="text-sm text-muted-foreground">
             <AuthLink href={AUTH_SIGN_IN_PATH}>Sign in</AuthLink> if your email
             is already confirmed, or{" "}
             <AuthLink href={AUTH_SIGN_UP_PATH}>create an account</AuthLink> to
             request a new confirmation link.
           </p>
           {state.canRetry ? (
-            <Button type="submit" disabled={isPending} className="w-full">
+            <Button
+              type="submit"
+              size="lg"
+              disabled={isPending}
+              className="w-full"
+            >
               {isPending ? "Trying again…" : "Try again"}
             </Button>
           ) : null}
         </>
       ) : (
         <>
-          <p role="status" aria-live="polite" className="text-muted-foreground">
+          <p
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-3 rounded-lg border border-border bg-surface p-4 text-sm text-foreground"
+          >
+            <ClockIcon className="shrink-0 text-primary" />
             {isPending
               ? "Confirming your email…"
               : "Confirming your email automatically. This only takes a moment."}
           </p>
-          <Button type="submit" disabled={isPending} className="w-full">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isPending}
+            className="w-full"
+          >
             {isPending ? "Confirming…" : "Confirm my email"}
           </Button>
         </>

@@ -8,8 +8,11 @@ export const AUTH_RESET_PASSWORD_PATH = "/auth/reset-password";
 /** Private application root. */
 export const APP_HOME_PATH = "/app";
 
-/** Destination for an unauthenticated visit to `/app/*` and for `/` without a session. */
+/** Destination for an unauthenticated visit to `/app/*` and for sign out. */
 export const SIGNED_OUT_REDIRECT_PATH = AUTH_SIGN_IN_PATH;
+
+/** Public landing page shown at `/` for visitors without a session. */
+export const LANDING_PATH = "/";
 
 /** Query parameter that carries the private path to open after signing in. */
 export const RETURN_TO_PARAM = "returnTo";
@@ -131,7 +134,7 @@ function normalizePath(pathname: string): string {
 
 /** Decides where `/` sends the visitor based on session presence. */
 export function getRootRedirectPath(hasSession: boolean): string {
-  return hasSession ? APP_HOME_PATH : SIGNED_OUT_REDIRECT_PATH;
+  return hasSession ? APP_HOME_PATH : LANDING_PATH;
 }
 
 /** Returns the redirect target for `/app/*`, or `null` when access is allowed. */
