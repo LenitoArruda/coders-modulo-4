@@ -164,4 +164,5 @@ Mapear os dez critérios da spec para entregas verificáveis:
   não cria migração: reaproveita o esquema da fatia 013.
 - Critérios de aceite: 10/10 marcados na spec; spec e plano com status `done`.
 - Decisões abertas mantidas: limites definitivos de busca, `robots.txt` e metas de latência/custo.
-- Commits: preenchido após o commit local na branch `spec/014`.
+- Commit de implementação: `2516a7c3bda15fddfdac611610de47779403c56e` (`spec/014`).
+- Commit de evidências: ver `git log -1 --format=%H` nesta branch (registro final do relatório).
