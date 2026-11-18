@@ -14,11 +14,17 @@ import type {
 import { DATABASE_POOL } from "../../shared/database/database.tokens";
 import { withDbSpan } from "../../shared/observability/db-span";
 import { databaseFailure } from "../../auth/infrastructure/database-error";
+import type {
+  AnswerStatus,
+  Citation,
+  RetrievalMetadata,
+} from "../../citations/domain/citation";
 
 const CONVERSATION_COLUMNS = "id, user_id, expert_id, created_at, updated_at";
-const MESSAGE_COLUMNS = "id, conversation_id, role, content, created_at";
+const MESSAGE_COLUMNS =
+  "id, conversation_id, role, content, created_at, citations, retrieval, answer_status";
 const MESSAGE_SELECT =
-  "m.id, m.conversation_id, m.role, m.content, m.created_at";
+  "m.id, m.conversation_id, m.role, m.content, m.created_at, m.citations, m.retrieval, m.answer_status";
 
 type ConversationRow = {
   id: string;
@@ -34,6 +40,9 @@ type MessageRow = {
   role: MessageRole;
   content: string;
   created_at: Date;
+  citations: unknown;
+  retrieval: unknown;
+  answer_status: string | null;
 };
 
 function toConversation(row: ConversationRow): Conversation {
@@ -46,13 +55,45 @@ function toConversation(row: ConversationRow): Conversation {
   };
 }
 
+function readJson(value: unknown): unknown {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  }
+
+  return value;
+}
+
+const ANSWER_STATUSES: AnswerStatus[] = [
+  "plain",
+  "with_source",
+  "no_match",
+  "retrieval_unavailable",
+];
+
 function toMessage(row: MessageRow): ConversationMessage {
+  const citations = readJson(row.citations);
+  const retrieval = readJson(row.retrieval);
+  const answerStatus = ANSWER_STATUSES.find(
+    (status) => status === row.answer_status,
+  );
+
   return {
     id: row.id,
     conversationId: row.conversation_id,
     role: row.role,
     content: row.content,
     createdAt: row.created_at,
+    ...(Array.isArray(citations) ? { citations: citations as Citation[] } : {}),
+    ...(retrieval !== null &&
+    retrieval !== undefined &&
+    typeof retrieval === "object"
+      ? { retrieval: retrieval as RetrievalMetadata }
+      : {}),
+    ...(answerStatus === undefined ? {} : { answerStatus }),
   };
 }
 
@@ -169,14 +210,32 @@ export class PostgresConversationsRepository extends ConversationsRepositoryPort
         throw new Error("conversation is not owned by the user");
       }
 
+      const citations =
+        exchange.citations === undefined
+          ? null
+          : JSON.stringify(exchange.citations);
+      const retrieval =
+        exchange.retrieval === undefined || exchange.retrieval === null
+          ? null
+          : JSON.stringify(exchange.retrieval);
       const result: QueryResult<MessageRow> = await withDbSpan(
         { table: "messages", operation: "INSERT" },
         () =>
           this.pool.query<MessageRow>(
-            `insert into public.messages (conversation_id, role, content)
-             values ($1, 'user', $2), ($1, 'expert', $3)
+            `insert into public.messages
+               (conversation_id, role, content, citations, retrieval, answer_status)
+             values
+               ($1, 'user', $2, null, null, null),
+               ($1, 'expert', $3, $4::jsonb, $5::jsonb, $6)
              returning ${MESSAGE_COLUMNS}`,
-            [conversationId, exchange.userContent, exchange.expertContent],
+            [
+              conversationId,
+              exchange.userContent,
+              exchange.expertContent,
+              citations,
+              retrieval,
+              exchange.answerStatus ?? null,
+            ],
           ),
       );
 

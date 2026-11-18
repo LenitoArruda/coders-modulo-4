@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 
 import { AuthModule } from "./modules/auth/auth.module";
+import { CitationsModule } from "./modules/citations/citations.module";
 import { ConversationsModule } from "./modules/conversations/conversations.module";
 import { ExpertsModule } from "./modules/experts/experts.module";
 import { HelloModule } from "./modules/hello/hello.module";
@@ -15,6 +16,7 @@ import { ErrorContractFilter } from "./modules/shared/interface/error-contract.f
     AuthModule,
     HelloModule,
     ExpertsModule,
+    CitationsModule,
     ConversationsModule,
     SourcesModule,
   ],

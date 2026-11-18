@@ -1,5 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 
+import { RefreshCitationsUseCase } from "../../citations/application/refresh-citations.use-case";
 import { getExpertById } from "../../experts/domain/expert-catalog";
 import { UnknownExpertError } from "../domain/conversation.errors";
 import type { ConversationMessage } from "../domain/conversation";
@@ -23,6 +24,9 @@ export class GetConversationUseCase {
   constructor(
     @Inject(ConversationsRepositoryPort)
     private readonly conversations: ConversationsRepositoryPort,
+    @Optional()
+    @Inject(RefreshCitationsUseCase)
+    private readonly refreshCitations: RefreshCitationsUseCase | null = null,
   ) {}
 
   async execute(input: GetConversationInput): Promise<GetConversationResult> {
@@ -47,9 +51,28 @@ export class GetConversationUseCase {
       return { conversationId: null, messages: [] };
     }
 
-    const messages = await this.conversations.listMessages(
+    const stored = await this.conversations.listMessages(
       conversation.id,
       input.userId,
+    );
+    const messages = await Promise.all(
+      stored.map(async (message) => {
+        if (
+          this.refreshCitations === null ||
+          message.citations === undefined ||
+          message.citations.length === 0
+        ) {
+          return message;
+        }
+
+        return {
+          ...message,
+          citations: await this.refreshCitations.execute(
+            input.userId,
+            message.citations,
+          ),
+        };
+      }),
     );
 
     return { conversationId: conversation.id, messages };

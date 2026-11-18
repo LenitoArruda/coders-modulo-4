@@ -75,7 +75,9 @@ Execute na raiz do monorepo:
 > `GET/POST /api/v1/sources`, `DELETE /api/v1/sources/:sourceId` e
 > `POST /api/v1/sources/:versionId/retry`, com estado isolado por token: dedup por SHA-256, nomes
 > com `fail`/`broken`/`corrupt` entram como `failed` e voltam a `ready` no retry, e `pending`
-> permanece `processing` até o polling. Não deixe um `bun run dev` antigo ocupando a porta 3000
+> permanece `processing` até o polling. No chat, os prefixos determinísticos `cite:`, `stale:`,
+> `removed:`, `nomatch:` e `vector-down:` ativam os cenários de citação da spec 016; prompts sem
+> prefixo preservam o modo fatia 012. Não deixe um `bun run dev` antigo ocupando a porta 3000
 > antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
 
 ### 2.1 Comando do OpenCode
@@ -375,6 +377,36 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] E2E cobre FAB, upload misto, dedup, versionamento, pendente, inválido, retry, remoção,
       isolamento, teclado/foco e 360/768/1280 px sem rolagem horizontal.
 
+### 5.17 Recuperação e citações (fatia 5 / spec 016)
+
+- [ ] `RAG_CITATIONS_ENABLED=false` por padrão: chat, sugestões, histórico e respostas sem campo
+      de citação continuam idênticos à fatia 012.
+- [ ] Com flag ligada e trecho relevante, a resposta traz `[n]` válido, `citations[]`,
+      `retrieval` e `answer_status = with_source`.
+- [ ] Marcadores fora de `[1..k]` são removidos; citações inválidas não viram fonte no painel.
+- [ ] Sem trecho acima de `RAG_THRESHOLD`, a resposta diz que não encontrou base, não mostra
+      citações e grava `answer_status = no_match`.
+- [ ] `RAG_TOP_K`, `RAG_THRESHOLD`, `RAG_MAX_CONTEXT_CHARS` e `RAG_MAX_HISTORY_MESSAGES` são
+      validados na configuração e limitam custo/latência.
+- [ ] Busca Weaviate usa `KnowledgeChunk`, filtro por `user_id` autenticado e timeout de 4 s;
+      nenhuma fonte de outro usuário é retornada.
+- [ ] Tipos de fonte novos ou desconhecidos são tolerados pelo contrato de vetor, sem alterar a
+      slice 013.
+- [ ] `isStale` e `sourceRemoved` são recalculados na leitura do histórico; a fonte removida
+      mantém o texto e desabilita o botão com "Source removed".
+- [ ] Citações são botões com `aria-label` descritivo e foco visível; o painel lateral mostra
+      nome, tipo, localização e trecho exato, e fecha com `Esc`.
+- [ ] Falha do vetorial produz aviso en-US acionável, resposta básica sem citações e
+      "Retry search"; nenhuma citação é inventada.
+- [ ] Falha do modelo continua `503 MODEL_UNAVAILABLE`, sem detalhes técnicos e sem mensagem
+      parcial persistida.
+- [ ] Documentos e prompts são tratados como dados não confiáveis; instruções neles não alteram
+      papel, tom ou política de citação do Expert.
+- [ ] E2E cobre abrir/fechar painel, persistência após reload, fonte antiga, fonte removida,
+      sem correspondência, retry do vetorial e prompt sem fontes.
+- [ ] Logs/telemetria `rag.*` contêm só IDs opacos, contagens, duração e desfecho; sem prompt,
+      trecho, chave de API, hash de conteúdo ou token de sessão.
+
 ---
 
 ## 6. QA manual — template
@@ -506,3 +538,51 @@ Limitação registrada:
   aplicação local do schema não foi confirmada.
 - `bun run db:test` não foi autorizado para esta entrega e não foi executado. A validação real com
   PostgreSQL, Weaviate e OpenAI segue como follow-up de integração.
+
+---
+
+## 12. Evidências da spec 016 (2026-11-18)
+
+Executadas na raiz do monorepo, na branch `spec/016`:
+
+| Comando               | Resultado                                                                  |
+| --------------------- | -------------------------------------------------------------------------- |
+| `bun run db:migrate`  | ok — 4 migrações aplicadas; `0004_rag_citations.sql` confirmada            |
+| `bun run db:test`     | ok — 4 arquivos SQL passaram                                               |
+| `bun run lint`        | ok — 3 tarefas Turbo                                                       |
+| `bun run types:check` | ok — 3 tarefas Turbo                                                       |
+| `bun run test`        | ok — API: 69 arquivos / 441 testes; web: 12 arquivos / 141 testes          |
+| `bun run build`       | ok — 2 tarefas Turbo; Next.js compilado                                    |
+| `bun run test:e2e`    | ok — 142 testes aprovados em ~3,3 min, incluindo os 6 cenários de citações |
+
+Cobertura adicional da fatia 016:
+
+- Unitários API: dedupe/ordenação/limiar, prompt com trechos como dados não confiáveis,
+  sanitização de `[n]`, `no_match`, `unavailable`, isolamento por usuário, flag desligada e
+  persistência de citações/metadados.
+- Integração HTTP: citações e metadados na resposta, recálculo de `isStale` ao reler o histórico,
+  degradação do vetorial e fallback sem correspondência.
+- Adaptadores: consulta GraphQL com filtro `userId`, validação de payload e timeout local;
+  metadados de fonte via SQL parametrizado, sem conteúdo ou caminho absoluto.
+- Web/E2E: painel com nome/tipo/localização/trecho, fechamento com `Esc`, sobrevivência após
+  reload, fonte antiga, fonte removida, sem correspondência, retry e prompt sem fontes.
+- `RAG_CITATIONS_ENABLED` permanece `false` em `.env.example`; nenhuma chave, token, prompt,
+  trecho ou valor de `.env` foi lido, exibido ou registrado. A API fake do E2E usa prefixos
+  determinísticos e não depende de OpenAI, Weaviate, PostgreSQL ou credenciais reais.
+
+QA manual equivalente (executado via Playwright/HTTP determinístico, ambiente Chromium
+headless-shell):
+
+| Cenário                     | Ação/esperado                                                                                          | Resultado |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ | --------- |
+| Citação válida              | Enviar `cite:` → abrir `[1]` → painel mostra nome, `txt · Page 7`, trecho exato → `Esc` fecha o painel | ok        |
+| Persistência e fonte antiga | Enviar `stale:` → "Outdated source" → recarregar → aviso e citação permanecem                          | ok        |
+| Fonte removida              | Enviar `removed:` → botão desabilitado e "Source removed" → recarregar → estado permanece              | ok        |
+| Sem correspondência         | Enviar `nomatch:` → mensagem sem base e nenhum botão de fonte                                          | ok        |
+| Vetorial indisponível       | Enviar `vector-down:` → aviso acionável → "Retry search" reapresenta o prompt                          | ok        |
+| Regressão fatia 012         | Prompt comum → resposta padrão sem bloco de fontes                                                     | ok        |
+| Falha do modelo             | Responder sem chave/erro → `503 MODEL_UNAVAILABLE`, sem detalhe técnico e sem escrita parcial          | ok        |
+
+Pendências de qualidade que permanecem como follow-up (fora desta fatia): avaliação humana da
+precisão das citações e medição de p95 em ambiente com OpenAI/Weaviate reais; o flag de rollout
+deve ser habilitado em produção somente após essa avaliação.

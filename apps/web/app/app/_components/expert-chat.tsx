@@ -8,12 +8,15 @@ import {
   PROMPT_MAX_LENGTH,
   PROMPT_TOO_LONG_MESSAGE,
   type ChatMessage,
+  type Citation,
   type Expert,
   type PromptSource,
 } from "../../../lib/expert-chat/types";
 import { FieldError, FormAlert } from "../../_components/form-parts";
 import { labelClassName } from "../../_components/shared-styles";
 import { loadConversationAction, sendPromptAction } from "../chat-actions";
+import { CitedContent } from "./cited-content";
+import { CitationPanel } from "./citation-panel";
 
 type ExpertChatProps = {
   experts: Expert[];
@@ -43,6 +46,10 @@ export function ExpertChat({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
   const [promptError, setPromptError] = useState<string | null>(null);
+  const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
+  const [promptByMessage, setPromptByMessage] = useState<
+    Record<string, string>
+  >({});
   const errorRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -65,6 +72,7 @@ export function ExpertChat({
     setSelectedExpertId(nextExpertId);
     setError(null);
     setPromptError(null);
+    setActiveCitation(null);
 
     if (
       nextExpertId === initialExpertId ||
@@ -124,6 +132,10 @@ export function ExpertChat({
         result.data.userMessage,
         result.data.expertMessage,
       ],
+    }));
+    setPromptByMessage((current) => ({
+      ...current,
+      [result.data.expertMessage.id]: trimmed,
     }));
     setPrompt("");
   }
@@ -198,9 +210,33 @@ export function ExpertChat({
                 <p className="text-sm font-semibold text-foreground">
                   {message.role === "user" ? "You" : selectedExpert.name}
                 </p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-                  {message.content}
-                </p>
+                {message.role === "expert" ? (
+                  <CitedContent
+                    content={message.content}
+                    citations={message.citations ?? []}
+                    onOpen={setActiveCitation}
+                  />
+                ) : (
+                  <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                    {message.content}
+                  </p>
+                )}
+                {message.role === "expert" &&
+                message.answerStatus === "retrieval_unavailable" &&
+                promptByMessage[message.id] !== undefined ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    <span>Knowledge search is unavailable right now.</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void send(promptByMessage[message.id] ?? "", "typed")
+                      }
+                      className="inline-flex min-h-9 items-center rounded-md border border-amber-500 px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Retry search
+                    </button>
+                  </div>
+                ) : null}
               </article>
             ))
           )}
@@ -278,6 +314,13 @@ export function ExpertChat({
           </div>
         </form>
       </footer>
+
+      {activeCitation !== null ? (
+        <CitationPanel
+          citation={activeCitation}
+          onClose={() => setActiveCitation(null)}
+        />
+      ) : null}
     </div>
   );
 }

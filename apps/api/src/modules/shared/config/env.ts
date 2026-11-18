@@ -57,6 +57,12 @@ export const DEFAULT_EXPERT_PROMPT_MAX_LENGTH = 4_000;
 /** Upper bound accepted for the configurable prompt length limit. */
 export const MAX_EXPERT_PROMPT_MAX_LENGTH = 100_000;
 
+/** Defaults for the optional RAG/citations slice (spec 016). */
+export const DEFAULT_RAG_TOP_K = 5;
+export const DEFAULT_RAG_THRESHOLD = 0.35;
+export const DEFAULT_RAG_MAX_CONTEXT_CHARS = 6_000;
+export const DEFAULT_RAG_MAX_HISTORY_MESSAGES = 6;
+
 export type Env = {
   /** Effective runtime environment (`NODE_ENV` normalized, defaulting to `dev`). */
   nodeEnv: string;
@@ -97,6 +103,16 @@ export type Env = {
   openaiApiKey: string;
   /** Maximum number of characters accepted in a single Expert prompt. */
   expertPromptMaxLength: number;
+  /** Enables retrieval and citations; disabled by default (spec 016 rollout). */
+  ragCitationsEnabled: boolean;
+  /** Maximum number of retrieved chunks injected into the model. */
+  ragTopK: number;
+  /** Minimum Weaviate certainty for a chunk to be considered relevant. */
+  ragThreshold: number;
+  /** Maximum characters of retrieved context per answer. */
+  ragMaxContextChars: number;
+  /** Recent messages included in the grounded prompt. */
+  ragMaxHistoryMessages: number;
 };
 
 export class ConfigurationError extends Error {
@@ -411,6 +427,44 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("EXPERT_PROMPT_MAX_LENGTH");
   }
 
+  const ragCitationsEnabled =
+    readBooleanFlag(readString(source.RAG_CITATIONS_ENABLED)) ?? false;
+  const ragTopKValue =
+    readString(source.RAG_TOP_K) || String(DEFAULT_RAG_TOP_K);
+  const ragTopK = Number(ragTopKValue);
+  const ragThresholdValue =
+    readString(source.RAG_THRESHOLD) || String(DEFAULT_RAG_THRESHOLD);
+  const ragThreshold = Number(ragThresholdValue);
+  const ragMaxContextCharsValue =
+    readString(source.RAG_MAX_CONTEXT_CHARS) ||
+    String(DEFAULT_RAG_MAX_CONTEXT_CHARS);
+  const ragMaxContextChars = Number(ragMaxContextCharsValue);
+  const ragMaxHistoryMessagesValue =
+    readString(source.RAG_MAX_HISTORY_MESSAGES) ||
+    String(DEFAULT_RAG_MAX_HISTORY_MESSAGES);
+  const ragMaxHistoryMessages = Number(ragMaxHistoryMessagesValue);
+
+  if (!Number.isInteger(ragTopK) || ragTopK < 1 || ragTopK > 20) {
+    invalid.push("RAG_TOP_K");
+  }
+  if (!Number.isFinite(ragThreshold) || ragThreshold < 0 || ragThreshold > 1) {
+    invalid.push("RAG_THRESHOLD");
+  }
+  if (
+    !Number.isInteger(ragMaxContextChars) ||
+    ragMaxContextChars < 1 ||
+    ragMaxContextChars > 100_000
+  ) {
+    invalid.push("RAG_MAX_CONTEXT_CHARS");
+  }
+  if (
+    !Number.isInteger(ragMaxHistoryMessages) ||
+    ragMaxHistoryMessages < 0 ||
+    ragMaxHistoryMessages > 50
+  ) {
+    invalid.push("RAG_MAX_HISTORY_MESSAGES");
+  }
+
   if (emailProvider === "resend") {
     if (!resendApiKey) missing.push("RESEND_API_KEY");
   } else if (!mailtrapApiToken) {
@@ -482,5 +536,10 @@ export function loadEnv(source: EnvSource = process.env): Env {
         : null,
     openaiApiKey,
     expertPromptMaxLength,
+    ragCitationsEnabled,
+    ragTopK,
+    ragThreshold,
+    ragMaxContextChars,
+    ragMaxHistoryMessages,
   };
 }

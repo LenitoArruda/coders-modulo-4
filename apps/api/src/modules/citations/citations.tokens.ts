@@ -1,0 +1,13 @@
+/** DI tokens for the RAG/citations slice. */
+export const RAG_CITATIONS_ENABLED = Symbol("RAG_CITATIONS_ENABLED");
+export const RAG_TOP_K = Symbol("RAG_TOP_K");
+export const RAG_THRESHOLD = Symbol("RAG_THRESHOLD");
+export const RAG_MAX_CONTEXT_CHARS = Symbol("RAG_MAX_CONTEXT_CHARS");
+export const RAG_MAX_HISTORY_MESSAGES = Symbol("RAG_MAX_HISTORY_MESSAGES");
+export const CITATION_QUERY_EMBEDDING_API_KEY = Symbol(
+  "CITATION_QUERY_EMBEDDING_API_KEY",
+);
+export const CITATION_WEAVIATE_URL = Symbol("CITATION_WEAVIATE_URL");
+export const CITATION_EMBEDDING_DIMENSIONS = Symbol(
+  "CITATION_EMBEDDING_DIMENSIONS",
+);
