@@ -26,6 +26,8 @@ export type ValidatedSourceFile = SourceUploadFile & {
   normalizedName: string;
   contentHash: string;
   byteSize: number;
+  /** Display name for URL sources; files keep their original name. */
+  displayName?: string;
 };
 
 const extensionTypes: Record<string, SourceType> = {

@@ -17,6 +17,7 @@ import type {
   SourceType,
   SourceVersion,
 } from "../domain/source";
+import { URL_SOURCE_MIME_TYPE } from "../domain/source-url-policy";
 
 const SOURCE_COLUMNS =
   "id, user_id, name, normalized_name, type, current_version_id, created_at, updated_at";
@@ -53,6 +54,8 @@ type VersionRow = {
 type SummaryRow = {
   id: string;
   name: string;
+  original_name: string;
+  mime_type: string;
   type: SourceType;
   byte_size: string | number;
   status: SourceStatus;
@@ -94,9 +97,12 @@ function toVersion(row: VersionRow): SourceVersion {
 }
 
 function toSummary(row: SummaryRow): SourceSummary {
+  const isUrl = row.mime_type === URL_SOURCE_MIME_TYPE;
+
   return {
     id: row.id,
     name: row.name,
+    url: isUrl ? row.original_name : undefined,
     type: row.type,
     byteSize: Number(row.byte_size),
     status: row.status,
@@ -207,8 +213,8 @@ export class PostgresSourcesRepository extends SourcesRepositoryPort {
           this.pool.query<VersionRow>(
             `insert into public.source_versions
                (source_id, user_id, content_hash, original_name, mime_type,
-                byte_size, type, status)
-             values ($1, $2, $3, $4, $5, $6, $7, $8)
+                byte_size, type, status, error_message)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              returning ${VERSION_COLUMNS}`,
             [
               input.sourceId,
@@ -219,6 +225,7 @@ export class PostgresSourcesRepository extends SourcesRepositoryPort {
               input.byteSize,
               input.type,
               input.status,
+              input.errorMessage ?? null,
             ],
           ),
       );
@@ -298,6 +305,26 @@ export class PostgresSourcesRepository extends SourcesRepositoryPort {
     }
   }
 
+  async updateVersionContentHash(
+    userId: string,
+    versionId: string,
+    contentHash: string,
+    byteSize: number,
+  ): Promise<void> {
+    try {
+      await withDbSpan({ table: "source_versions", operation: "UPDATE" }, () =>
+        this.pool.query(
+          `update public.source_versions
+              set content_hash = $3, byte_size = $4
+            where user_id = $1 and id = $2`,
+          [userId, versionId, contentHash, byteSize],
+        ),
+      );
+    } catch (error) {
+      throw databaseFailure("update source version hash", error);
+    }
+  }
+
   async saveChunks(chunks: Chunk[]): Promise<void> {
     try {
       for (const chunk of chunks) {
@@ -374,6 +401,7 @@ export class PostgresSourcesRepository extends SourcesRepositoryPort {
         () =>
           this.pool.query<SummaryRow>(
             `select s.id, s.name, s.type, v.byte_size, v.status,
+                    v.original_name, v.mime_type,
                     v.id as version_id,
                     (select count(*) from public.source_versions sv
                      where sv.source_id = s.id and sv.created_at <= v.created_at)

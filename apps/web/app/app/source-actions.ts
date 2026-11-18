@@ -4,6 +4,7 @@ import { fetchApiWithSession } from "../../lib/auth/api-client";
 import {
   ALREADY_CONNECTED_MESSAGE,
   CONNECT_SOURCES_PATH,
+  CONNECT_SOURCE_URL_PATH,
   MAX_FILES_PER_UPLOAD,
   MAX_SOURCE_FILE_BYTES,
   SESSION_EXPIRED_MESSAGE,
@@ -12,6 +13,8 @@ import {
   SOURCE_FORMATS_MESSAGE,
   SOURCE_LOAD_FAILED_MESSAGE,
   SOURCE_RETRY_FAILED_MESSAGE,
+  SOURCE_URL_CONNECT_FAILED_MESSAGE,
+  SOURCE_URL_REQUIRED_MESSAGE,
   type ConnectSourcesResponse,
   type ListSourcesResponse,
   type SourceActionResult,
@@ -30,6 +33,11 @@ const PUBLIC_SOURCE_CODES = new Set([
   "EMPTY_SOURCE_FILE",
   "SOURCE_NOT_FOUND",
   "SOURCE_VERSION_NOT_FOUND",
+  "INVALID_SOURCE_URL",
+  "BLOCKED_SOURCE_URL",
+  "SOURCE_URL_UNAVAILABLE",
+  "SOURCE_URL_NO_TEXT",
+  "SOURCE_URL_TOO_LARGE",
   "VALIDATION_ERROR",
 ]);
 
@@ -153,6 +161,51 @@ export async function connectSourcesAction(
       response.status,
       await readErrorBody(response),
       SOURCE_CONNECT_FAILED_MESSAGE,
+    );
+  }
+
+  const result = await readJson<ConnectSourcesResponse>(response);
+
+  if (result.ok && result.data.results.every((item) => item.alreadyConnected)) {
+    return {
+      ok: true,
+      data: result.data,
+      message: ALREADY_CONNECTED_MESSAGE,
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Sends one public URL to the API. The session token is added server-side and
+ * never becomes part of the browser payload.
+ */
+export async function connectSourceUrlAction(
+  url: string,
+): Promise<SourceActionResult<ConnectSourcesResponse>> {
+  const trimmed = url.trim();
+
+  if (trimmed.length === 0) return failure(SOURCE_URL_REQUIRED_MESSAGE);
+
+  let response: Response;
+
+  try {
+    response = await fetchApiWithSession(CONNECT_SOURCE_URL_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: trimmed }),
+      cache: "no-store",
+    });
+  } catch {
+    return failure(SOURCE_URL_CONNECT_FAILED_MESSAGE);
+  }
+
+  if (!response.ok) {
+    return apiFailure(
+      response.status,
+      await readErrorBody(response),
+      SOURCE_URL_CONNECT_FAILED_MESSAGE,
     );
   }
 

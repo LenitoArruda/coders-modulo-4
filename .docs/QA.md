@@ -72,10 +72,13 @@ Execute na raiz do monorepo:
 > senha de `<nome>@signin.example.com` e revoga as sessões dela (a senha antiga passa a falhar);
 > `rate-limited-reset-token` responde `429`, qualquer outro token responde `INVALID_RESET_TOKEN` e
 > a senha é validada antes do token, como na API real. A fake também implementa
-> `GET/POST /api/v1/sources`, `DELETE /api/v1/sources/:sourceId` e
+> `GET/POST /api/v1/sources`, `POST /api/v1/sources/urls`, `DELETE /api/v1/sources/:sourceId` e
 > `POST /api/v1/sources/:versionId/retry`, com estado isolado por token: dedup por SHA-256, nomes
 > com `fail`/`broken`/`corrupt` entram como `failed` e voltam a `ready` no retry, e `pending`
-> permanece `processing` até o polling. Não deixe um `bun run dev` antigo ocupando a porta 3000
+> permanece `processing` até o polling. Para URLs, `POST /__fake/pages` (somente teste) define o
+> título, o texto e o estado da página (`text`, `no-text`, `unavailable`), permitindo simular
+> conteúdo alterado e falha de busca sem acessar a rede. URLs internas e esquemas não http/https
+> são recusados com `BLOCKED_SOURCE_URL`/`INVALID_SOURCE_URL`. Não deixe um `bun run dev` antigo ocupando a porta 3000
 > antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
 
 ### 2.1 Comando do OpenCode
@@ -375,6 +378,29 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 - [ ] E2E cobre FAB, upload misto, dedup, versionamento, pendente, inválido, retry, remoção,
       isolamento, teclado/foco e 360/768/1280 px sem rolagem horizontal.
 
+### 5.17 Fontes de conhecimento por URL (fatia 014)
+
+- [ ] Campo “Add a URL” tem rótulo, dica em inglês, `inputmode="url"` e mensagem para URL vazia.
+- [ ] `POST /api/v1/sources/urls` com JSON `{ url }` responde `202` com `name`, `url`, `status`,
+      `versionId` e `alreadyConnected`; o token segue apenas no Server Action.
+- [ ] Normalização remove fragmento e parâmetros de rastreamento, minúscula o host e limita 255
+      caracteres; a URL exibida na lista é a normalizada.
+- [ ] URL pública com texto aparece `processing` e depois `ready`, com título, endereço, versão e
+      chunks; texto extraído vira `source_files.content` e o hash é SHA-256 desse texto.
+- [ ] Mesma URL com mesmo conteúdo responde “Already connected” sem nova versão, chunk ou vetor.
+- [ ] Duas URLs diferentes com o mesmo texto geram apenas uma fonte válida para o usuário.
+- [ ] Conteúdo alterado na mesma URL cria nova `SourceVersion`; a anterior fica desatualizada.
+- [ ] Esquema não http/https, credenciais, host interno/loopback/metadados e redirect para rede
+      privada são recusados antes de qualquer conexão; E2E cobre `ftp://` e `127.0.0.1`.
+- [ ] Fetch com timeout, resposta > 2 MB, sem texto, 5xx transitório e redirects acima de 3 vira
+      versão `failed` com mensagem acionável; o retry refaz a busca e pode chegar a `ready`.
+- [ ] Isolamento por `user_id` cobre registro e vetores; exclusão remove URL, versões, chunks e
+      vetores e preserva conversas.
+- [ ] Logs/telemetria e cliente não contêm URL, trecho de página, hash, `SOURCE_OPENAI_API_KEY` ou
+      token de sessão.
+- [ ] E2E cobre URL válida, normalização, dedup por URL/conteúdo, mudança de conteúdo, recusa
+      interna, falha e retry, isolamento, remoção, teclado/foco e 360/768/1280 px sem scroll horizontal.
+
 ---
 
 ## 6. QA manual — template
@@ -506,3 +532,32 @@ Limitação registrada:
   aplicação local do schema não foi confirmada.
 - `bun run db:test` não foi autorizado para esta entrega e não foi executado. A validação real com
   PostgreSQL, Weaviate e OpenAI segue como follow-up de integração.
+
+---
+
+## 12. Evidências da spec 014 (2026-11-18)
+
+Executadas na raiz do monorepo, em `spec/014`, após `bun install --frozen-lockfile` (544 pacotes),
+sem ler valores de `.env` e sem chamada real à OpenAI durante os testes:
+
+| Comando                                   | Resultado                                                                                                                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`                            | ok — 3 tarefas (1 em cache), 1m2,692s                                                                                                                                                 |
+| `bun run types:check`                     | ok — 3 tarefas (1 em cache), 1m33,203s                                                                                                                                                |
+| `bun run test`                            | ok — API: 66 arquivos / 442 testes; web: 11 arquivos / 147 testes; 4m33,172s                                                                                                          |
+| `bun run build`                           | ok — 2 tarefas Turbo, 31,807s                                                                                                                                                         |
+| `bun run test:e2e` (`apps/web`, 1 worker) | 147 testes: 144 passaram na execução completa; 3 testes antigos expiraram por timeout do Next dev e passaram isoladamente (3/3). Os 11 cenários de URL passaram na execução completa. |
+
+Cobertura adicional da fatia 014:
+
+- Política de URL testada por unidade (normalização, esquemas, faixas de IP, metadados, redirects,
+  extração) e adaptador HTTP validado contra servidor local, com `allowPrivateHosts` apenas em teste.
+- Fake API do E2E estendida com `POST /api/v1/sources/urls`, `POST /__fake/pages`, dedup por conteúdo,
+  retry com refetch e isolamento por token; cliente nunca recebe URL de origem, texto, hash ou chave.
+- Nenhuma migração nova: a página é persistida como `txt` com marcador `text/plain+url` no esquema 013.
+
+Limitação registrada:
+
+- `bun run infra:up` falhou porque o Docker não está instalado ou em execução; `bun run db:migrate`
+  encontrou `ECONNREFUSED 127.0.0.1:5433` e a porta 5432 recusou a autenticação. Nenhum comando
+  destrutivo de banco foi executado; validação real com PostgreSQL/Weaviate segue como follow-up.

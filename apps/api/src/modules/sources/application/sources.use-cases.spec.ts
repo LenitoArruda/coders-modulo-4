@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { InMemorySourcesRepository } from "../../../test/fakes/in-memory-sources.repository";
 import { FakeDocumentTextExtractor } from "../../../test/fakes/fake-document-text-extractor";
 import { FakeEmbeddingGenerator } from "../../../test/fakes/fake-embedding-generator";
+import { FakeWebPageFetcher } from "../../../test/fakes/fake-web-page-fetcher";
 import {
   InMemoryVectorStore,
   vectorStoreFailure,
@@ -56,7 +57,12 @@ describe("knowledge source use cases", () => {
     connect = new ConnectSourcesUseCase(sources, processVersion);
     list = new ListSourcesUseCase(sources);
     remove = new DeleteSourceUseCase(sources, vectors);
-    retry = new RetrySourceVersionUseCase(sources, vectors, processVersion);
+    retry = new RetrySourceVersionUseCase(
+      sources,
+      vectors,
+      processVersion,
+      new FakeWebPageFetcher(),
+    );
   });
 
   it("indexa um arquivo novo com chunks e vetores", async () => {

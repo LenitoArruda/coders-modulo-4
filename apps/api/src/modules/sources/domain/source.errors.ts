@@ -82,3 +82,48 @@ export class SourceVersionNotFoundError extends SourceError {
     super("SOURCE_VERSION_NOT_FOUND", "That version is no longer available.");
   }
 }
+
+export class InvalidSourceUrlError extends SourceError {
+  constructor() {
+    super(
+      "INVALID_SOURCE_URL",
+      "Enter a valid public HTTP or HTTPS URL (255 characters or fewer).",
+    );
+  }
+}
+
+export class BlockedSourceUrlError extends SourceError {
+  constructor() {
+    super(
+      "BLOCKED_SOURCE_URL",
+      "That address is not allowed. Use a public HTTP or HTTPS link.",
+    );
+  }
+}
+
+export class SourceUrlUnavailableError extends SourceError {
+  constructor() {
+    super(
+      "SOURCE_URL_UNAVAILABLE",
+      "We could not load that page. Check the address and try again.",
+    );
+  }
+}
+
+export class SourceUrlNoTextError extends SourceError {
+  constructor() {
+    super(
+      "SOURCE_URL_NO_TEXT",
+      "That page has no text we can index. Try another URL or upload a file.",
+    );
+  }
+}
+
+export class SourceUrlTooLargeError extends SourceError {
+  constructor() {
+    super(
+      "SOURCE_URL_TOO_LARGE",
+      "That page is too large to index. Try another URL or upload a file.",
+    );
+  }
+}

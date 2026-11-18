@@ -1,6 +1,6 @@
 # BUSINESS.md — Negócio e produto
 
-> **Status:** hipóteses iniciais + catálogo de Experts, chat e fontes de arquivo implementados (fatias 012–013) · **Atualizado em:** 2026-11-18
+> **Status:** hipóteses iniciais + catálogo de Experts, chat, fontes de arquivo e URLs públicas implementados (fatias 012–014) · **Atualizado em:** 2026-11-18
 > **Público:** produto, engenharia e agentes que precisam entender **o que** estamos construindo.
 
 Este documento descreve o problema, a proposta de valor e o escopo do produto. Decisões ainda
@@ -83,25 +83,28 @@ papel, escopo, tom e sugestões) vive na API (`EXPERT_CATALOG`) e é a fonte ún
 
 ## 7. Conectores
 
-| Conector      | Conteúdo                     | Prioridade (hipótese) |
-| ------------- | ---------------------------- | --------------------- |
-| Upload de PDF | Documentos e relatórios      | MVP                   |
-| Markdown      | Notas e documentação técnica | MVP                   |
-| Google Drive  | Arquivos e pastas            | MVP                   |
-| Notion        | Páginas e bases              | MVP                   |
-| Google Docs   | Documentos                   | Próxima fase          |
-| Google Sheets | Planilhas                    | Próxima fase          |
-| Confluence    | Páginas e spaces             | Próxima fase          |
-| Jira          | Issues, épicos e projetos    | Próxima fase          |
-| Linear        | Issues e projetos            | Próxima fase          |
-| ClickUp       | Tarefas e docs               | Próxima fase          |
+| Conector      | Conteúdo                           | Prioridade (hipótese) |
+| ------------- | ---------------------------------- | --------------------- |
+| Upload de PDF | Documentos e relatórios            | MVP                   |
+| Markdown      | Notas e documentação técnica       | MVP                   |
+| URL pública   | Documentação, artigos e changelogs | MVP                   |
+| Google Drive  | Arquivos e pastas                  | MVP                   |
+| Notion        | Páginas e bases                    | MVP                   |
+| Google Docs   | Documentos                         | Próxima fase          |
+| Google Sheets | Planilhas                          | Próxima fase          |
+| Confluence    | Páginas e spaces                   | Próxima fase          |
+| Jira          | Issues, épicos e projetos          | Próxima fase          |
+| Linear        | Issues e projetos                  | Próxima fase          |
+| ClickUp       | Tarefas e docs                     | Próxima fase          |
 
-> **Estado atual (fatia 013):** upload de PDF, TXT e Markdown já está implementado na home privada.
-> A pessoa anexa arquivos pelo botão flutuante, acompanha `queued`/`processing`/`ready`/`failed`,
-> recebe "Already connected" quando reenvia o mesmo conteúdo e pode remover uma fonte. O hash do
-> conteúdo deduplica no escopo do usuário; nome igual com conteúdo diferente cria nova versão e a
-> anterior fica desatualizada. Arquivo, versões, chunks e vetores são removidos juntos na exclusão.
-> Google Drive e Notion seguem como hipótese de MVP, não implementados nesta fatia.
+> **Estado atual (fatia 014):** upload de PDF, TXT e Markdown e conexão de URLs públicas já estão
+> implementados na home privada. No mesmo botão flutuante a pessoa anexa arquivos ou informa um
+> link, acompanha `queued`/`processing`/`ready`/`failed`, recebe "Already connected" quando reenvia
+> o mesmo conteúdo e pode remover uma fonte. O hash do conteúdo deduplica no escopo do usuário;
+> conteúdo diferente na mesma fonte cria nova versão e a anterior fica desatualizada. Arquivos,
+> páginas, versões, chunks e vetores são removidos juntos na exclusão. Endereços internos são
+> bloqueados por política SSRF antes de qualquer busca. Google Drive e Notion seguem como hipótese
+> de MVP, não implementados nesta fatia.
 
 Requisitos por conector:
 
@@ -151,8 +154,8 @@ Requisitos por conector:
 
 - Autenticação (implementada); workspace segue como hipótese.
 - Catálogo de nove Experts com chat em persona (implementado na fatia 012).
-- Conexão de fontes de arquivo (PDF, TXT e Markdown — implementada na fatia 013); Google Drive e
-  Notion seguem como hipótese de MVP.
+- Conexão de fontes de arquivo (PDF, TXT e Markdown — fatia 013) e de URLs públicas (fatia 014);
+  Google Drive e Notion seguem como hipótese de MVP.
 - Pergunta e resposta com citações das fontes (citações nas fatias seguintes).
 - Histórico de conversas isolado por usuário (implementado na fatia 012).
 - Controle básico de acesso por workspace.
@@ -199,15 +202,17 @@ Requisitos por conector:
 
 ## 12. Riscos e questões abertas
 
-| Risco/questão                             | Impacto                                               |
-| ----------------------------------------- | ----------------------------------------------------- |
-| Alucinação ou resposta sem evidência      | Perda de confiança; mitigar com citações obrigatórias |
-| Custo de LLM e ingestão                   | Inviabiliza o modelo de negócio; medir desde o MVP    |
-| Permissões nas fontes externas            | Vazamento de dados; aplicar menor privilégio          |
-| Multi-tenancy não definido                | Retrabalho de modelo de dados e RLS                   |
-| Escopo do Expert (aconselhar vs executar) | Expectativa do usuário e complexidade                 |
-| Modelo de cobrança                        | Ainda não definido                                    |
-| Dependência de APIs de terceiros          | Rate limits e mudanças de contrato                    |
+| Risco/questão                             | Impacto                                                        |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| Alucinação ou resposta sem evidência      | Perda de confiança; mitigar com citações obrigatórias          |
+| Custo de LLM e ingestão                   | Inviabiliza o modelo de negócio; medir desde o MVP             |
+| Permissões nas fontes externas            | Vazamento de dados; aplicar menor privilégio                   |
+| Multi-tenancy não definido                | Retrabalho de modelo de dados e RLS                            |
+| Escopo do Expert (aconselhar vs executar) | Expectativa do usuário e complexidade                          |
+| Modelo de cobrança                        | Ainda não definido                                             |
+| Dependência de APIs de terceiros          | Rate limits e mudanças de contrato                             |
+| SSRF em URL informada pelo usuário        | Mitigado por bloqueio de redes internas, DNS e redirects       |
+| Termos de uso de páginas externas         | `robots.txt` segue em decisão aberta; hoje só conteúdo público |
 
 ---
 

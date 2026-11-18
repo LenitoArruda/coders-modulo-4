@@ -9,14 +9,18 @@ vi.mock("../../lib/auth/api-client", () => ({
 import {
   ALREADY_CONNECTED_MESSAGE,
   CONNECT_SOURCES_PATH,
+  CONNECT_SOURCE_URL_PATH,
   SESSION_EXPIRED_MESSAGE,
   SOURCE_CONNECT_FAILED_MESSAGE,
   SOURCE_DELETE_FAILED_MESSAGE,
   SOURCE_LOAD_FAILED_MESSAGE,
+  SOURCE_URL_CONNECT_FAILED_MESSAGE,
+  SOURCE_URL_REQUIRED_MESSAGE,
   type ConnectSourcesResponse,
   type ListSourcesResponse,
 } from "../../lib/knowledge/types";
 import {
+  connectSourceUrlAction,
   connectSourcesAction,
   deleteSourceAction,
   listSourcesAction,
@@ -169,6 +173,108 @@ describe("connectSourcesAction", () => {
     await expect(connectSourcesAction(upload())).resolves.toEqual({
       ok: false,
       message: SOURCE_CONNECT_FAILED_MESSAGE,
+    });
+  });
+});
+
+describe("connectSourceUrlAction", () => {
+  const url = "https://example.com/guide";
+  const urlBody: ConnectSourcesResponse = {
+    results: [
+      {
+        name: "guide",
+        type: "txt",
+        byteSize: 42,
+        sourceId: source.id,
+        versionId: source.versionId,
+        status: "processing",
+        alreadyConnected: false,
+        url,
+      },
+    ],
+  };
+
+  it("envia a URL como JSON ao endpoint de URLs sem expor o token", async () => {
+    fetchApi.mock.mockResolvedValue(jsonResponse(202, urlBody));
+
+    await expect(connectSourceUrlAction(`  ${url}  `)).resolves.toEqual({
+      ok: true,
+      data: urlBody,
+    });
+    expect(fetchApi.mock).toHaveBeenCalledWith(CONNECT_SOURCE_URL_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+      cache: "no-store",
+    });
+  });
+
+  it("informa Already connected quando a URL já foi indexada", async () => {
+    fetchApi.mock.mockResolvedValue(
+      jsonResponse(202, {
+        results: [
+          {
+            ...urlBody.results[0],
+            alreadyConnected: true,
+            status: "ready",
+          },
+        ],
+      }),
+    );
+
+    await expect(connectSourceUrlAction(url)).resolves.toMatchObject({
+      ok: true,
+      message: ALREADY_CONNECTED_MESSAGE,
+    });
+  });
+
+  it("rejeita URL vazia sem chamar a API", async () => {
+    await expect(connectSourceUrlAction("   ")).resolves.toEqual({
+      ok: false,
+      message: SOURCE_URL_REQUIRED_MESSAGE,
+    });
+    expect(fetchApi.mock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["INVALID_SOURCE_URL", 400, "Enter a valid public http or https URL."],
+    ["BLOCKED_SOURCE_URL", 400, "That address is not allowed."],
+    ["SOURCE_URL_NO_TEXT", 422, "The page has no text we can index."],
+    ["SOURCE_URL_TOO_LARGE", 413, "The page is too large to index."],
+    ["SOURCE_URL_UNAVAILABLE", 503, SOURCE_URL_CONNECT_FAILED_MESSAGE],
+  ])("trata %s com mensagem pública segura", async (code, status, message) => {
+    fetchApi.mock.mockResolvedValue(jsonResponse(status, { code, message }));
+
+    await expect(connectSourceUrlAction(url)).resolves.toEqual({
+      ok: false,
+      message,
+    });
+  });
+
+  it("mapeia sessão expirada e falha de rede para mensagens próprias", async () => {
+    fetchApi.mock.mockResolvedValueOnce(
+      jsonResponse(401, { code: "UNAUTHORIZED", message: "JWT expired" }),
+    );
+    fetchApi.mock.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+
+    await expect(connectSourceUrlAction(url)).resolves.toEqual({
+      ok: false,
+      message: SESSION_EXPIRED_MESSAGE,
+    });
+    await expect(connectSourceUrlAction(url)).resolves.toEqual({
+      ok: false,
+      message: SOURCE_URL_CONNECT_FAILED_MESSAGE,
+    });
+  });
+
+  it("não propaga erro interno da API", async () => {
+    fetchApi.mock.mockResolvedValue(
+      jsonResponse(500, { code: "DB_DOWN", message: "password in stack" }),
+    );
+
+    await expect(connectSourceUrlAction(url)).resolves.toEqual({
+      ok: false,
+      message: SOURCE_URL_CONNECT_FAILED_MESSAGE,
     });
   });
 });

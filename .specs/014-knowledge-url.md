@@ -1,7 +1,7 @@
 # Fontes de conhecimento por URL — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-17
+> **Status:** done
+> **Atualizado em:** 2026-11-18
 > **Autor:** OpenCode Agent
 > **Épico:** `.plans/012-expert-platform-breakdown.md` (fatia 3)
 > **Depende de:** `.specs/013-knowledge-files.md`
@@ -194,27 +194,27 @@ As metas numéricas de latência e custo ficam como decisão aberta com o solici
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um usuário autenticado no fluxo de conexões, quando escolhe adicionar URL, então encontra
+- [x] Dado um usuário autenticado no fluxo de conexões, quando escolhe adicionar URL, então encontra
       um campo para informar o endereço com rótulo e mensagens em inglês.
-- [ ] Dado uma URL pública com texto, quando é adicionada, então a versão aparece em
+- [x] Dado uma URL pública com texto, quando é adicionada, então a versão aparece em
       `queued`/`processing` e ao concluir passa a `ready`, com título, endereço normalizado e
       quantidade de chunks.
-- [ ] Dado uma conexão de URL já existente para o mesmo usuário, quando a mesma URL é reenviada com
+- [x] Dado uma conexão de URL já existente para o mesmo usuário, quando a mesma URL é reenviada com
       o mesmo conteúdo, então nenhuma versão, chunk ou embedding novo é criado e a interface informa
       "Already connected".
-- [ ] Dado duas URLs diferentes com o mesmo conteúdo, quando ambas são adicionadas, então apenas uma
+- [x] Dado duas URLs diferentes com o mesmo conteúdo, quando ambas são adicionadas, então apenas uma
       fonte válida permanece para aquele usuário.
-- [ ] Dado um endereço com esquema não permitido ou que aponta para rede interna, quando é enviado,
+- [x] Dado um endereço com esquema não permitido ou que aponta para rede interna, quando é enviado,
       então é recusado antes de qualquer busca, com mensagem em inglês.
-- [ ] Dado uma URL já conectada cujo conteúdo mudou, quando é processada novamente, então uma nova
+- [x] Dado uma URL já conectada cujo conteúdo mudou, quando é processada novamente, então uma nova
       `SourceVersion` é criada e a anterior é marcada como desatualizada.
-- [ ] Dado uma página inacessível ou sem texto extraível, quando o processamento termina, então a
+- [x] Dado uma página inacessível ou sem texto extraível, quando o processamento termina, então a
       versão aparece como `failed`, sem vetores gravados, e pode ser tentada novamente.
-- [ ] Dado dois usuários, quando cada um adiciona a mesma URL, então cada um possui sua própria
+- [x] Dado dois usuários, quando cada um adiciona a mesma URL, então cada um possui sua própria
       fonte, sem compartilhamento de registro ou vetores.
-- [ ] Dado uma fonte de URL conectada, quando a pessoa a exclui, então URL, versões, chunks e vetores
+- [x] Dado uma fonte de URL conectada, quando a pessoa a exclui, então URL, versões, chunks e vetores
       são removidos conforme a fatia 2 e o histórico de chat permanece.
-- [ ] Dado qualquer URL processada, quando inspecionados logs e telemetria, então nenhum endereço,
+- [x] Dado qualquer URL processada, quando inspecionados logs e telemetria, então nenhum endereço,
       trecho de página ou hash aparece registrado.
 
 ## 15. Decisões e questões abertas

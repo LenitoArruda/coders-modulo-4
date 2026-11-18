@@ -15,11 +15,13 @@ import {
   MAX_FILES_PER_UPLOAD,
   SOURCE_EMPTY_MESSAGE,
   SOURCE_FORMATS_MESSAGE,
+  SOURCE_URL_REQUIRED_MESSAGE,
   type SourceActionResult,
   type SourceStatus,
   type SourceSummary,
 } from "../../../lib/knowledge/types";
 import {
+  connectSourceUrlAction,
   connectSourcesAction,
   deleteSourceAction,
   listSourcesAction,
@@ -64,7 +66,9 @@ export function KnowledgeSources({
   const [isOpen, setIsOpen] = useState(false);
   const [sources, setSources] = useState(initialSources);
   const [fileCount, setFileCount] = useState(0);
+  const [urlValue, setUrlValue] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [isConnectingUrl, setIsConnectingUrl] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError);
   const [notice, setNotice] = useState<string | null>(null);
@@ -139,6 +143,41 @@ export function KnowledgeSources({
 
     if (inputRef.current !== null) inputRef.current.value = "";
     setFileCount(0);
+    await refresh(false);
+  }
+
+  async function handleConnectUrl(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (urlValue.trim() === "") {
+      setNotice(null);
+      setError(SOURCE_URL_REQUIRED_MESSAGE);
+      return;
+    }
+
+    setIsConnectingUrl(true);
+    setError(null);
+    setNotice(null);
+
+    const result = await connectSourceUrlAction(urlValue);
+
+    setIsConnectingUrl(false);
+
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+
+    const details = result.data.results.map((item) =>
+      item.alreadyConnected
+        ? `${item.name}: ${ALREADY_CONNECTED_MESSAGE}`
+        : `${item.name}: ${STATUS_LABELS[item.status]}`,
+    );
+
+    setNotice(
+      result.message === undefined ? details.join(" ") : result.message,
+    );
+    setUrlValue("");
     await refresh(false);
   }
 
@@ -245,6 +284,44 @@ export function KnowledgeSources({
             </button>
           </form>
 
+          <form
+            onSubmit={(event) => void handleConnectUrl(event)}
+            noValidate
+            className="mt-6"
+          >
+            <label
+              htmlFor="knowledge-source-url"
+              className="block text-sm font-medium text-foreground"
+            >
+              Add a URL
+            </label>
+            <input
+              id="knowledge-source-url"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
+              placeholder="https://example.com/article"
+              value={urlValue}
+              aria-describedby="knowledge-source-url-hint"
+              disabled={isConnectingUrl}
+              onChange={(event) => setUrlValue(event.target.value)}
+              className="mt-2 block w-full min-w-0 max-w-full rounded-md border border-input bg-background p-2 text-sm text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            />
+            <p
+              id="knowledge-source-url-hint"
+              className="mt-1.5 text-sm leading-relaxed text-muted-foreground"
+            >
+              Public HTTP or HTTPS pages only. Tracking parameters are removed.
+            </p>
+            <button
+              type="submit"
+              disabled={isConnectingUrl}
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isConnectingUrl ? "Connecting..." : "Connect URL"}
+            </button>
+          </form>
+
           <div className="mt-6 border-t border-border pt-5">
             <h3 className="text-sm font-semibold text-foreground">
               Connected sources
@@ -266,9 +343,16 @@ export function KnowledgeSources({
                         <p className="break-words text-sm font-medium text-foreground">
                           {source.name}
                         </p>
+                        {source.url === undefined ? null : (
+                          <p className="mt-1 break-all text-xs leading-relaxed text-muted-foreground">
+                            {source.url}
+                          </p>
+                        )}
                         <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">
-                          {source.type.toUpperCase()} ·{" "}
-                          {formatSourceSize(source.byteSize)} · v
+                          {source.url === undefined
+                            ? source.type.toUpperCase()
+                            : "URL"}{" "}
+                          · {formatSourceSize(source.byteSize)} · v
                           {source.versionNumber} · {source.chunkCount} chunks
                         </p>
                       </div>

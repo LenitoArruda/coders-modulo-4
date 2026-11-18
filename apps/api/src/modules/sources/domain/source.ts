@@ -48,6 +48,8 @@ export type Document = {
 export type SourceSummary = {
   id: string;
   name: string;
+  /** Present only for URL sources; `name` then holds the extracted page title. */
+  url?: string;
   type: SourceType;
   byteSize: number;
   status: SourceStatus;
@@ -66,6 +68,7 @@ export type NewSourceVersion = {
   byteSize: number;
   type: SourceType;
   status: SourceStatus;
+  errorMessage?: string | null;
 };
 
 export const ACCEPTED_SOURCE_FORMATS = "PDF, TXT or Markdown";
