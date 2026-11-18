@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="2410" viewBox="0 0 1200 2410" role="img" aria-label="Prévia estrutural do dashboard API Overview">
+<title>API Overview — estrutura do dashboard (não dados de produção)</title>
+<rect x="0" y="0" width="1200" height="100%" fill="#ffffff"/>
+<text x="32" y="50" font-family="system-ui, sans-serif" font-size="24" font-weight="700" fill="#0f172a">API Overview — estrutura do dashboard</text>
+<text x="32" y="74" font-family="system-ui, sans-serif" font-size="13" fill="#475569">UID coders-api-overview · refresh 30s · janela now-3h → now</text>
+<rect x="32" y="90" width="1136" height="34" rx="6" fill="#fff7ed" stroke="#fdba74"/>
+<text x="44" y="112" font-family="system-ui, sans-serif" font-size="12" fill="#9a3412">Representação da estrutura versionada — NÃO são dados reais de produção. Fonte: observability/dashboards/api-overview.json</text>
+<rect x="32" y="148" width="278" height="58" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="44" y="174" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#0f172a">10</text>
+<text x="44" y="194" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">rows</text>
+<rect x="318" y="148" width="278" height="58" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="330" y="174" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#0f172a">51</text>
+<text x="330" y="194" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">visualizações</text>
+<rect x="604" y="148" width="278" height="58" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="616" y="174" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#0f172a">64</text>
+<text x="616" y="194" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">queries</text>
+<rect x="890" y="148" width="278" height="58" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="902" y="174" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#0f172a">16 Loki · 30 Prometheus · 4 Tempo</text>
+<text x="902" y="194" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">painéis por fonte</text>
+<rect x="32" y="230" width="1136" height="214" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="255" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">1. Visão geral (período selecionado)</text>
+<text x="1154" y="255" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">6 painéis</text>
+<rect x="46" y="268" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="287" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Requisições</text>
+<text x="56" y="304" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">stat · loki · 1 query</text>
+<rect x="614" y="268" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="624" y="287" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Taxa de erro 5xx</text>
+<text x="624" y="304" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">stat · loki · 1 query</text>
+<rect x="46" y="322" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="341" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Respostas 4xx</text>
+<text x="56" y="358" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">stat · loki · 1 query</text>
+<rect x="614" y="322" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="624" y="341" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Latência p95</text>
+<text x="624" y="358" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">stat · loki · 1 query</text>
+<rect x="46" y="376" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="395" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Warnings + erros (logs)</text>
+<text x="56" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">stat · loki · 1 query</text>
+<rect x="614" y="376" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="395" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">API enviando telemetria</text>
+<text x="624" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="32" y="456" width="1136" height="160" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="481" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">2. Tráfego, erros e latência</text>
+<text x="1154" y="481" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">4 painéis</text>
+<rect x="46" y="494" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="513" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Requisições por status HTTP</text>
+<text x="56" y="530" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">timeseries · loki · 1 query</text>
+<rect x="614" y="494" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="624" y="513" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Latência da API: p50 / p95 / p99</text>
+<text x="624" y="530" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">timeseries · loki · 3 queries</text>
+<rect x="46" y="548" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="567" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Requisições por rota</text>
+<text x="56" y="584" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">timeseries · loki · 1 query</text>
+<rect x="614" y="548" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="624" y="567" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Taxa de erro por rota (4xx/5xx)</text>
+<text x="624" y="584" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">timeseries · loki · 1 query</text>
+<rect x="32" y="628" width="1136" height="106" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="653" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">3. Endpoints: o que funciona e o que não</text>
+<text x="1154" y="653" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">2 painéis</text>
+<rect x="46" y="666" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="685" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Resumo por rota e status</text>
+<text x="56" y="702" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">table · loki · 1 query</text>
+<rect x="614" y="666" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="624" y="685" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Rotas mais lentas (p95, ms)</text>
+<text x="624" y="702" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">bargauge · loki · 1 query</text>
+<rect x="32" y="746" width="1136" height="106" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="771" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">4. Autenticação e eventos de negócio</text>
+<text x="1154" y="771" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">2 painéis</text>
+<rect x="46" y="784" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="803" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Eventos de auth por resultado (outcome)</text>
+<text x="56" y="820" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">timeseries · loki · 1 query</text>
+<rect x="614" y="784" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="624" y="803" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Eventos de auth (sign-up, sign-in, senha, sessão, c…</text>
+<text x="624" y="820" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">logs · loki · 1 query</text>
+<rect x="32" y="864" width="1136" height="160" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="889" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">5. Logs</text>
+<text x="1154" y="889" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">3 painéis</text>
+<rect x="46" y="902" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="921" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Volume de logs por nível</text>
+<text x="56" y="938" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">timeseries · loki · 1 query</text>
+<rect x="614" y="902" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="624" y="921" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Warnings e erros</text>
+<text x="624" y="938" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">logs · loki · 1 query</text>
+<rect x="46" y="956" width="546" height="46" rx="5" fill="#e8f1ff" stroke="#3b82f6"/>
+<text x="56" y="975" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Stream completo da API</text>
+<text x="56" y="992" font-family="system-ui, sans-serif" font-size="10" fill="#1d4ed8">logs · loki · 1 query</text>
+<rect x="32" y="1036" width="1136" height="214" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="1061" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">6. Traces (Tempo) e RED por span</text>
+<text x="1154" y="1061" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">5 painéis</text>
+<rect x="46" y="1074" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1093" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Taxa de spans por operação (req/s)</text>
+<text x="56" y="1110" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 1 query</text>
+<rect x="614" y="1074" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1093" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Spans com erro (req/s)</text>
+<text x="624" y="1110" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 1 query</text>
+<rect x="46" y="1128" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1147" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Latência dos spans p50 / p95 / p99</text>
+<text x="56" y="1164" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 3 queries</text>
+<rect x="614" y="1128" width="546" height="46" rx="5" fill="#f3e8ff" stroke="#a855f7"/>
+<text x="624" y="1147" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Traces mais lentos (&gt; 300 ms)</text>
+<text x="624" y="1164" font-family="system-ui, sans-serif" font-size="10" fill="#6b21a8">table · tempo · 1 query</text>
+<rect x="46" y="1182" width="546" height="46" rx="5" fill="#f3e8ff" stroke="#a855f7"/>
+<text x="56" y="1201" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Traces com erro ou status &gt;= 400</text>
+<text x="56" y="1218" font-family="system-ui, sans-serif" font-size="10" fill="#6b21a8">table · tempo · 1 query</text>
+<rect x="32" y="1262" width="1136" height="322" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="1287" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">7. Banco de dados: queries da API (spans)</text>
+<text x="1154" y="1287" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">9 painéis</text>
+<rect x="46" y="1300" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1319" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Queries</text>
+<text x="56" y="1336" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="614" y="1300" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1319" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Taxa de erro</text>
+<text x="624" y="1336" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="46" y="1354" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1373" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Latência p95</text>
+<text x="56" y="1390" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="614" y="1354" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1373" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Latência média</text>
+<text x="624" y="1390" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="46" y="1408" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1427" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Queries por operação e tabela (req/s)</text>
+<text x="56" y="1444" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 1 query</text>
+<rect x="614" y="1408" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1427" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Latência p95 por operação e tabela</text>
+<text x="624" y="1444" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 1 query</text>
+<rect x="46" y="1462" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1481" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Queries com erro por operação (req/s)</text>
+<text x="56" y="1498" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 1 query</text>
+<rect x="614" y="1462" width="546" height="46" rx="5" fill="#f3e8ff" stroke="#a855f7"/>
+<text x="624" y="1481" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Queries lentas (&gt; 100 ms)</text>
+<text x="624" y="1498" font-family="system-ui, sans-serif" font-size="10" fill="#6b21a8">table · tempo · 1 query</text>
+<rect x="46" y="1516" width="546" height="46" rx="5" fill="#f3e8ff" stroke="#a855f7"/>
+<text x="56" y="1535" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Queries com erro</text>
+<text x="56" y="1552" font-family="system-ui, sans-serif" font-size="10" fill="#6b21a8">table · tempo · 1 query</text>
+<rect x="32" y="1596" width="1136" height="430" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="1621" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">8. Postgres: saúde do banco (métricas do servidor)</text>
+<text x="1154" y="1621" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">13 painéis</text>
+<rect x="46" y="1634" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1653" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Conexões em uso</text>
+<text x="56" y="1670" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="614" y="1634" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1653" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Cache hit (heap)</text>
+<text x="624" y="1670" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="46" y="1688" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1707" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Tamanho do banco</text>
+<text x="56" y="1724" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="614" y="1688" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1707" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Rollbacks</text>
+<text x="624" y="1724" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="46" y="1742" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1761" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Deadlocks</text>
+<text x="56" y="1778" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="614" y="1742" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1761" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Linhas mortas</text>
+<text x="624" y="1778" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="46" y="1796" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1815" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Conexões ativas</text>
+<text x="56" y="1832" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 2 queries</text>
+<rect x="614" y="1796" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1815" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Transações: commits e rollbacks (por s)</text>
+<text x="624" y="1832" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 2 queries</text>
+<rect x="46" y="1850" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1869" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Linhas por operação (por s)</text>
+<text x="56" y="1886" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 5 queries</text>
+<rect x="614" y="1850" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1869" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Linhas vivas vs mortas</text>
+<text x="624" y="1886" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 1 query</text>
+<rect x="46" y="1904" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1923" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Locks por modo</text>
+<text x="56" y="1940" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 1 query</text>
+<rect x="614" y="1904" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="1923" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Sequential scans por tabela (por s)</text>
+<text x="624" y="1940" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 1 query</text>
+<rect x="46" y="1958" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="1977" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Tabelas por tamanho</text>
+<text x="56" y="1994" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">table · prometheus · 1 query</text>
+<rect x="32" y="2038" width="1136" height="106" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="2063" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">9. Alertas</text>
+<text x="1154" y="2063" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">1 painel</text>
+<rect x="46" y="2076" width="546" height="46" rx="5" fill="#f1f5f9" stroke="#94a3b8"/>
+<text x="56" y="2095" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Alertas do Grafana</text>
+<text x="56" y="2112" font-family="system-ui, sans-serif" font-size="10" fill="#475569">alertlist · — · 0 queries</text>
+<rect x="32" y="2156" width="1136" height="214" rx="8" fill="#fbfdff" stroke="#dbeafe"/>
+<text x="46" y="2181" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">10. Saúde da pipeline de telemetria (OpenTelemetry Collector)</text>
+<text x="1154" y="2181" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">6 painéis</text>
+<rect x="46" y="2194" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="2213" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Collector no ar</text>
+<text x="56" y="2230" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="614" y="2194" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="2213" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Registros recusados/falhos (rate)</text>
+<text x="624" y="2230" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="46" y="2248" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="2267" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Fila do exporter (uso)</text>
+<text x="56" y="2284" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="614" y="2248" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="2267" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Memória do collector</text>
+<text x="624" y="2284" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">stat · prometheus · 1 query</text>
+<rect x="46" y="2302" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="56" y="2321" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Recebido pelo collector (por sinal)</text>
+<text x="56" y="2338" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 3 queries</text>
+<rect x="614" y="2302" width="546" height="46" rx="5" fill="#fff0e6" stroke="#f97316"/>
+<text x="624" y="2321" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Recusado / falho no collector</text>
+<text x="624" y="2338" font-family="system-ui, sans-serif" font-size="10" fill="#9a3412">timeseries · prometheus · 3 queries</text>
+<text x="32" y="2390" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">Gerado por observability/gen-dashboard-preview.mjs — execute bun observability/gen-dashboard-preview.mjs para atualizar.</text>
+</svg>

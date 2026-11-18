@@ -152,21 +152,22 @@ Regras:
 
 ## 6. Mapa da documentação
 
-| Arquivo                                                 | Responsabilidade                                                             |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [RULES.md](./RULES.md)                                  | Regras obrigatórias de processo, escopo, segurança e entrega                 |
-| [ARCHITECTURE.md](./ARCHITECTURE.md)                    | Estrutura do monorepo, stack, camadas, contratos e fluxo de dados            |
-| [AI.md](./AI.md)                                        | Experts, chat, fontes, RAG/citações, multimídia, modelos, flags e segurança  |
-| [OBSERVABILITY.md](./OBSERVABILITY.md)                  | Telemetria, spans locais, dashboards, evaluation, runbook e limites          |
-| [BUSINESS.md](./BUSINESS.md)                            | Problema, proposta de valor, conceitos, Experts, conectores e MVP            |
-| [DESIGN.md](./DESIGN.md)                                | Direção visual, paleta, tipografia, espaçamento e princípios                 |
-| [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)                  | shadcn/ui, tokens, API de componentes, acessibilidade e governança           |
-| [DEVELOPMENT.md](./DEVELOPMENT.md)                      | Padrões de engenharia, arquitetura em camadas, front-end, testes e segurança |
-| [QA.md](./QA.md)                                        | Comandos reais, verificações, QA manual, evidências e DoD                    |
-| [`.specs/README.md`](../.specs/README.md)               | Convenções, status, Definition of Ready e índice navegável de specs          |
-| [`.specs/_template.md`](../.specs/_template.md)         | Template canônico para criar e refinar specs                                 |
-| [`.adrs/README.md`](../.adrs/README.md)                 | Architecture Decision Records: contexto, decisão e consequências             |
-| [`eval/datasets/README.md`](../eval/datasets/README.md) | Esquema e execução dos datasets de avaliação                                 |
+| Arquivo                                                                         | Responsabilidade                                                             |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [RULES.md](./RULES.md)                                                          | Regras obrigatórias de processo, escopo, segurança e entrega                 |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)                                            | Estrutura do monorepo, stack, camadas, contratos e fluxo de dados            |
+| [AI.md](./AI.md)                                                                | Experts, chat, fontes, RAG/citações, multimídia, modelos, flags e segurança  |
+| [OBSERVABILITY.md](./OBSERVABILITY.md)                                          | Telemetria, spans locais, dashboards, evaluation, runbook e limites          |
+| [BUSINESS.md](./BUSINESS.md)                                                    | Problema, proposta de valor, conceitos, Experts, conectores e MVP            |
+| [DESIGN.md](./DESIGN.md)                                                        | Direção visual, paleta, tipografia, espaçamento e princípios                 |
+| [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)                                          | shadcn/ui, tokens, API de componentes, acessibilidade e governança           |
+| [DEVELOPMENT.md](./DEVELOPMENT.md)                                              | Padrões de engenharia, arquitetura em camadas, front-end, testes e segurança |
+| [QA.md](./QA.md)                                                                | Comandos reais, verificações, QA manual, evidências e DoD                    |
+| [`.specs/README.md`](../.specs/README.md)                                       | Convenções, status, Definition of Ready e índice navegável de specs          |
+| [`.specs/_template.md`](../.specs/_template.md)                                 | Template canônico para criar e refinar specs                                 |
+| [`.adrs/README.md`](../.adrs/README.md)                                         | Architecture Decision Records: contexto, decisão e consequências             |
+| [`eval/datasets/README.md`](../eval/datasets/README.md)                         | Esquema e execução dos datasets de avaliação                                 |
+| [`observability/dashboard-preview.svg`](../observability/dashboard-preview.svg) | Prévia estrutural do dashboard (gerada; não dados reais)                     |
 
 ---
 
