@@ -15,7 +15,7 @@
 | 015  | Fontes de conhecimento por mídia   | done     | `../spec-015` | `spec/015` | mesclada   | commit `3d29102`; merge `b9b4d89`; QA verde                  |
 | 016  | Respostas com RAG e citações       | done     | `../spec-016` | `spec/016` | mesclada   | commit `c84aa5f`; merge `eee1cd5`; QA verde                  |
 | 017  | Entregáveis multimídia             | approved | `../spec-017` | `spec/017` | executando | onda 3; HEAD `dd33577`; risco Gemini/Veo billing             |
-| 018  | LangSmith local                    | done     | `../spec-018` | `spec/018` | mesclada   | commit `5e2ad77`; merge `ae91965`; QA verde                  |
+| 018  | LangSmith local                    | done     | —             | —          | mesclada   | commit `5e2ad77`; merge `ae91965`; push `b591fd9`; QA verde  |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
@@ -25,7 +25,7 @@ Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 | ---- | ------------- | ---------- | ------------ | ------------------------------------------------------ |
 | 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push `b1d10c7`                        |
 | 2    | 014, 015, 016 | 2026-11-18 | 2026-11-18   | merges `b16f183`, `b9b4d89`, `eee1cd5`; push `dd33577` |
-| 3    | 017, 018      | 2026-11-18 | —            | merge `ae91965` (018); push pendente                   |
+| 3    | 017, 018      | 2026-11-18 | —            | 018: push `b591fd9`; 017 pendente                      |
 
 Ondas confirmadas pelo usuário em 2026-11-17. A onda 1 foi concluída e publicada com QA verde.
 A onda 2 foi lançada em paralelo com worktrees independentes; a onda 3 segue após sua integração.
@@ -36,9 +36,9 @@ A onda 2 foi lançada em paralelo com worktrees independentes; a onda 3 segue ap
 012 (done)
 ├── 013 (mesclada)
 │   ├── 014 (mesclada)
-│   ├── 015 (mesclada) ──► 017 (pendente)
-│   └── 016 (mesclada) ──► 018 (pendente)
-└── 017 (pendente)
+│   ├── 015 (mesclada) ──► 017 (executando)
+│   └── 016 (mesclada) ──► 018 (mesclada/publicada)
+└── 017 (executando)
 ```
 
 Detalhamento:
@@ -117,6 +117,7 @@ Detalhamento:
 - 2026-11-18 — [018] QA na principal: `lint` 3/3, `types:check` 3/3, `test` API 87/593 + web
   12/156, `build` 2/2, `obs:eval` 4/4, `test:e2e` 163/163. Studio/traces ao vivo não validados:
   imagem LangSmith self-hosted é Enterprise/licenciada e o Docker não está disponível.
+- 2026-11-18 — [018] publicada em `b591fd9`; worktree `../spec-018` e branch `spec/018` removidos.
 
 ## 5. Resultado consolidado
 
