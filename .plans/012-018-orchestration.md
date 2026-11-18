@@ -7,15 +7,15 @@
 
 ## 1. Specs do range
 
-| Spec | Título                             | Status   | Worktree                      | Branch     | Estado    | Observações                                                  |
-| ---- | ---------------------------------- | -------- | ----------------------------- | ---------- | --------- | ------------------------------------------------------------ |
-| 012  | Catálogo de Experts e chat         | done     | —                             | —          | pulada    | entregue manualmente antes da orquestração; commit `1412ae6` |
-| 013  | Fontes de conhecimento por arquivo | approved | `../coders-modulo-4-spec-013` | `spec/013` | bloqueada | sem commit; worktree mantido para continuação                |
-| 014  | Fontes de conhecimento por URL     | approved | —                             | —          | bloqueada | removida da fila: depende de 013                             |
-| 015  | Fontes de conhecimento por mídia   | approved | —                             | —          | bloqueada | removida da fila: depende de 013                             |
-| 016  | Respostas com RAG e citações       | approved | —                             | —          | bloqueada | removida da fila: depende de 013                             |
-| 017  | Entregáveis multimídia             | approved | —                             | —          | bloqueada | não lançada: credenciais de imagem/vídeo e decisões abertas  |
-| 018  | LangSmith local                    | approved | —                             | —          | bloqueada | removida da fila: depende de 016                             |
+| Spec | Título                             | Status   | Worktree      | Branch     | Estado     | Observações                                                  |
+| ---- | ---------------------------------- | -------- | ------------- | ---------- | ---------- | ------------------------------------------------------------ |
+| 012  | Catálogo de Experts e chat         | done     | —             | —          | pulada     | entregue manualmente antes da orquestração; commit `1412ae6` |
+| 013  | Fontes de conhecimento por arquivo | approved | `../spec-013` | `spec/013` | executando | relançada após desbloqueio (`a9b3ebb`); chaves no `.env`     |
+| 014  | Fontes de conhecimento por URL     | approved | —             | —          | bloqueada  | removida da fila: depende de 013                             |
+| 015  | Fontes de conhecimento por mídia   | approved | —             | —          | bloqueada  | removida da fila: depende de 013                             |
+| 016  | Respostas com RAG e citações       | approved | —             | —          | bloqueada  | removida da fila: depende de 013                             |
+| 017  | Entregáveis multimídia             | approved | —             | —          | bloqueada  | não lançada: credenciais de imagem/vídeo e decisões abertas  |
+| 018  | LangSmith local                    | approved | —             | —          | bloqueada  | removida da fila: depende de 016                             |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
@@ -23,7 +23,7 @@ Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
 | Onda | Specs         | Lançada em | Concluída em | Merge/push |
 | ---- | ------------- | ---------- | ------------ | ---------- |
-| 1    | 013           | 21:32      | 21:36        | —          |
+| 1    | 013           | 21:32      | —            | —          |
 | 2    | 014, 015, 016 | —          | —            | —          |
 | 3    | 017, 018      | —          | —            | —          |
 
@@ -64,6 +64,11 @@ Detalhamento:
 - 21:36 — sem retry automático (regra da skill). 014, 015, 016 e 018 removidas da fila por
   dependência transitiva de 013; 017 não lançada por compartilhar a ausência de credenciais
   externas e ter decisões abertas próprias. Worktree `spec/013` mantido para continuação.
+- 2026-11-18 — usuário forneceu credenciais (`OPENAI_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`)
+  e decidiu o embedding (`text-embedding-3-small`, 1536 dims, cosine). Orquestrador registrou a
+  decisão na spec, adicionou Weaviate 1.40.5 ao Compose (`a9b3ebb`), subiu a infra (`:8080` → 200)
+  e recriou o worktree `../spec-013` a partir de `a9b3ebb` com `.env` atualizado.
+- 2026-11-18 — [013] subagente relançado.
 
 ## 5. Resultado consolidado
 
