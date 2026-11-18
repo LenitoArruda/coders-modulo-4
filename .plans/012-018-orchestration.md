@@ -3,42 +3,42 @@
 > **Range:** 012-018
 > **Criado em:** 2026-11-17
 > **Branch base:** `feat/code-review-skill` @ `1412ae6`
-> **Status:** partial
+> **Status:** in_progress
 
 ## 1. Specs do range
 
-| Spec | Título                             | Status   | Worktree      | Branch     | Estado     | Observações                                                  |
-| ---- | ---------------------------------- | -------- | ------------- | ---------- | ---------- | ------------------------------------------------------------ |
-| 012  | Catálogo de Experts e chat         | done     | —             | —          | pulada     | entregue manualmente antes da orquestração; commit `1412ae6` |
-| 013  | Fontes de conhecimento por arquivo | approved | `../spec-013` | `spec/013` | executando | relançada após desbloqueio (`a9b3ebb`); chaves no `.env`     |
-| 014  | Fontes de conhecimento por URL     | approved | —             | —          | bloqueada  | removida da fila: depende de 013                             |
-| 015  | Fontes de conhecimento por mídia   | approved | —             | —          | bloqueada  | removida da fila: depende de 013                             |
-| 016  | Respostas com RAG e citações       | approved | —             | —          | bloqueada  | removida da fila: depende de 013                             |
-| 017  | Entregáveis multimídia             | approved | —             | —          | bloqueada  | não lançada: credenciais de imagem/vídeo e decisões abertas  |
-| 018  | LangSmith local                    | approved | —             | —          | bloqueada  | removida da fila: depende de 016                             |
+| Spec | Título                             | Status   | Worktree      | Branch     | Estado   | Observações                                                  |
+| ---- | ---------------------------------- | -------- | ------------- | ---------- | -------- | ------------------------------------------------------------ |
+| 012  | Catálogo de Experts e chat         | done     | —             | —          | pulada   | entregue manualmente antes da orquestração; commit `1412ae6` |
+| 013  | Fontes de conhecimento por arquivo | done     | `../spec-013` | `spec/013` | mesclada | commit `92e4a5c`; merge `b8c99d8`; QA verde                  |
+| 014  | Fontes de conhecimento por URL     | approved | —             | —          | pendente | depende de 013 (concluída); elegível para a onda 2           |
+| 015  | Fontes de conhecimento por mídia   | approved | —             | —          | pendente | depende de 013 (concluída); elegível para a onda 2           |
+| 016  | Respostas com RAG e citações       | approved | —             | —          | pendente | depende de 013 (concluída); elegível para a onda 2           |
+| 017  | Entregáveis multimídia             | approved | —             | —          | pendente | depende de 015; credencial Gemini e decisões abertas         |
+| 018  | LangSmith local                    | approved | —             | —          | pendente | depende de 016                                               |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
 ## 2. Ondas
 
-| Onda | Specs         | Lançada em | Concluída em | Merge/push |
-| ---- | ------------- | ---------- | ------------ | ---------- |
-| 1    | 013           | 21:32      | —            | —          |
-| 2    | 014, 015, 016 | —          | —            | —          |
-| 3    | 017, 018      | —          | —            | —          |
+| Onda | Specs         | Lançada em | Concluída em | Merge/push                     |
+| ---- | ------------- | ---------- | ------------ | ------------------------------ |
+| 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push pendente |
+| 2    | 014, 015, 016 | —          | —            | —                              |
+| 3    | 017, 018      | —          | —            | —                              |
 
-Ondas confirmadas pelo usuário em 2026-11-17. Ondas 2 e 3 **não foram lançadas**: a onda 1
-terminou bloqueada e suas dependentes transitivas saíram da fila.
+Ondas confirmadas pelo usuário em 2026-11-17. A onda 1 foi concluída após o desbloqueio de
+credenciais e da decisão de embedding; as ondas 2 e 3 seguem após o push verde da onda 1.
 
 ## 3. Grafo de dependências
 
 ```text
 012 (done)
-├── 013 (bloqueada)
-│   ├── 014 (bloqueada)
-│   ├── 015 (bloqueada) ──► 017 (bloqueada)
-│   └── 016 (bloqueada) ──► 018 (bloqueada)
-└── 017 (bloqueada)
+├── 013 (mesclada)
+│   ├── 014 (pendente)
+│   ├── 015 (pendente) ──► 017 (pendente)
+│   └── 016 (pendente) ──► 018 (pendente)
+└── 017 (pendente)
 ```
 
 Detalhamento:
@@ -68,24 +68,29 @@ Detalhamento:
   e decidiu o embedding (`text-embedding-3-small`, 1536 dims, cosine). Orquestrador registrou a
   decisão na spec, adicionou Weaviate 1.40.5 ao Compose (`a9b3ebb`), subiu a infra (`:8080` → 200)
   e recriou o worktree `../spec-013` a partir de `a9b3ebb` com `.env` atualizado.
-- 2026-11-18 — [013] subagente relançado.
+- 2026-11-18 — [013] subagente relançado (`ses_e1179fbf3ffecrF6VpXnZfhplX`) e concluído com
+  `RESULTADO: ok`; commit `92e4a5c` na branch `spec/013`.
+- 2026-11-18 — [013] merge `--no-ff` na principal (`b8c99d8`). Migration `0003_knowledge_sources.sql`
+  aplicada; `db:test` 3/3 verde.
+- 2026-11-18 — QA de integração: `lint` 3/3, `types:check` 3/3, `test` API 64/421 + web 11/137,
+  `build` 2/2. E2E estabilizado com `40e941b` (timeout de expect 30 s e timeout do teste de
+  sessão única 90 s): 136/136 verde.
 
 ## 5. Resultado consolidado
 
-| Spec | Resultado | Commit da spec | Merge | QA    | Bloqueios                                                       |
-| ---- | --------- | -------------- | ----- | ----- | --------------------------------------------------------------- |
-| 012  | pulada    | `1412ae6`      | —     | verde | —                                                               |
-| 013  | bloqueada | —              | —     | —     | Weaviate ausente; `OPENAI_API_KEY` ausente; modelo de embedding |
-| 014  | bloqueada | —              | —     | —     | depende de 013                                                  |
-| 015  | bloqueada | —              | —     | —     | depende de 013                                                  |
-| 016  | bloqueada | —              | —     | —     | depende de 013                                                  |
-| 017  | bloqueada | —              | —     | —     | credenciais de imagem/vídeo; decisões abertas                   |
-| 018  | bloqueada | —              | —     | —     | depende de 016                                                  |
+| Spec | Resultado | Commit da spec | Merge     | QA    | Bloqueios                     |
+| ---- | --------- | -------------- | --------- | ----- | ----------------------------- |
+| 012  | pulada    | `1412ae6`      | —         | verde | —                             |
+| 013  | ok        | `92e4a5c`      | `b8c99d8` | verde | —                             |
+| 014  | pendente  | —              | —         | —     | aguardando onda 2             |
+| 015  | pendente  | —              | —         | —     | aguardando onda 2             |
+| 016  | pendente  | —              | —         | —     | aguardando onda 2             |
+| 017  | pendente  | —              | —         | —     | aguardando onda 3; Gemini/Veo |
+| 018  | pendente  | —              | —         | —     | aguardando onda 3             |
 
 ## 6. Retomada
 
-Para retomar: (a) decidir e documentar o modelo de embedding (modelo, dimensões, métrica de
-distância); (b) disponibilizar `OPENAI_API_KEY` no ambiente da API e, para a 017, credencial Gemini;
-(c) adicionar o serviço Weaviate ao `docker-compose.yml` e subi-lo na infra compartilhada; (d)
-relançar `orchestrate-me 013-018` (ou `implement-me` individual). O worktree `spec/013` e a branch
-foram preservados; a spec permanece `approved` na principal.
+Para retomar: (a) publicar `c697486`, `b8c99d8` e `40e941b` com a credencial `LenitoArruda`;
+(b) remover o worktree `../spec-013` e a branch `spec/013`; (c) lançar a onda 2 (014, 015, 016)
+em worktrees independentes com HEAD já atualizado; (d) integrar com QA verde e lançar a onda 3
+(017, 018). Risco futuro: geração de vídeo da 017 via Gemini/Veo pode exigir billing ativado.
