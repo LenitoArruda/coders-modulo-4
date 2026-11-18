@@ -731,3 +731,26 @@ headless-shell):
 Pendências de qualidade que permanecem como follow-up (fora desta fatia): avaliação humana da
 precisão das citações e medição de p95 em ambiente com OpenAI/Weaviate reais; o flag de rollout
 deve ser habilitado em produção somente após essa avaliação.
+
+---
+
+## 16. Evidências de integração da onda 2 (2026-11-18)
+
+Merges na principal: `b16f183` (014), `b9b4d89` (015), `02e8320` (correção de contratos),
+`c561cb8` (registro de QA) e `eee1cd5` (016). A migration da 016 foi renomeada para
+`0005_rag_citations.sql` e seu teste para `005_rag_citations.test.sql` para não colidir com
+`0004_knowledge_media.sql` da 015; nomes antigos não chegaram a ser aplicados em banco compartilhado.
+
+| Comando               | Resultado                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| `bun run lint`        | ok — 3 tarefas                                                  |
+| `bun run types:check` | ok — 3 tarefas                                                  |
+| `bun run test`        | ok — API 74 arquivos / 483 testes; web 12 arquivos / 156 testes |
+| `bun run build`       | ok — `api` + `web`                                              |
+| `bun run test:e2e`    | ok — 163/163 testes em 4,1 min, portas padrão 3000/3434         |
+| `bun run db:migrate`  | bloqueado — Docker fora e 5432 recusou as credenciais do `.env` |
+
+As migrações `0001`–`0005` e seus testes SQL foram validados nos worktrees da 015 e da 016 com
+bancos isolados (§13 e §15). A validação real na principal segue como follow-up quando o Docker
+estiver disponível. Nenhuma chave, token, URL sensível, prompt, trecho, hash ou conteúdo de arquivo
+foi registrado em logs ou documentação.
