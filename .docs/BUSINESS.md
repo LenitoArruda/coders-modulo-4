@@ -1,7 +1,8 @@
 # BUSINESS.md — Negócio e produto
 
-> **Status:** hipóteses iniciais + catálogo de Experts, chat, fontes de arquivo, URLs públicas e
-> mídia implementados (fatias 012–015) · **Atualizado em:** 2026-11-18
+> **Status:** hipóteses iniciais + catálogo de Experts, chat, fontes de arquivo, URLs públicas,
+> mídia como conhecimento, citações e entregáveis multimídia implementados (fatias 012–017) ·
+> **Atualizado em:** 2026-11-18
 > **Público:** produto, engenharia e agentes que precisam entender **o que** estamos construindo.
 
 Este documento descreve o problema, a proposta de valor e o escopo do produto. Decisões ainda
@@ -147,7 +148,25 @@ Requisitos por conector:
 > base: a resposta continua vindo do modelo com a persona do Expert. A recuperação de contexto e as
 > citações (passos 3–4) entram na fatia 5.
 
-### 8.3 Gestão
+### 8.3 Pedido → conhecimento → entregável
+
+1. Usuário pede uma imagem ou um vídeo curto ao Expert, em linguagem natural.
+2. Expert confirma tema, formato e parâmetros antes de gerar; pedido ambíguo gera uma pergunta curta
+   e nenhum job.
+3. Se o pedido contém `[n]`, a citação `n` da última resposta do Expert é recuperada e anexada ao
+   entregável como contexto (a fatia atual ancora a citação; o envio dos bytes da fonte ao modelo é
+   follow-up).
+4. Plataforma gera o arquivo, persiste os bytes com o usuário autenticado e mostra preview inline com
+   metadados, duração/resolução quando aplicável e opção de download pelo próprio chat.
+5. Usuário pode cancelar, tentar novamente ou recarregar a conversa: o anexo permanece disponível
+   apenas para a conta que o criou.
+
+> **Estado atual (fatia 017):** fluxo implementado atrás da flag `MULTIMEDIA_DELIVERABLES_ENABLED`
+> (desligada por padrão). Imagem usa `gpt-image-2` e vídeo usa `gemini-omni-1.2-flash`; limites de
+> briefing/tamanho/duração e cota por hora protegem custo. A cobrança real do provedor de vídeo e a
+> passagem dos bytes da fonte citada ao modelo permanecem como follow-up de rollout.
+
+### 8.4 Gestão
 
 - Administrador gerencia membros, fontes e permissões do workspace.
 - Administrador configura quais fontes cada Expert pode acessar.
@@ -163,7 +182,10 @@ Requisitos por conector:
 - Catálogo de nove Experts com chat em persona (implementado na fatia 012).
 - Conexão de fontes de arquivo (PDF, TXT e Markdown — fatia 013) e de URLs públicas (fatia 014);
   Google Drive e Notion seguem como hipótese de MVP.
-- Pergunta e resposta com citações das fontes (citações nas fatias seguintes).
+- Pergunta e resposta com citações das fontes (implementado na fatia 016 sobre mídia como
+  conhecimento da fatia 015).
+- Entregáveis multimídia no chat — imagem e vídeo curto — com preview, download e isolamento por
+  usuário (implementado na fatia 017, desligado por padrão).
 - Histórico de conversas isolado por usuário (implementado na fatia 012).
 - Controle básico de acesso por workspace.
 
