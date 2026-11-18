@@ -1,4 +1,4 @@
-import { ACCEPTED_SOURCE_FORMATS } from "./source";
+import { ACCEPTED_ALL_SOURCE_FORMATS, ACCEPTED_SOURCE_FORMATS } from "./source";
 
 /** Base class for failures with an actionable, en-US public message. */
 export class SourceError extends Error {
@@ -12,10 +12,12 @@ export class SourceError extends Error {
 }
 
 export class UnsupportedSourceFileError extends SourceError {
-  constructor() {
+  constructor(includeMedia = false) {
     super(
       "UNSUPPORTED_SOURCE_FILE",
-      `Only ${ACCEPTED_SOURCE_FORMATS} files are supported.`,
+      includeMedia
+        ? `Only ${ACCEPTED_ALL_SOURCE_FORMATS} files are supported.`
+        : `Only ${ACCEPTED_SOURCE_FORMATS} files are supported.`,
     );
   }
 }
@@ -41,6 +43,39 @@ export class TooManySourceFilesError extends SourceError {
 export class EmptySourceFileError extends SourceError {
   constructor() {
     super("EMPTY_SOURCE_FILE", "The file has no text we can index.");
+  }
+}
+
+export class MediaDurationTooLongError extends SourceError {
+  constructor() {
+    super(
+      "MEDIA_DURATION_TOO_LONG",
+      "Media longer than 60 minutes is not supported. Try a shorter file.",
+    );
+  }
+}
+
+export class InvalidMediaDurationError extends SourceError {
+  constructor() {
+    super(
+      "INVALID_MEDIA_DURATION",
+      "Enter a valid duration in seconds, up to 60 minutes.",
+    );
+  }
+}
+
+export class NoSpeechDetectedError extends SourceError {
+  constructor() {
+    super("NO_SPEECH_DETECTED", "No speech detected");
+  }
+}
+
+export class MediaExtractionUnavailableError extends SourceError {
+  constructor() {
+    super(
+      "MEDIA_EXTRACTION_UNAVAILABLE",
+      "Media text extraction is not configured on this server. Try again later.",
+    );
   }
 }
 

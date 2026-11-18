@@ -10,7 +10,9 @@ import {
 import {
   BlockedSourceUrlError,
   EmptySourceFileError,
+  InvalidMediaDurationError,
   InvalidSourceUrlError,
+  MediaDurationTooLongError,
   SourceError,
   SourceFileTooLargeError,
   SourceNotFoundError,
@@ -29,7 +31,9 @@ export function sourceHttpError(error: unknown): HttpException | null {
     error instanceof UnsupportedSourceFileError ||
     error instanceof TooManySourceFilesError ||
     error instanceof InvalidSourceUrlError ||
-    error instanceof BlockedSourceUrlError
+    error instanceof BlockedSourceUrlError ||
+    error instanceof MediaDurationTooLongError ||
+    error instanceof InvalidMediaDurationError
   ) {
     return new BadRequestException({
       code: error.code,

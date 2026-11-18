@@ -78,8 +78,12 @@ Execute na raiz do monorepo:
 > permanece `processing` até o polling. Para URLs, `POST /__fake/pages` (somente teste) define o
 > título, o texto e o estado da página (`text`, `no-text`, `unavailable`), permitindo simular
 > conteúdo alterado e falha de busca sem acessar a rede. URLs internas e esquemas não http/https
-> são recusados com `BLOCKED_SOURCE_URL`/`INVALID_SOURCE_URL`. Não deixe um `bun run dev` antigo ocupando a porta 3000
-> antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
+> são recusados com `BLOCKED_SOURCE_URL`/`INVALID_SOURCE_URL`. Na fatia 015 a fake também aceita
+> imagem/áudio/vídeo quando a requisição traz `allowMedia`, simulando extração
+> (`extracting` → `chunking` → `embedding`), reaproveitamento por hash, "No speech detected",
+> retry e exclusão; cenários de mídia ligam a flag com o cookie `knowledge_media_enabled=1` no
+> contexto do navegador, sem alterar a config global. Não deixe um `bun run dev` antigo ocupando a
+> porta 3000 antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
 
 ### 2.1 Comando do OpenCode
 
@@ -403,6 +407,27 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
 
 ---
 
+### 5.17 Mídia como conhecimento (fatia 015)
+
+- [ ] Flag `knowledge_media_enabled` desligada por padrão: sem Image/Audio/Video no painel e suíte
+      da 013 permanece verde (o E2E liga a flag com cookie no contexto, não na config global).
+- [ ] PNG/JPEG válidos viram `processing` → `ready` com texto de OCR; MP3/MP4 com fala viram
+      transcrição fatiada e vetores no Weaviate com o mesmo `source_id` da fonte.
+- [ ] `type` inválido, extensão/MIME/magic bytes divergentes, tamanho acima de 25/50/200 MB e
+      duração acima de 60 min são recusados com mensagem en-US e nenhuma fonte é criada.
+- [ ] Reenvio do mesmo arquivo responde “Already connected” e não duplica chunk/vetor; outro
+      usuário com o mesmo arquivo vê apenas a sua fonte.
+- [ ] Áudio/vídeo sem fala falha com **“No speech detected”** e não grava vetores; falha de
+      extração mostra mensagem acionável e “Try again” reinicia o mesmo `sourceId`.
+- [ ] Listagem mantém status público da 013 e mostra fases `extracting`/`chunking`/`embedding`
+      como detalhe; exclusão remove arquivo, versões, chunks e vetores sem apagar histórico de chat.
+- [ ] Navegação por teclado e leitor de tela alcançam seletor, input, progresso e erro (`aria-live`);
+      rótulos e ordem de foco da 013 (`knowledge-source-files`, “Add files”) permanecem intactos.
+- [ ] Logs e telemetria `media.*` não contêm nome de arquivo, hash, comando, transcrição ou chave;
+      `.env` não é lido, exibido ou versionado.
+
+---
+
 ## 6. QA manual — template
 
 Registre no relatório final:
@@ -561,3 +586,48 @@ Limitação registrada:
 - `bun run infra:up` falhou porque o Docker não está instalado ou em execução; `bun run db:migrate`
   encontrou `ECONNREFUSED 127.0.0.1:5433` e a porta 5432 recusou a autenticação. Nenhum comando
   destrutivo de banco foi executado; validação real com PostgreSQL/Weaviate segue como follow-up.
+
+## 13. Evidências da spec 015 (2026-11-18)
+
+Executada no worktree `C:\Users\Gamer\Desktop\pos graduacao\PROJETOS\spec-015`, branch `spec/015`,
+sem ler, exibir ou versionar `.env`. O banco de validação ficou isolado em `127.0.0.1:55433`.
+
+| Comando                           | Resultado                                                                           |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `bun run db:migrate`              | ok — 4 migrações aplicadas; rerun final: "nenhuma migração pendente"                |
+| `bun run db:test`                 | ok — 4 arquivos (`001`, `002`, `003`, `004_knowledge_media.test.sql`)               |
+| `bun run lint`                    | ok — todos os pacotes                                                               |
+| `bun run types:check`             | ok — todos os pacotes                                                               |
+| `bun run test`                    | ok — API 67 arquivos / 442 testes; web 12 arquivos / 142 testes                     |
+| `bun run build`                   | ok — `api` + `web`, 10,83 s                                                         |
+| Playwright (146 testes, 1 worker) | ok — 146/146 aprovados em 4,6 min, com portas isoladas 3015 (web) e 3435 (fake API) |
+
+A suíte E2E completa foi executada com o mesmo Playwright, os mesmos 146 cenários e o mesmo código
+do gate `bun run test:e2e`, mas com portas isoladas porque outras worktrees (`spec/014`, `spec/016`)
+usavam simultaneamente as portas padrão 3000/3434. O comando equivalente executado foi:
+
+```text
+bun x playwright test --config=playwright.isolated.config.ts --workers=1
+```
+
+O arquivo de configuração isolado e a cópia temporária dos cenários foram removidos após a execução;
+nenhum arquivo de `playwright.config.ts`, da 014 ou das specs 016–018 foi alterado.
+
+Tentativas anteriores de `bun run test:e2e` nas portas padrão foram invalidadas por
+`reuseExistingServer` ao reaproveitar servidores `next dev`/fake API de outras worktrees em
+execução concorrente, produzindo `ERR_CONNECTION_REFUSED` e timeouts sem relação com a fatia 015.
+A execução isolada acima cobre integralmente os 10 cenários de mídia e a regressão da 013,
+incluindo os seletores e rótulos preservados (`knowledge-source-files`, "Add files", mensagens
+padrão e ordem de tabulação).
+
+Cobertura E2E da fatia 015:
+
+- flag desligada esconde Image/Audio/Video; ligada por cookie expõe os controles;
+- PNG, MP3 e MP4 passam por `processing` até `ready` e são indexados;
+- reenvio idêntico informa "Already connected" sem duplicar;
+- formato não suportado lista todos os formatos aceitos;
+- áudio sem fala falha com "No speech detected" e oferece "Try again";
+- isolamento por usuário autenticado, navegação por teclado e 360/768/1280 px sem rolagem horizontal.
+
+Commit local principal: `3d29102 feat: connect image, audio and video as knowledge sources`
+(sem push, merge ou alterações na branch principal).

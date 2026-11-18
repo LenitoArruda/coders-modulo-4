@@ -11,7 +11,7 @@
 | ---- | ---------------------------------- | -------- | ------------- | ---------- | ---------- | ------------------------------------------------------------ |
 | 012  | Catálogo de Experts e chat         | done     | —             | —          | pulada     | entregue manualmente antes da orquestração; commit `1412ae6` |
 | 013  | Fontes de conhecimento por arquivo | done     | `../spec-013` | `spec/013` | mesclada   | commit `92e4a5c`; merge `b8c99d8`; QA verde                  |
-| 014  | Fontes de conhecimento por URL     | approved | `../spec-014` | `spec/014` | executando | onda 2; HEAD `453db9c`; `.env` copiado                       |
+| 014  | Fontes de conhecimento por URL     | done     | `../spec-014` | `spec/014` | mesclada   | commit `2516a7c`; merge `b16f183`; gates verdes              |
 | 015  | Fontes de conhecimento por mídia   | approved | `../spec-015` | `spec/015` | executando | onda 2; HEAD `453db9c`; `.env` copiado                       |
 | 016  | Respostas com RAG e citações       | approved | `../spec-016` | `spec/016` | executando | onda 2; HEAD `453db9c`; `.env` copiado                       |
 | 017  | Entregáveis multimídia             | approved | —             | —          | pendente   | depende de 015; credencial Gemini e decisões abertas         |
@@ -80,6 +80,11 @@ Detalhamento:
 - 2026-11-18 — onda 2 lançada: worktrees `../spec-014`, `../spec-015`, `../spec-016` criados do
   HEAD `453db9c` com `.env` copiado; subagentes `ses_e112519c6ffeIgSGazd3F9AZTB` (014),
   `ses_e112519c3ffeaOPBw7st7yYVhF` (015) e `ses_e112519bdffe8Lv4f1WPGrZLWx` (016) em background.
+- 2026-11-18 — [014] `RESULTADO: ok`; commits `2516a7c` e `1a510c3`; merge `b16f183`. Gates na
+  principal: `lint` 3/3, `types:check` 3/3, `test` API 66/442 + web 11/147, `build` 2/2. E2E da
+  fatia passou no worktree (11 cenários novos); E2E consolidado na principal fica para o fim da onda.
+- 2026-11-18 — [015] `RESULTADO: ok`; commits `3d29102` e `f15f276`. `db:migrate`/`db:test`,
+  lint, tipos, testes e build verdes no worktree; E2E 146/146 em portas isoladas 3015/3435.
 
 ## 5. Resultado consolidado
 
@@ -87,8 +92,8 @@ Detalhamento:
 | ---- | ---------- | -------------- | --------- | ----- | ------------------ |
 | 012  | pulada     | `1412ae6`      | —         | verde | —                  |
 | 013  | ok         | `92e4a5c`      | `b8c99d8` | verde | —                  |
-| 014  | executando | —              | —         | —     | onda 2             |
-| 015  | executando | —              | —         | —     | onda 2             |
+| 014  | ok         | `2516a7c`      | `b16f183` | verde | —                  |
+| 015  | ok         | `3d29102`      | pendente  | verde | —                  |
 | 016  | executando | —              | —         | —     | onda 2             |
 | 017  | pendente   | —              | —         | —     | onda 3; Gemini/Veo |
 | 018  | pendente   | —              | —         | —     | onda 3             |

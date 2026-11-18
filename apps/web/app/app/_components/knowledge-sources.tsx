@@ -11,11 +11,20 @@ import {
 import { FormAlert, StatusNotice } from "../../_components/form-parts";
 import {
   ALREADY_CONNECTED_MESSAGE,
+  ALL_SOURCE_FORMATS_MESSAGE,
+  DOCUMENT_ACCEPT,
+  MEDIA_ACCEPT,
+  MEDIA_FORMATS_MESSAGE,
   formatSourceSize,
+  isMediaType,
   MAX_FILES_PER_UPLOAD,
+  MAX_MEDIA_DURATION_SECONDS,
   SOURCE_EMPTY_MESSAGE,
   SOURCE_FORMATS_MESSAGE,
   SOURCE_URL_REQUIRED_MESSAGE,
+  type ConnectSourcesResponse,
+  type MediaType,
+  type ProcessingPhase,
   type SourceActionResult,
   type SourceStatus,
   type SourceSummary,
@@ -31,13 +40,31 @@ import {
 type KnowledgeSourcesProps = {
   initialSources: SourceSummary[];
   initialError?: string | null;
+  mediaEnabled?: boolean;
 };
+
+type UploadKind = "documents" | MediaType;
 
 const STATUS_LABELS: Record<SourceStatus, string> = {
   queued: "Queued",
   processing: "Processing",
   ready: "Ready",
   failed: "Failed",
+};
+
+const TYPE_LABELS: Record<SourceSummary["type"], string> = {
+  pdf: "PDF",
+  txt: "TXT",
+  markdown: "MARKDOWN",
+  image: "IMAGE",
+  audio: "AUDIO",
+  video: "VIDEO",
+};
+
+const PHASE_LABELS: Record<ProcessingPhase, string> = {
+  extracting: "Extracting text",
+  chunking: "Chunking text",
+  embedding: "Creating embeddings",
 };
 
 function isPending(status: SourceStatus): boolean {
@@ -55,6 +82,13 @@ function statusClassName(status: SourceStatus): string {
   return "bg-secondary text-secondary-foreground";
 }
 
+function formatHint(kind: UploadKind): string {
+  const formats =
+    kind === "documents" ? SOURCE_FORMATS_MESSAGE : MEDIA_FORMATS_MESSAGE;
+
+  return `${formats}. Up to ${MAX_FILES_PER_UPLOAD} files.`;
+}
+
 /**
  * Floating disclosure on the private home. Every read and write goes through
  * a Server Action, so the session token never reaches the browser.
@@ -62,9 +96,12 @@ function statusClassName(status: SourceStatus): string {
 export function KnowledgeSources({
   initialSources,
   initialError = null,
+  mediaEnabled = false,
 }: KnowledgeSourcesProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [sources, setSources] = useState(initialSources);
+  const [kind, setKind] = useState<UploadKind>("documents");
+  const [duration, setDuration] = useState("");
   const [fileCount, setFileCount] = useState(0);
   const [urlValue, setUrlValue] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -73,6 +110,7 @@ export function KnowledgeSources({
   const [error, setError] = useState<string | null>(initialError);
   const [notice, setNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const durationRef = useRef<HTMLInputElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async (reportErrors: boolean) => {
@@ -88,6 +126,10 @@ export function KnowledgeSources({
   }, []);
 
   const hasPending = sources.some((source) => isPending(source.status));
+  const acceptsMedia = mediaEnabled && kind !== "documents";
+  const formats = mediaEnabled
+    ? ALL_SOURCE_FORMATS_MESSAGE
+    : SOURCE_FORMATS_MESSAGE;
 
   useEffect(() => {
     if (!isOpen || !hasPending) return;
@@ -103,6 +145,13 @@ export function KnowledgeSources({
     if (error !== null) errorRef.current?.focus();
   }, [error]);
 
+  function handleKindChange(next: UploadKind) {
+    setKind(next);
+    setFileCount(0);
+    if (inputRef.current !== null) inputRef.current.value = "";
+    if (next !== "audio" && next !== "video") setDuration("");
+  }
+
   async function handleUpload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -110,19 +159,23 @@ export function KnowledgeSources({
 
     if (files.length === 0) {
       setNotice(null);
-      setError(`Choose at least one ${SOURCE_FORMATS_MESSAGE} file.`);
+      setError(`Choose at least one ${formats} file.`);
       return;
     }
 
     const formData = new FormData();
 
     for (const file of files) formData.append("files", file);
+    if (acceptsMedia && duration.trim() !== "") {
+      formData.append("durationSeconds", duration.trim());
+    }
 
     setIsUploading(true);
     setError(null);
     setNotice(null);
 
-    const result = await connectSourcesAction(formData);
+    const result: SourceActionResult<ConnectSourcesResponse> =
+      await connectSourcesAction(formData);
 
     setIsUploading(false);
 
@@ -260,7 +313,7 @@ export function KnowledgeSources({
               id="knowledge-source-files"
               type="file"
               multiple
-              accept=".pdf,.txt,.md,.markdown,application/pdf,text/plain,text/markdown"
+              accept={acceptsMedia ? MEDIA_ACCEPT : DOCUMENT_ACCEPT}
               aria-describedby="knowledge-source-files-hint"
               disabled={isUploading}
               onChange={(event) =>
@@ -272,9 +325,75 @@ export function KnowledgeSources({
               id="knowledge-source-files-hint"
               className="mt-1.5 text-sm leading-relaxed text-muted-foreground"
             >
-              {SOURCE_FORMATS_MESSAGE}. Up to {MAX_FILES_PER_UPLOAD} files.
+              {formatHint(kind)}
               {fileCount > 0 ? ` ${fileCount} selected.` : ""}
             </p>
+
+            {mediaEnabled ? (
+              <div className="mt-3">
+                <label
+                  htmlFor="knowledge-source-kind"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Source type
+                </label>
+                <select
+                  id="knowledge-source-kind"
+                  value={kind}
+                  disabled={isUploading}
+                  aria-describedby="knowledge-source-kind-hint"
+                  onChange={(event) =>
+                    handleKindChange(event.target.value as UploadKind)
+                  }
+                  className="mt-2 block min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                >
+                  <option value="documents">Documents</option>
+                  <option value="image">Image</option>
+                  <option value="audio">Audio</option>
+                  <option value="video">Video</option>
+                </select>
+                <p
+                  id="knowledge-source-kind-hint"
+                  className="mt-1.5 text-sm leading-relaxed text-muted-foreground"
+                >
+                  {kind === "documents"
+                    ? "Documents are indexed directly."
+                    : "Media is converted to text before indexing."}
+                </p>
+              </div>
+            ) : null}
+
+            {acceptsMedia && (kind === "audio" || kind === "video") ? (
+              <div className="mt-3">
+                <label
+                  htmlFor="knowledge-source-duration"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Duration (seconds)
+                </label>
+                <input
+                  ref={durationRef}
+                  id="knowledge-source-duration"
+                  type="number"
+                  min={1}
+                  max={MAX_MEDIA_DURATION_SECONDS}
+                  step={1}
+                  inputMode="numeric"
+                  value={duration}
+                  disabled={isUploading}
+                  aria-describedby="knowledge-source-duration-hint"
+                  onChange={(event) => setDuration(event.target.value)}
+                  className="mt-2 block min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                />
+                <p
+                  id="knowledge-source-duration-hint"
+                  className="mt-1.5 text-sm leading-relaxed text-muted-foreground"
+                >
+                  Optional. Up to {MAX_MEDIA_DURATION_SECONDS / 60} minutes.
+                </p>
+              </div>
+            ) : null}
+
             <button
               type="submit"
               disabled={isUploading}
@@ -350,7 +469,7 @@ export function KnowledgeSources({
                         )}
                         <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">
                           {source.url === undefined
-                            ? source.type.toUpperCase()
+                            ? TYPE_LABELS[source.type]
                             : "URL"}{" "}
                           · {formatSourceSize(source.byteSize)} · v
                           {source.versionNumber} · {source.chunkCount} chunks
@@ -362,6 +481,20 @@ export function KnowledgeSources({
                         {STATUS_LABELS[source.status]}
                       </span>
                     </div>
+
+                    {source.status === "processing" &&
+                    source.processingPhase !== null &&
+                    source.processingPhase !== undefined ? (
+                      <p className="mt-2 text-xs font-medium text-muted-foreground">
+                        {PHASE_LABELS[source.processingPhase]}
+                      </p>
+                    ) : null}
+
+                    {source.status === "failed" && source.errorMessage ? (
+                      <p className="mt-2 break-words text-xs font-medium text-destructive">
+                        {source.errorMessage}
+                      </p>
+                    ) : null}
 
                     {source.isStale ? (
                       <p className="mt-2 text-xs font-medium text-muted-foreground">
@@ -383,7 +516,7 @@ export function KnowledgeSources({
                           }
                           className="inline-flex min-h-11 items-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Retry
+                          {isMediaType(source.type) ? "Try again" : "Retry"}
                         </button>
                       ) : null}
                       <button

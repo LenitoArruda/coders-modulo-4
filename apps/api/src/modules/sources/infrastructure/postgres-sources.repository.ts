@@ -10,6 +10,7 @@ import { withDbSpan } from "../../shared/observability/db-span";
 import { SourcesRepositoryPort } from "../application/ports/sources-repository.port";
 import type {
   Chunk,
+  MediaSourceMetadata,
   NewSourceVersion,
   Source,
   SourceStatus,
@@ -21,8 +22,10 @@ import { URL_SOURCE_MIME_TYPE } from "../domain/source-url-policy";
 
 const SOURCE_COLUMNS =
   "id, user_id, name, normalized_name, type, current_version_id, created_at, updated_at";
-const VERSION_COLUMNS =
-  "id, source_id, user_id, content_hash, original_name, mime_type, byte_size, type, status, chunk_count, error_message, created_at, updated_at";
+const VERSION_COLUMNS = `id, source_id, user_id, content_hash, original_name,
+  mime_type, byte_size, type, status, chunk_count, error_message,
+  processing_phase, media_type, duration_seconds, extraction_method,
+  extraction_model_version, created_at, updated_at`;
 
 type SourceRow = {
   id: string;
@@ -47,6 +50,11 @@ type VersionRow = {
   status: SourceStatus;
   chunk_count: number;
   error_message: string | null;
+  processing_phase: SourceVersion["processingPhase"];
+  media_type: SourceVersion["mediaType"];
+  duration_seconds: string | number | null;
+  extraction_method: SourceVersion["extractionMethod"];
+  extraction_model_version: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -59,9 +67,15 @@ type SummaryRow = {
   type: SourceType;
   byte_size: string | number;
   status: SourceStatus;
+  error_message: string | null;
   version_id: string;
   version_number: string | number;
   chunk_count: number;
+  processing_phase: SourceVersion["processingPhase"];
+  media_type: SourceVersion["mediaType"];
+  duration_seconds: string | number | null;
+  extraction_method: SourceVersion["extractionMethod"];
+  extraction_model_version: string | null;
   created_at: Date;
 };
 
@@ -91,6 +105,12 @@ function toVersion(row: VersionRow): SourceVersion {
     status: row.status,
     chunkCount: row.chunk_count,
     errorMessage: row.error_message,
+    processingPhase: row.processing_phase ?? null,
+    mediaType: row.media_type ?? null,
+    durationSeconds:
+      row.duration_seconds === null ? null : Number(row.duration_seconds),
+    extractionMethod: row.extraction_method ?? null,
+    extractionModelVersion: row.extraction_model_version ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -106,11 +126,18 @@ function toSummary(row: SummaryRow): SourceSummary {
     type: row.type,
     byteSize: Number(row.byte_size),
     status: row.status,
+    errorMessage: row.error_message ?? null,
     versionId: row.version_id,
     versionNumber: Number(row.version_number),
     chunkCount: row.chunk_count,
     isStale: false,
     createdAt: row.created_at,
+    processingPhase: row.processing_phase ?? null,
+    mediaType: row.media_type ?? null,
+    durationSeconds:
+      row.duration_seconds === null ? null : Number(row.duration_seconds),
+    extractionMethod: row.extraction_method ?? null,
+    extractionModelVersion: row.extraction_model_version ?? null,
   };
 }
 
@@ -213,8 +240,9 @@ export class PostgresSourcesRepository extends SourcesRepositoryPort {
           this.pool.query<VersionRow>(
             `insert into public.source_versions
                (source_id, user_id, content_hash, original_name, mime_type,
-                byte_size, type, status, error_message)
-             values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                byte_size, type, status, error_message,
+                media_type, duration_seconds)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              returning ${VERSION_COLUMNS}`,
             [
               input.sourceId,
@@ -226,6 +254,8 @@ export class PostgresSourcesRepository extends SourcesRepositoryPort {
               input.type,
               input.status,
               input.errorMessage ?? null,
+              input.mediaType ?? null,
+              input.durationSeconds ?? null,
             ],
           ),
       );
@@ -375,6 +405,43 @@ export class PostgresSourcesRepository extends SourcesRepositoryPort {
     }
   }
 
+  async updateVersionProgress(
+    userId: string,
+    versionId: string,
+    progress: MediaSourceMetadata,
+  ): Promise<void> {
+    const columns: Record<keyof MediaSourceMetadata, string> = {
+      processingPhase: "processing_phase",
+      mediaType: "media_type",
+      durationSeconds: "duration_seconds",
+      extractionMethod: "extraction_method",
+      extractionModelVersion: "extraction_model_version",
+    };
+    const entries = Object.entries(progress).filter(
+      ([, value]) => value !== undefined,
+    ) as Array<[keyof MediaSourceMetadata, unknown]>;
+
+    if (entries.length === 0) return;
+
+    const assignments = entries.map(
+      ([key], index) => `${columns[key]} = $${index + 3}`,
+    );
+    const values = entries.map(([, value]) => value ?? null);
+
+    try {
+      await withDbSpan({ table: "source_versions", operation: "UPDATE" }, () =>
+        this.pool.query(
+          `update public.source_versions
+              set ${assignments.join(", ")}
+              where user_id = $1 and id = $2`,
+          [userId, versionId, ...values],
+        ),
+      );
+    } catch (error) {
+      throw databaseFailure("update source version progress", error);
+    }
+  }
+
   async activateVersion(
     userId: string,
     sourceId: string,
@@ -402,11 +469,13 @@ export class PostgresSourcesRepository extends SourcesRepositoryPort {
           this.pool.query<SummaryRow>(
             `select s.id, s.name, s.type, v.byte_size, v.status,
                     v.original_name, v.mime_type,
-                    v.id as version_id,
+                    v.error_message, v.id as version_id,
                     (select count(*) from public.source_versions sv
                      where sv.source_id = s.id and sv.created_at <= v.created_at)
                       as version_number,
-                    v.chunk_count, s.created_at
+                    v.chunk_count, v.processing_phase, v.media_type,
+                    v.duration_seconds, v.extraction_method,
+                    v.extraction_model_version, s.created_at
              from public.sources s
              join public.source_versions v
                on v.id = s.current_version_id and v.user_id = s.user_id

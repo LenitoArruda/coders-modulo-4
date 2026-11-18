@@ -1,7 +1,7 @@
 # Conexão de mídia como conhecimento — Spec
 
-> **Status:** approved
-> **Atualizado em:** 2026-11-17
+> **Status:** done
+> **Atualizado em:** 2026-11-18
 > **Autor:** OpenCode Agent
 > **Épico:** `.plans/012-expert-platform-breakdown.md` (fatia 4)
 > **Depende de:** `.specs/013-knowledge-files.md`
@@ -237,26 +237,26 @@ interface são en-US.
 
 ## 14. Critérios de aceite
 
-- [ ] Dado um usuário autenticado, quando ele seleciona "Imagem" e envia um PNG válido, então
+- [x] Dado um usuário autenticado, quando ele seleciona "Imagem" e envia um PNG válido, então
       a fonte aparece na lista e termina com status `ready` após OCR.
-- [ ] Dado um usuário autenticado, quando ele envia um MP3 com fala, então uma transcrição é
+- [x] Dado um usuário autenticado, quando ele envia um MP3 com fala, então uma transcrição é
       extraída, fatiada e gravada no Weaviate com o `source_id` da fonte.
-- [ ] Dado um usuário autenticado, quando ele envia um MP4 com fala, então uma transcrição é
+- [x] Dado um usuário autenticado, quando ele envia um MP4 com fala, então uma transcrição é
       extraída e a fonte termina com status `ready`.
-- [ ] Dado uma fonte de mídia já processada, quando o mesmo arquivo é enviado novamente,
+- [x] Dado uma fonte de mídia já processada, quando o mesmo arquivo é enviado novamente,
       então a fonte existente é reutilizada e nenhum chunk/vetor duplicado é criado.
-- [ ] Dado um arquivo com tipo MIME não suportado, quando o usuário tenta enviá-lo, então o
+- [x] Dado um arquivo com tipo MIME não suportado, quando o usuário tenta enviá-lo, então o
       upload é rejeitado com mensagem específica e nenhuma fonte é criada.
-- [ ] Dado um áudio sem fala inteligível, quando a extração termina, então a versão é marcada
+- [x] Dado um áudio sem fala inteligível, quando a extração termina, então a versão é marcada
       como `failed` com a mensagem "No speech detected" e nenhum vetor é gravado.
-- [ ] Dado dois usuários autenticados, quando ambos enviam o mesmo arquivo, então cada um vê
+- [x] Dado dois usuários autenticados, quando ambos enviam o mesmo arquivo, então cada um vê
       apenas a sua própria fonte na lista de conexões.
-- [ ] Dado um usuário autenticado, quando ele exclui uma fonte de mídia, então arquivo original,
+- [x] Dado um usuário autenticado, quando ele exclui uma fonte de mídia, então arquivo original,
       versões, chunks e vetores associados são removidos, a fonte desaparece da lista e o histórico
       de chat permanece.
-- [ ] Dado um erro de extração, quando o usuário clica em "Try again", então um novo job é iniciado
+- [x] Dado um erro de extração, quando o usuário clica em "Try again", então um novo job é iniciado
       para o mesmo `sourceId` sem duplicar a fonte.
-- [ ] Dado um usuário usando teclado, quando ele percorre o floating button e envia mídia,
+- [x] Dado um usuário usando teclado, quando ele percorre o floating button e envia mídia,
       então seleção, progresso e erro são anunciados e alcançáveis.
 
 ## 15. Decisões e questões abertas
