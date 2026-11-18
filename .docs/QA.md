@@ -631,3 +631,25 @@ Cobertura E2E da fatia 015:
 
 Commit local principal: `3d29102 feat: connect image, audio and video as knowledge sources`
 (sem push, merge ou alterações na branch principal).
+
+---
+
+## 14. Evidências de integração 014 + 015 (2026-11-18)
+
+Merges na principal: `b16f183` (014), `b9b4d89` (015) e `02e8320` (correção de contratos após o
+merge). Os 11 conflitos entre 014 e 015 eram aditivos e foram combinados: tipo de arquivo com
+`displayName` e `durationSeconds`, INSERT de versão com 11 parâmetros, mapeamento de erros URL e
+mídia, DI com fetcher HTTP e extrator local, rótulos `TYPE_LABELS` e campos da fake API.
+
+| Comando               | Resultado                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| `bun run lint`        | ok — 3 tarefas                                                  |
+| `bun run types:check` | ok — 3 tarefas, após `02e8320`                                  |
+| `bun run test`        | ok — API 69 arquivos / 463 testes; web 12 arquivos / 152 testes |
+| `bun run build`       | ok — `api` + `web`                                              |
+| `bun run test:e2e`    | ok — 157/157 testes em 5,5 min, portas padrão 3000/3434         |
+| `bun run db:migrate`  | bloqueado — Docker indisponível; `ECONNREFUSED 127.0.0.1:5433`  |
+
+As migrações `0001`–`0004` e seus testes SQL foram validados no worktree da 015 com banco isolado
+(§13). A validação real na principal segue como follow-up assim que o Docker estiver disponível.
+Nenhuma chave, token, URL sensível, hash ou conteúdo de arquivo foi registrado em logs ou docs.

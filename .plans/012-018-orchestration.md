@@ -12,7 +12,7 @@
 | 012  | Catálogo de Experts e chat         | done     | —             | —          | pulada     | entregue manualmente antes da orquestração; commit `1412ae6` |
 | 013  | Fontes de conhecimento por arquivo | done     | `../spec-013` | `spec/013` | mesclada   | commit `92e4a5c`; merge `b8c99d8`; QA verde                  |
 | 014  | Fontes de conhecimento por URL     | done     | `../spec-014` | `spec/014` | mesclada   | commit `2516a7c`; merge `b16f183`; gates verdes              |
-| 015  | Fontes de conhecimento por mídia   | approved | `../spec-015` | `spec/015` | executando | onda 2; HEAD `453db9c`; `.env` copiado                       |
+| 015  | Fontes de conhecimento por mídia   | done     | `../spec-015` | `spec/015` | mesclada   | commit `3d29102`; merge `b9b4d89`; QA verde                  |
 | 016  | Respostas com RAG e citações       | approved | `../spec-016` | `spec/016` | executando | onda 2; HEAD `453db9c`; `.env` copiado                       |
 | 017  | Entregáveis multimídia             | approved | —             | —          | pendente   | depende de 015; credencial Gemini e decisões abertas         |
 | 018  | LangSmith local                    | approved | —             | —          | pendente   | depende de 016                                               |
@@ -21,11 +21,11 @@ Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
 ## 2. Ondas
 
-| Onda | Specs         | Lançada em | Concluída em | Merge/push                      |
-| ---- | ------------- | ---------- | ------------ | ------------------------------- |
-| 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push `b1d10c7` |
-| 2    | 014, 015, 016 | 2026-11-18 | —            | —                               |
-| 3    | 017, 018      | —          | —            | —                               |
+| Onda | Specs         | Lançada em | Concluída em | Merge/push                                 |
+| ---- | ------------- | ---------- | ------------ | ------------------------------------------ |
+| 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push `b1d10c7`            |
+| 2    | 014, 015, 016 | 2026-11-18 | —            | merges `b16f183`, `b9b4d89`; push pendente |
+| 3    | 017, 018      | —          | —            | —                                          |
 
 Ondas confirmadas pelo usuário em 2026-11-17. A onda 1 foi concluída e publicada com QA verde.
 A onda 2 foi lançada em paralelo com worktrees independentes; a onda 3 segue após sua integração.
@@ -85,6 +85,14 @@ Detalhamento:
   fatia passou no worktree (11 cenários novos); E2E consolidado na principal fica para o fim da onda.
 - 2026-11-18 — [015] `RESULTADO: ok`; commits `3d29102` e `f15f276`. `db:migrate`/`db:test`,
   lint, tipos, testes e build verdes no worktree; E2E 146/146 em portas isoladas 3015/3435.
+- 2026-11-18 — [015] merge `b9b4d89` após combinar 11 conflitos aditivos entre 014 e 015 em API,
+  web e documentação; nenhuma funcionalidade foi descartada.
+- 2026-11-18 — correção de integração `02e8320`: `durationSeconds: null` nas fontes URL e
+  `FakeWebPageFetcher` no teste da 015, eliminando as duas quebras de tipo do merge.
+- 2026-11-18 — QA consolidado 014+015 na principal: `lint` 3/3, `types:check` 3/3, `test` API
+  69/463 + web 12/152, `build` 2/2, `test:e2e` 157/157. `db:migrate` na principal segue bloqueado
+  porque o Docker não está disponível (5433 recusa conexão); a 015 validou as 4 migrações no
+  worktree com banco isolado.
 
 ## 5. Resultado consolidado
 
@@ -93,14 +101,15 @@ Detalhamento:
 | 012  | pulada     | `1412ae6`      | —         | verde | —                  |
 | 013  | ok         | `92e4a5c`      | `b8c99d8` | verde | —                  |
 | 014  | ok         | `2516a7c`      | `b16f183` | verde | —                  |
-| 015  | ok         | `3d29102`      | pendente  | verde | —                  |
+| 015  | ok         | `3d29102`      | `b9b4d89` | verde | —                  |
 | 016  | executando | —              | —         | —     | onda 2             |
 | 017  | pendente   | —              | —         | —     | onda 3; Gemini/Veo |
 | 018  | pendente   | —              | —         | —     | onda 3             |
 
 ## 6. Retomada
 
-Para retomar: aguardar o `RESULTADO` dos três subagentes da onda 2; integrar cada spec com
-`merge --no-ff` e rodar QA completo na principal; publicar com a credencial `LenitoArruda`;
-remover os worktrees; lançar a onda 3 (017, 018). Risco futuro: geração de vídeo da 017 via
-Gemini/Veo pode exigir billing ativado.
+Para retomar: 014 e 015 já estão integradas com QA verde; aguardar apenas o `RESULTADO` da 016,
+integrá-la com `merge --no-ff`, rodar o QA completo e publicar a onda com a credencial
+`LenitoArruda`; remover os worktrees `spec-014`, `spec-015` e `spec/016`; lançar a onda 3 (017,
+018). Risco futuro: geração de vídeo da 017 via Gemini/Veo pode exigir billing ativado; o
+`db:migrate` da principal depende de Docker, indisponível no momento.
