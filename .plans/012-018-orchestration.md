@@ -7,25 +7,25 @@
 
 ## 1. Specs do range
 
-| Spec | Título                             | Status   | Worktree      | Branch     | Estado   | Observações                                                  |
-| ---- | ---------------------------------- | -------- | ------------- | ---------- | -------- | ------------------------------------------------------------ |
-| 012  | Catálogo de Experts e chat         | done     | —             | —          | pulada   | entregue manualmente antes da orquestração; commit `1412ae6` |
-| 013  | Fontes de conhecimento por arquivo | done     | `../spec-013` | `spec/013` | mesclada | commit `92e4a5c`; merge `b8c99d8`; QA verde                  |
-| 014  | Fontes de conhecimento por URL     | done     | `../spec-014` | `spec/014` | mesclada | commit `2516a7c`; merge `b16f183`; gates verdes              |
-| 015  | Fontes de conhecimento por mídia   | done     | `../spec-015` | `spec/015` | mesclada | commit `3d29102`; merge `b9b4d89`; QA verde                  |
-| 016  | Respostas com RAG e citações       | done     | `../spec-016` | `spec/016` | mesclada | commit `c84aa5f`; merge `eee1cd5`; QA verde                  |
-| 017  | Entregáveis multimídia             | approved | —             | —          | pendente | depende de 015; credencial Gemini e decisões abertas         |
-| 018  | LangSmith local                    | approved | —             | —          | pendente | depende de 016                                               |
+| Spec | Título                             | Status   | Worktree      | Branch     | Estado     | Observações                                                  |
+| ---- | ---------------------------------- | -------- | ------------- | ---------- | ---------- | ------------------------------------------------------------ |
+| 012  | Catálogo de Experts e chat         | done     | —             | —          | pulada     | entregue manualmente antes da orquestração; commit `1412ae6` |
+| 013  | Fontes de conhecimento por arquivo | done     | `../spec-013` | `spec/013` | mesclada   | commit `92e4a5c`; merge `b8c99d8`; QA verde                  |
+| 014  | Fontes de conhecimento por URL     | done     | `../spec-014` | `spec/014` | mesclada   | commit `2516a7c`; merge `b16f183`; gates verdes              |
+| 015  | Fontes de conhecimento por mídia   | done     | `../spec-015` | `spec/015` | mesclada   | commit `3d29102`; merge `b9b4d89`; QA verde                  |
+| 016  | Respostas com RAG e citações       | done     | `../spec-016` | `spec/016` | mesclada   | commit `c84aa5f`; merge `eee1cd5`; QA verde                  |
+| 017  | Entregáveis multimídia             | approved | `../spec-017` | `spec/017` | executando | onda 3; HEAD `dd33577`; risco Gemini/Veo billing             |
+| 018  | LangSmith local                    | approved | `../spec-018` | `spec/018` | executando | onda 3; HEAD `dd33577`; `.env` copiado                       |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
 ## 2. Ondas
 
-| Onda | Specs         | Lançada em | Concluída em | Merge/push                                            |
-| ---- | ------------- | ---------- | ------------ | ----------------------------------------------------- |
-| 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push `b1d10c7`                       |
-| 2    | 014, 015, 016 | 2026-11-18 | 2026-11-18   | merges `b16f183`, `b9b4d89`, `eee1cd5`; push pendente |
-| 3    | 017, 018      | —          | —            | —                                                     |
+| Onda | Specs         | Lançada em | Concluída em | Merge/push                                             |
+| ---- | ------------- | ---------- | ------------ | ------------------------------------------------------ |
+| 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push `b1d10c7`                        |
+| 2    | 014, 015, 016 | 2026-11-18 | 2026-11-18   | merges `b16f183`, `b9b4d89`, `eee1cd5`; push `dd33577` |
+| 3    | 017, 018      | 2026-11-18 | —            | —                                                      |
 
 Ondas confirmadas pelo usuário em 2026-11-17. A onda 1 foi concluída e publicada com QA verde.
 A onda 2 foi lançada em paralelo com worktrees independentes; a onda 3 segue após sua integração.
@@ -105,22 +105,29 @@ Detalhamento:
   - web 12/156, `build` 2/2, `test:e2e` 163/163. `db:migrate`/`db:test` continuam bloqueados na
     principal: Docker fora e a porta 5432 recusou as credenciais do `.env`; as migrações da 015 e
     016 foram validadas nos worktrees com bancos isolados.
+- 2026-11-18 — onda 2 publicada: `c561cb8..dd33577` com a credencial `LenitoArruda`; worktree
+  `spec-016` e branch `spec/016` removidos. Todas as specs 014–016 estão integradas e publicadas.
+- 2026-11-18 — onda 3 lançada: worktrees `../spec-017` e `../spec-018` criados do HEAD `dd33577`
+  com `.env` copiado; subagentes `ses_e10b14beeffeAMP0vDnQLKMDTp` (017) e
+  `ses_e10b14bedffet87IcR6BiNC2B9` (018) em background, com portas E2E isoladas 3017/3437 e
+  3018/3438.
 
 ## 5. Resultado consolidado
 
-| Spec | Resultado | Commit da spec | Merge     | QA    | Bloqueios          |
-| ---- | --------- | -------------- | --------- | ----- | ------------------ |
-| 012  | pulada    | `1412ae6`      | —         | verde | —                  |
-| 013  | ok        | `92e4a5c`      | `b8c99d8` | verde | —                  |
-| 014  | ok        | `2516a7c`      | `b16f183` | verde | —                  |
-| 015  | ok        | `3d29102`      | `b9b4d89` | verde | —                  |
-| 016  | ok        | `c84aa5f`      | `eee1cd5` | verde | —                  |
-| 017  | pendente  | —              | —         | —     | onda 3; Gemini/Veo |
-| 018  | pendente  | —              | —         | —     | onda 3             |
+| Spec | Resultado  | Commit da spec | Merge     | QA    | Bloqueios          |
+| ---- | ---------- | -------------- | --------- | ----- | ------------------ |
+| 012  | pulada     | `1412ae6`      | —         | verde | —                  |
+| 013  | ok         | `92e4a5c`      | `b8c99d8` | verde | —                  |
+| 014  | ok         | `2516a7c`      | `b16f183` | verde | —                  |
+| 015  | ok         | `3d29102`      | `b9b4d89` | verde | —                  |
+| 016  | ok         | `c84aa5f`      | `eee1cd5` | verde | —                  |
+| 017  | executando | —              | —         | —     | onda 3; Gemini/Veo |
+| 018  | executando | —              | —         | —     | onda 3             |
 
 ## 6. Retomada
 
-Onda 2 concluída com QA verde; publicação final pendente. Para retomar: publicar `c561cb8..HEAD`
-com a credencial `LenitoArruda`, remover o worktree `spec-016` e a branch `spec/016`, depois lançar
-a onda 3 (017 e 018). Risco futuro: geração de vídeo da 017 via Gemini/Veo pode exigir billing
-ativado; o `db:migrate` da principal depende de Docker, indisponível no momento.
+Onda 2 publicada e worktrees limpos. Para retomar: aguardar o `RESULTADO` de 017 e 018, integrar
+cada spec com `merge --no-ff`, rodar QA completo na principal, publicar e remover os worktrees.
+Riscos: geração de vídeo da 017 via Gemini/Veo pode exigir billing ativado; o `db:migrate` da
+principal depende de Docker, indisponível no momento; se ambas criarem migrations, conferir a
+numeração (017 pode usar 0006 e 018, 0007).
