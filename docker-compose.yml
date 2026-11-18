@@ -58,5 +58,34 @@ services:
     volumes:
       - ./observability/postgres-collector.yaml:/etc/otelcol/config.yaml:ro
 
+  # Banco de vetores local. Os embeddings são gerados pela API (OpenAI) e enviados
+  # já prontos, por isso o vectorizer interno do Weaviate fica desligado.
+  weaviate:
+    image: semitechnologies/weaviate:1.40.5
+    container_name: coders-modulo-4-weaviate
+    restart: unless-stopped
+    ports:
+      # Apenas loopback: o banco de vetores não é exposto à rede local.
+      - "127.0.0.1:${WEAVIATE_PORT:-8080}:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      CLUSTER_HOSTNAME: "node1"
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://localhost:8080/v1/meta >/dev/null || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
 volumes:
   postgres-data:
+  weaviate-data:

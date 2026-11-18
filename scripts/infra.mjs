@@ -49,13 +49,16 @@ function up() {
 
   if (compose !== 0) {
     fail(
-      "Não foi possível subir a infraestrutura. Verifique se as portas 5432, 3010, 4317 e 4318 estão livres.",
+      "Não foi possível subir a infraestrutura. Verifique se as portas 5432, 8080, 3010, 4317 e 4318 estão livres.",
     );
   }
 
   console.log("[infra] Ambiente local pronto:");
   console.log(
     "  - PostgreSQL: localhost:5432 (ou POSTGRES_PORT do .env) — banco coders_modulo_4",
+  );
+  console.log(
+    "  - Weaviate:   localhost:8080 (ou WEAVIATE_PORT do .env) — banco de vetores",
   );
   console.log("  - Grafana:    http://localhost:3010");
   console.log("  - OTLP gRPC:  localhost:4317");

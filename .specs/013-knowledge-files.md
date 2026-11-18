@@ -180,8 +180,8 @@ As metas numéricas de latência e custo ficam como decisão aberta com o solici
   mapa `.plans/012-expert-platform-breakdown.md`.
 - **Restrição do solicitante:** document loaders e Weaviate instalados e executando localmente via
   Docker; registro da fonte no banco local para deduplicação.
-- **Risco — modelo de embedding não definido:** o tipo de vetor e o contrato de distância dependem
-  dessa decisão; mitigação: registrar como aberta com dono de Engenharia antes do plano.
+- **Modelo de embedding definido:** OpenAI `text-embedding-3-small` (1536 dimensões, distância
+  cosine) — decisão de Engenharia registrada em 2026-11-17; define o schema da collection Weaviate.
 - **Risco — dados sensíveis:** documentos podem conter PII; mitigação: sem conteúdo em logs e
   isolamento por usuário desde a primeira versão.
 - **Risco — erro silencioso:** falha na extração pode gerar fonte vazia; mitigação: status explícito
@@ -241,7 +241,7 @@ As metas numéricas de latência e custo ficam como decisão aberta com o solici
 | Critério de dedup   | Hash do conteúdo do arquivo, no escopo do usuário autenticado.                                                                             | Define quando uma conexão é considerada existente.                     | Solicitante | decidida |
 | Isolamento          | Fontes e vetores isolados por usuário; sem workspace.                                                                                      | Define chave de propriedade de todos os dados indexados.               | Solicitante | decidida |
 | Banco de vetores    | Weaviate executando localmente via Docker, com suporte a LangChain.js.                                                                     | Define o adaptador e o contrato de vetores.                            | Solicitante | decidida |
-| Modelo de embedding | Qual modelo gera os embeddings dos chunks?                                                                                                 | Define dimensionalidade, custo e qualidade da recuperação futura.      | Engenharia  | aberta   |
+| Modelo de embedding | OpenAI `text-embedding-3-small`, 1536 dimensões, distância cosine no Weaviate.                                                             | Define dimensionalidade, custo e qualidade da recuperação futura.      | Engenharia  | decidida |
 | Limites de envio    | Tamanho máximo por arquivo e quantidade máxima de arquivos por envio.                                                                      | Define validação, tempo de processamento e exposição a abuso.          | Solicitante | aberta   |
 | Conteúdo alterado   | Conteúdo diferente em uma fonte existente cria nova `SourceVersion`; a anterior fica desatualizada e é sinalizada nas citações da fatia 5. | Define histórico de versões e convivência de vetores antigos.          | Solicitante | decidida |
 | Retenção            | Por quanto tempo manter arquivo original, versões antigas, chunks e embeddings após a conexão?                                             | Define política de privacidade e custo de armazenamento.               | Solicitante | aberta   |
