@@ -653,6 +653,56 @@ Regras:
 - As suítes usam fakes (`InMemorySourcesRepository`, extrator/embedding/vetor em memória) e um
   servidor HTTP local para o adaptador Weaviate. A chave real não é usada nos testes.
 
+### 4.13 Mídia como conhecimento (fatia 015)
+
+A fatia 015 estende o pipeline da 013 com imagem (JPEG/PNG), áudio (MP3) e vídeo (MP4). A mídia
+é convertida em texto localmente (OCR ou transcrição) e esse texto segue o mesmo caminho de
+chunking, embedding e vetores `KnowledgeChunk`, sem pipeline paralelo. A flag de rollout
+`knowledge_media_enabled` (padrão `false`) controla a exposição das novas opções no web.
+
+```text
+/app (flag ligada) ── Server Action ──► POST /api/v1/sources  (allowMedia)
+        │                                   │ ConnectSourcesUseCase
+        │                                   ├─ MIME + extensão + magic bytes + limites por tipo
+        │                                   ├─ SHA-256 → Source/SourceVersion (mediatype, duração, proveniência)
+        │                                   └─ ProcessSourceVersionUseCase (background)
+        │                                          ├─ MediaTextExtractorPort (OCR/transcrição local)
+        │                                          │      ├─ extracting → "No speech detected" → failed
+        │                                          ├─ chunking → embedding → Weaviate (sourceId)
+        │                                          └─ ready (+ fases em processing)
+        ▼
+KnowledgeSources ◄── listagem com status 013 + progresso/erro legíveis em en-US
+```
+
+| Peça                             | Responsabilidade                                                                                                                                                            |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SourceType` estendido           | `image \| audio \| video` somados a `pdf \| txt \| md`; `sourceTypeFor` permanece documental, `sourceTypeForUpload`/`mediaTypeFor` tratam mídia                             |
+| `media-file-policy.ts`           | Magic bytes (JPEG `FF D8 FF`, PNG assinatura completa, MP3 `ID3`/sync MPEG, MP4 `ftyp` no offset 4), limites 25/50/200 MB, duração máxima 60 min                            |
+| `MediaTextExtractorPort`         | Contrato `extract(file, type, durationSeconds?)` → texto + `method`/`modelVersion`/`durationSeconds`                                                                        |
+| `LocalMediaTextExtractorAdapter` | `execFile` de comandos OCR/transcrição configurados no servidor (`{file}`/`{output}`), diretório temporário removido em `finally`; sem chamada a OpenAI/Gemini              |
+| `ProcessSourceVersionUseCase`    | Atualiza fases `extracting`/`chunking`/`embedding` dentro de `processing`, persiste proveniência e limpa vetores parciais em falha                                          |
+| `0004_knowledge_media.sql`       | Migração aditiva: novos valores de `type`, colunas opcionais de mídia e constraint `media_type is not null and type = media_type`; sem migração de dados                    |
+| `flags.ts` / `source-actions.ts` | Flag lida somente no servidor (env ou cookie `knowledge_media_enabled=1`), parâmetro `allowMedia` do cliente descartado e reaplicado no servidor                            |
+| `KnowledgeSources`               | Seletor Image/Audio/Video, `accept` dinâmico, duração opcional, `aria-live` para fases e erro; rótulos/selectors da 013 (`knowledge-source-files`, “Add files”) preservados |
+
+Regras:
+
+- O status público continua `queued|processing|ready|failed`; `extracting|chunking|embedding` são
+  detalhes opcionais de progresso, nunca novos valores de status da API.
+- Validação na borda e no domínio: MIME + extensão + magic bytes + tamanho por tipo antes de
+  persistir; limite de duração também no cliente e no servidor. Tipos não suportados recebem
+  mensagem en-US específica e nenhuma fonte é criada.
+- Transcrição/OCR vazia marca a versão como `failed` com **"No speech detected"**, sem gravar
+  vetores; falhas de comando/provedor local são blocos parciais com mensagem acionável em en-US.
+- Dedup é o SHA-256 da 013 no escopo do usuário: reenvio do mesmo arquivo reaproveita a versão e
+  não duplica chunks/vetores; retry usa o mesmo `sourceId`.
+- Telemetria `media.*` registra apenas IDs opacos, tipo, fases, durações e desfecho. Nunca nome de
+  arquivo, hash, comando, texto extraído ou chave.
+- `next.config.js` usa `bodySizeLimit: "1gb"` para cobrir o limite de 200 MB por vídeo; a chave de
+  embedding continua exclusivamente no servidor via `SOURCE_OPENAI_API_KEY`.
+- Modelos/formatos adicionais, OCR de frames e limites definitivos seguem como decisões abertas na
+  spec; nenhum arquivo da fatia 014 (URLs) foi alterado.
+
 ---
 
 ## 5. Fluxo de dados alvo
@@ -697,9 +747,11 @@ Fluxo resumido:
 > LangGraph/`gpt-4o-mini` (`GET /api/v1/conversations` e `POST /api/v1/conversations/messages`) e
 > o histórico isolado por usuário. A fatia 013 acrescenta o FAB/painel de fontes, o upload
 > multipart de PDF/TXT/Markdown, deduplicação por hash, chunks, embeddings e gravação no Weaviate
-> local (`KnowledgeChunk`), com listagem, retry e exclusão isolados por usuário. O schema de auth
-> veio na fatia 001, o de conversas na fatia 012 e o de fontes na fatia 013; os vetores ainda não
-> são consultados pelo chat (fatia 5 do épico).
+> local (`KnowledgeChunk`), com listagem, retry e exclusão isolados por usuário. A fatia 015
+> acrescenta imagem, áudio e vídeo convertidos em texto por OCR/transcrição local e indexados pelo
+> mesmo pipeline, atrás da flag `knowledge_media_enabled` (desligada por padrão). O schema de auth
+> veio na fatia 001, o de conversas na fatia 012 e o de fontes na fatia 013, com colunas opcionais
+> de mídia na migração 0004; os vetores ainda não são consultados pelo chat (fatia 5 do épico).
 
 ---
 

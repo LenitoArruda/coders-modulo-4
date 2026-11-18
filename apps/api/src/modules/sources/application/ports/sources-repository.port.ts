@@ -1,5 +1,6 @@
 import type {
   Chunk,
+  MediaSourceMetadata,
   NewSourceVersion,
   Source,
   SourceStatus,
@@ -52,6 +53,13 @@ export abstract class SourcesRepositoryPort {
     status: SourceStatus,
     chunkCount?: number,
     errorMessage?: string | null,
+  ): Promise<void>;
+
+  /** Writes optional media progress/provenance without changing public status. */
+  abstract updateVersionProgress(
+    userId: string,
+    versionId: string,
+    progress: MediaSourceMetadata,
   ): Promise<void>;
 
   abstract activateVersion(

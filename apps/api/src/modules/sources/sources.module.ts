@@ -7,10 +7,11 @@ import { loadEnv } from "../shared/config/env";
 
 import {
   MAX_FILES_PER_UPLOAD,
-  MAX_SOURCE_FILE_BYTES,
+  MAX_UPLOAD_FILE_BYTES,
 } from "./domain/source-file-policy";
 import {
   SOURCE_EMBEDDING_DIMENSIONS,
+  SOURCE_MEDIA_ENABLED,
   SOURCE_OPENAI_API_KEY,
   SOURCE_WEAVIATE_URL,
 } from "./sources.tokens";
@@ -19,11 +20,13 @@ import { DeleteSourceUseCase } from "./application/delete-source.use-case";
 import { ListSourcesUseCase } from "./application/list-sources.use-case";
 import { SourcesRepositoryPort } from "./application/ports/sources-repository.port";
 import { DocumentTextExtractorPort } from "./application/ports/document-text-extractor.port";
+import { MediaTextExtractorPort } from "./application/ports/media-text-extractor.port";
 import { EmbeddingGeneratorPort } from "./application/ports/embedding-generator.port";
 import { VectorStorePort } from "./application/ports/vector-store.port";
 import { ProcessSourceVersionUseCase } from "./application/process-source-version.use-case";
 import { RetrySourceVersionUseCase } from "./application/retry-source-version.use-case";
 import { DocumentTextExtractorAdapter } from "./infrastructure/document-text-extractor.adapter";
+import { LocalMediaTextExtractorAdapter } from "./infrastructure/local-media-text-extractor.adapter";
 import { OpenAIEmbeddingGeneratorAdapter } from "./infrastructure/openai-embedding-generator.adapter";
 import { PostgresSourcesRepository } from "./infrastructure/postgres-sources.repository";
 import { WeaviateRestVectorStoreAdapter } from "./infrastructure/weaviate-rest-vector-store.adapter";
@@ -41,7 +44,7 @@ const DEFAULT_EMBEDDING_DIMENSIONS = 1536;
     MulterModule.register({
       storage: memoryStorage(),
       limits: {
-        fileSize: MAX_SOURCE_FILE_BYTES,
+        fileSize: MAX_UPLOAD_FILE_BYTES,
         files: MAX_FILES_PER_UPLOAD,
       },
     }),
@@ -72,10 +75,21 @@ const DEFAULT_EMBEDDING_DIMENSIONS = 1536;
       provide: SOURCE_OPENAI_API_KEY,
       useFactory: () => loadEnv().openaiApiKey,
     },
+    {
+      provide: SOURCE_MEDIA_ENABLED,
+      useFactory: () =>
+        ["1", "true"].includes(
+          process.env.KNOWLEDGE_MEDIA_ENABLED?.trim().toLowerCase() ?? "",
+        ),
+    },
     { provide: SourcesRepositoryPort, useClass: PostgresSourcesRepository },
     {
       provide: DocumentTextExtractorPort,
       useClass: DocumentTextExtractorAdapter,
+    },
+    {
+      provide: MediaTextExtractorPort,
+      useClass: LocalMediaTextExtractorAdapter,
     },
     {
       provide: EmbeddingGeneratorPort,

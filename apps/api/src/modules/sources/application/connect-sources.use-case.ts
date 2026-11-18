@@ -3,7 +3,11 @@ import { Inject, Injectable } from "@nestjs/common";
 import { log } from "../../shared/observability/app-logger";
 import { SourcesRepositoryPort } from "./ports/sources-repository.port";
 import { ProcessSourceVersionUseCase } from "./process-source-version.use-case";
-import type { SourceStatus, SourceType } from "../domain/source";
+import {
+  isMediaSourceType,
+  type SourceStatus,
+  type SourceType,
+} from "../domain/source";
 import type { ValidatedSourceFile } from "../domain/source-file-policy";
 import { SourceProcessingError } from "../domain/source.errors";
 
@@ -54,6 +58,17 @@ export class ConnectSourcesUseCase {
           versionId: existing.id,
         });
 
+        if (isMediaSourceType(file.type)) {
+          log("info", "knowledge.sources", {
+            event: "media.source.reused",
+            outcome: "ok",
+            userId: input.userId,
+            sourceId: existing.sourceId,
+            versionId: existing.id,
+            mediaType: file.type,
+          });
+        }
+
         results.push({
           name: file.originalName,
           type: file.type,
@@ -87,6 +102,8 @@ export class ConnectSourcesUseCase {
         byteSize: file.byteSize,
         type: file.type,
         status: "processing",
+        mediaType: isMediaSourceType(file.type) ? file.type : null,
+        durationSeconds: file.durationSeconds ?? null,
       });
 
       if (version === null) {
@@ -123,6 +140,17 @@ export class ConnectSourcesUseCase {
         sourceId: source.id,
         versionId: version.id,
       });
+
+      if (isMediaSourceType(file.type)) {
+        log("info", "knowledge.sources", {
+          event: "media.upload.accepted",
+          outcome: "accepted",
+          userId: input.userId,
+          sourceId: source.id,
+          versionId: version.id,
+          mediaType: file.type,
+        });
+      }
 
       results.push({
         name: file.originalName,

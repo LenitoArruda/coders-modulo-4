@@ -75,8 +75,12 @@ Execute na raiz do monorepo:
 > `GET/POST /api/v1/sources`, `DELETE /api/v1/sources/:sourceId` e
 > `POST /api/v1/sources/:versionId/retry`, com estado isolado por token: dedup por SHA-256, nomes
 > com `fail`/`broken`/`corrupt` entram como `failed` e voltam a `ready` no retry, e `pending`
-> permanece `processing` até o polling. Não deixe um `bun run dev` antigo ocupando a porta 3000
-> antes do E2E, pois o Playwright reutiliza o servidor existente em modo local.
+> permanece `processing` até o polling. Na fatia 015 a fake também aceita imagem/áudio/vídeo quando
+> a requisição traz `allowMedia`, simulando extração (`extracting` → `chunking` → `embedding`),
+> reaproveitamento por hash, "No speech detected", retry e exclusão; cenários de mídia ligam a flag
+> com o cookie `knowledge_media_enabled=1` no contexto do navegador, sem alterar a config global.
+> Não deixe um `bun run dev` antigo ocupando a porta 3000 antes do E2E, pois o Playwright reutiliza
+> o servidor existente em modo local.
 
 ### 2.1 Comando do OpenCode
 
@@ -374,6 +378,27 @@ O `build` é o **gate final**: se ele falha, a tarefa não está concluída.
       chave de API ou token de sessão.
 - [ ] E2E cobre FAB, upload misto, dedup, versionamento, pendente, inválido, retry, remoção,
       isolamento, teclado/foco e 360/768/1280 px sem rolagem horizontal.
+
+---
+
+### 5.17 Mídia como conhecimento (fatia 015)
+
+- [ ] Flag `knowledge_media_enabled` desligada por padrão: sem Image/Audio/Video no painel e suíte
+      da 013 permanece verde (o E2E liga a flag com cookie no contexto, não na config global).
+- [ ] PNG/JPEG válidos viram `processing` → `ready` com texto de OCR; MP3/MP4 com fala viram
+      transcrição fatiada e vetores no Weaviate com o mesmo `source_id` da fonte.
+- [ ] `type` inválido, extensão/MIME/magic bytes divergentes, tamanho acima de 25/50/200 MB e
+      duração acima de 60 min são recusados com mensagem en-US e nenhuma fonte é criada.
+- [ ] Reenvio do mesmo arquivo responde “Already connected” e não duplica chunk/vetor; outro
+      usuário com o mesmo arquivo vê apenas a sua fonte.
+- [ ] Áudio/vídeo sem fala falha com **“No speech detected”** e não grava vetores; falha de
+      extração mostra mensagem acionável e “Try again” reinicia o mesmo `sourceId`.
+- [ ] Listagem mantém status público da 013 e mostra fases `extracting`/`chunking`/`embedding`
+      como detalhe; exclusão remove arquivo, versões, chunks e vetores sem apagar histórico de chat.
+- [ ] Navegação por teclado e leitor de tela alcançam seletor, input, progresso e erro (`aria-live`);
+      rótulos e ordem de foco da 013 (`knowledge-source-files`, “Add files”) permanecem intactos.
+- [ ] Logs e telemetria `media.*` não contêm nome de arquivo, hash, comando, transcrição ou chave;
+      `.env` não é lido, exibido ou versionado.
 
 ---
 

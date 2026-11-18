@@ -4,7 +4,9 @@
  */
 
 export type SourceStatus = "queued" | "processing" | "ready" | "failed";
-export type SourceType = "pdf" | "txt" | "markdown";
+export type MediaType = "image" | "audio" | "video";
+export type SourceType = "pdf" | "txt" | "markdown" | MediaType;
+export type ProcessingPhase = "extracting" | "chunking" | "embedding";
 
 export type SourceSummary = {
   id: string;
@@ -17,6 +19,12 @@ export type SourceSummary = {
   chunkCount: number;
   isStale: boolean;
   createdAt: string;
+  processingPhase?: ProcessingPhase | null;
+  mediaType?: MediaType | null;
+  durationSeconds?: number | null;
+  extractionMethod?: string | null;
+  extractionModelVersion?: string | null;
+  errorMessage?: string | null;
 };
 
 export type ConnectedSourceResult = {
@@ -27,6 +35,9 @@ export type ConnectedSourceResult = {
   versionId: string;
   status: SourceStatus;
   alreadyConnected: boolean;
+  processingPhase?: ProcessingPhase | null;
+  mediaType?: MediaType | null;
+  durationSeconds?: number | null;
 };
 
 export type ListSourcesResponse = { sources: SourceSummary[] };
@@ -39,9 +50,21 @@ export const CONNECT_SOURCES_PATH = "/api/v1/sources";
 
 /** Mirrors the API domain limits; the API validates again on every request. */
 export const MAX_SOURCE_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_IMAGE_FILE_BYTES = 25 * 1024 * 1024;
+export const MAX_AUDIO_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_VIDEO_FILE_BYTES = 200 * 1024 * 1024;
 export const MAX_FILES_PER_UPLOAD = 5;
+export const MAX_MEDIA_DURATION_SECONDS = 60 * 60;
 
 export const SOURCE_FORMATS_MESSAGE = "PDF, TXT or Markdown";
+export const MEDIA_FORMATS_MESSAGE = "JPEG, PNG, MP3 or MP4";
+export const ALL_SOURCE_FORMATS_MESSAGE =
+  "PDF, TXT, Markdown, JPEG, PNG, MP3 or MP4";
+export const MEDIA_ACCEPT =
+  ".jpg,.jpeg,.png,.mp3,.mp4,image/jpeg,image/png,audio/mpeg,video/mp4";
+export const DOCUMENT_ACCEPT =
+  ".pdf,.txt,.md,.markdown,application/pdf,text/plain,text/markdown";
+
 export const SOURCE_EMPTY_MESSAGE =
   "No sources connected yet. Use the add button to connect a document.";
 export const SOURCE_CONNECT_FAILED_MESSAGE =
@@ -55,6 +78,11 @@ export const SOURCE_RETRY_FAILED_MESSAGE =
 export const SESSION_EXPIRED_MESSAGE =
   "Your session has expired. Sign in again.";
 export const ALREADY_CONNECTED_MESSAGE = "Already connected";
+export const NO_SPEECH_DETECTED_MESSAGE = "No speech detected";
+
+export function isMediaType(type: SourceType): type is MediaType {
+  return type === "image" || type === "audio" || type === "video";
+}
 
 export function formatSourceSize(byteSize: number): string {
   if (byteSize < 1024) return `${byteSize} B`;

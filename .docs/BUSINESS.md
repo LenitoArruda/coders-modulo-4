@@ -1,6 +1,6 @@
 # BUSINESS.md — Negócio e produto
 
-> **Status:** hipóteses iniciais + catálogo de Experts, chat e fontes de arquivo implementados (fatias 012–013) · **Atualizado em:** 2026-11-18
+> **Status:** hipóteses iniciais + catálogo de Experts, chat, fontes de arquivo e mídia implementados (fatias 012–013, 015) · **Atualizado em:** 2026-11-18
 > **Público:** produto, engenharia e agentes que precisam entender **o que** estamos construindo.
 
 Este documento descreve o problema, a proposta de valor e o escopo do produto. Decisões ainda
@@ -102,6 +102,13 @@ papel, escopo, tom e sugestões) vive na API (`EXPERT_CATALOG`) e é a fonte ún
 > conteúdo deduplica no escopo do usuário; nome igual com conteúdo diferente cria nova versão e a
 > anterior fica desatualizada. Arquivo, versões, chunks e vetores são removidos juntos na exclusão.
 > Google Drive e Notion seguem como hipótese de MVP, não implementados nesta fatia.
+>
+> **Estado atual (fatia 015):** a mesma lista de conexões aceita imagem (JPEG/PNG), áudio (MP3) e
+> vídeo (MP4) atrás da flag `knowledge_media_enabled`, desligada por padrão. A mídia é convertida
+> em texto localmente por OCR/transcrição e segue o pipeline de chunks, embeddings e Weaviate da
+> fatia 013, com deduplicação, status, retry e exclusão iguais. Áudio sem fala falha com
+> "No speech detected"; formatos não suportados são recusados com mensagem em inglês. As opções
+> de mídia por URL, modelos locais definitivos e limites operacionais seguem em decisão aberta.
 
 Requisitos por conector:
 

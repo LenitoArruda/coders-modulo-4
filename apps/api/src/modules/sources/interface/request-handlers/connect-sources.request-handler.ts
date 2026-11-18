@@ -1,6 +1,8 @@
 import {
+  Body,
   Controller,
   HttpCode,
+  Inject,
   Post,
   UploadedFiles,
   UseFilters,
@@ -18,16 +20,23 @@ import {
 } from "../../application/connect-sources.use-case";
 import {
   MAX_FILES_PER_UPLOAD,
+  validateDurationSeconds,
   validateSourceFiles,
 } from "../../domain/source-file-policy";
+import { SOURCE_MEDIA_ENABLED } from "../../sources.tokens";
 import { sourceHttpError } from "../source-error-response";
 import { SourceUploadExceptionFilter } from "../source-upload.exception-filter";
 
-/** Accepts up to five PDF/TXT/Markdown files and starts async indexing. */
+type MultipartBody = { durationSeconds?: string | number };
+
+/** Accepts up to five supported files and starts async indexing. */
 @Controller("sources")
 @UseFilters(SourceUploadExceptionFilter)
 export class ConnectSourcesRequestHandler {
-  constructor(private readonly connectSources: ConnectSourcesUseCase) {}
+  constructor(
+    private readonly connectSources: ConnectSourcesUseCase,
+    @Inject(SOURCE_MEDIA_ENABLED) private readonly mediaEnabled: boolean,
+  ) {}
 
   @Post()
   @HttpCode(202)
@@ -36,14 +45,20 @@ export class ConnectSourcesRequestHandler {
   async handle(
     @CurrentUser() user: AuthUser,
     @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: MultipartBody,
   ): Promise<ConnectSourcesResult> {
     try {
+      const durationSeconds = validateDurationSeconds(body?.durationSeconds);
       const validated = validateSourceFiles(
         (files ?? []).map((file) => ({
           originalName: file.originalname,
           mimeType: file.mimetype,
           buffer: file.buffer,
+          durationSeconds,
         })),
+        undefined,
+        undefined,
+        { allowMedia: this.mediaEnabled },
       );
 
       return await this.connectSources.execute({

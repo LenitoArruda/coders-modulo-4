@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { SourcesRepositoryPort } from "../../modules/sources/application/ports/sources-repository.port";
 import type {
   Chunk,
+  MediaSourceMetadata,
   NewSourceVersion,
   Source,
   SourceStatus,
@@ -106,6 +107,11 @@ export class InMemorySourcesRepository extends SourcesRepositoryPort {
     this.order += 1;
     const version: StoredVersion = {
       ...input,
+      processingPhase: null,
+      mediaType: input.mediaType ?? null,
+      durationSeconds: input.durationSeconds ?? null,
+      extractionMethod: null,
+      extractionModelVersion: null,
       id: randomUUID(),
       chunkCount: 0,
       errorMessage: null,
@@ -185,6 +191,19 @@ export class InMemorySourcesRepository extends SourcesRepositoryPort {
     version.updatedAt = new Date();
   }
 
+  async updateVersionProgress(
+    userId: string,
+    versionId: string,
+    progress: MediaSourceMetadata,
+  ): Promise<void> {
+    const version = await this.findVersion(userId, versionId);
+
+    if (version === null) return;
+
+    Object.assign(version, progress);
+    version.updatedAt = new Date();
+  }
+
   async activateVersion(
     userId: string,
     sourceId: string,
@@ -222,11 +241,17 @@ export class InMemorySourcesRepository extends SourcesRepositoryPort {
           type: source.type,
           byteSize: version.byteSize,
           status: version.status,
+          errorMessage: version.errorMessage ?? null,
           versionId: version.id,
           versionNumber: sourceVersions.indexOf(version) + 1,
           chunkCount: version.chunkCount,
           isStale: false,
           createdAt: source.createdAt,
+          processingPhase: version.processingPhase ?? null,
+          mediaType: version.mediaType ?? null,
+          durationSeconds: version.durationSeconds ?? null,
+          extractionMethod: version.extractionMethod ?? null,
+          extractionModelVersion: version.extractionModelVersion ?? null,
         };
       });
   }

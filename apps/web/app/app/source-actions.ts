@@ -1,11 +1,17 @@
 "use server";
 
 import { fetchApiWithSession } from "../../lib/auth/api-client";
+import { isKnowledgeMediaEnabled } from "../../lib/knowledge/flags";
 import {
   ALREADY_CONNECTED_MESSAGE,
+  ALL_SOURCE_FORMATS_MESSAGE,
   CONNECT_SOURCES_PATH,
+  MAX_AUDIO_FILE_BYTES,
   MAX_FILES_PER_UPLOAD,
+  MAX_IMAGE_FILE_BYTES,
+  MAX_MEDIA_DURATION_SECONDS,
   MAX_SOURCE_FILE_BYTES,
+  MAX_VIDEO_FILE_BYTES,
   SESSION_EXPIRED_MESSAGE,
   SOURCE_CONNECT_FAILED_MESSAGE,
   SOURCE_DELETE_FAILED_MESSAGE,
@@ -14,6 +20,7 @@ import {
   SOURCE_RETRY_FAILED_MESSAGE,
   type ConnectSourcesResponse,
   type ListSourcesResponse,
+  type MediaType,
   type SourceActionResult,
 } from "../../lib/knowledge/types";
 
@@ -28,10 +35,32 @@ const PUBLIC_SOURCE_CODES = new Set([
   "SOURCE_FILE_TOO_LARGE",
   "TOO_MANY_SOURCE_FILES",
   "EMPTY_SOURCE_FILE",
+  "MEDIA_DURATION_TOO_LONG",
+  "INVALID_MEDIA_DURATION",
+  "NO_SPEECH_DETECTED",
+  "MEDIA_EXTRACTION_UNAVAILABLE",
+  "SOURCE_PROCESSING_FAILED",
+  "SOURCE_VECTOR_STORE_UNAVAILABLE",
+  "SOURCE_EMBEDDING_UNAVAILABLE",
   "SOURCE_NOT_FOUND",
   "SOURCE_VERSION_NOT_FOUND",
   "VALIDATION_ERROR",
 ]);
+
+const DOCUMENT_EXTENSIONS = [".pdf", ".txt", ".md", ".markdown"];
+const MEDIA_EXTENSIONS: Record<string, MediaType> = {
+  ".jpg": "image",
+  ".jpeg": "image",
+  ".png": "image",
+  ".mp3": "audio",
+  ".mp4": "video",
+};
+
+const MEDIA_SIZE_LIMITS: Record<MediaType, number> = {
+  image: MAX_IMAGE_FILE_BYTES,
+  audio: MAX_AUDIO_FILE_BYTES,
+  video: MAX_VIDEO_FILE_BYTES,
+};
 
 async function readErrorBody(response: Response): Promise<ApiError> {
   try {
@@ -54,12 +83,7 @@ function apiFailure<T>(
 ): SourceActionResult<T> {
   if (status === 401) return failure<T>(SESSION_EXPIRED_MESSAGE);
 
-  if (
-    status >= 400 &&
-    status < 500 &&
-    body.code !== undefined &&
-    PUBLIC_SOURCE_CODES.has(body.code)
-  ) {
+  if (body.code !== undefined && PUBLIC_SOURCE_CODES.has(body.code)) {
     return failure<T>(body.message ?? fallback);
   }
 
@@ -74,15 +98,50 @@ async function readJson<T>(response: Response): Promise<SourceActionResult<T>> {
   }
 }
 
-function supportedFileName(name: string): boolean {
+function mediaTypeForName(name: string): MediaType | null {
   const normalized = name.trim().toLowerCase();
 
   return (
-    normalized.endsWith(".pdf") ||
-    normalized.endsWith(".txt") ||
-    normalized.endsWith(".md") ||
-    normalized.endsWith(".markdown")
+    Object.entries(MEDIA_EXTENSIONS).find(([extension]) =>
+      normalized.endsWith(extension),
+    )?.[1] ?? null
   );
+}
+
+function supportedFileName(name: string, mediaEnabled: boolean): boolean {
+  const normalized = name.trim().toLowerCase();
+  const isDocument = DOCUMENT_EXTENSIONS.some((extension) =>
+    normalized.endsWith(extension),
+  );
+
+  return isDocument || (mediaEnabled && mediaTypeForName(name) !== null);
+}
+
+function maxBytesFor(file: File, mediaEnabled: boolean): number {
+  if (mediaEnabled) {
+    const mediaType = mediaTypeForName(file.name);
+
+    if (mediaType !== null) return MEDIA_SIZE_LIMITS[mediaType];
+  }
+
+  return MAX_SOURCE_FILE_BYTES;
+}
+
+function validateDuration(value: FormDataEntryValue | null): string | null {
+  if (value === null || typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const seconds = Number(value.trim());
+
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "Enter a valid duration in seconds, up to 60 minutes.";
+  }
+  if (seconds > MAX_MEDIA_DURATION_SECONDS) {
+    return "Media longer than 60 minutes is not supported. Try a shorter file.";
+  }
+
+  return null;
 }
 
 /** Lists only the authenticated user's sources; the token stays on the server. */
@@ -117,24 +176,44 @@ export async function listSourcesAction(): Promise<
 export async function connectSourcesAction(
   formData: FormData,
 ): Promise<SourceActionResult<ConnectSourcesResponse>> {
+  const mediaEnabled = await isKnowledgeMediaEnabled();
+  const formats = mediaEnabled
+    ? ALL_SOURCE_FORMATS_MESSAGE
+    : SOURCE_FORMATS_MESSAGE;
+
+  // The flag is resolved on the server; a client cannot enable media here.
+  formData.delete("allowMedia");
+
   const files = formData
     .getAll("files")
     .filter((entry): entry is File => entry instanceof File);
 
   if (files.length === 0) {
-    return failure(`Choose at least one ${SOURCE_FORMATS_MESSAGE} file.`);
+    return failure(`Choose at least one ${formats} file.`);
   }
   if (files.length > MAX_FILES_PER_UPLOAD) {
     return failure(`Choose up to ${MAX_FILES_PER_UPLOAD} files at a time.`);
   }
-  if (files.some((file) => !supportedFileName(file.name))) {
-    return failure(`Only ${SOURCE_FORMATS_MESSAGE} files are supported.`);
+  if (files.some((file) => !supportedFileName(file.name, mediaEnabled))) {
+    return failure(`Only ${formats} files are supported.`);
   }
   if (
-    files.some((file) => file.size === 0 || file.size > MAX_SOURCE_FILE_BYTES)
+    files.some(
+      (file) => file.size === 0 || file.size > maxBytesFor(file, mediaEnabled),
+    )
   ) {
-    return failure("One of the files is too large or empty. Try another file.");
+    return failure("One of the files is too large. Try a smaller file.");
   }
+
+  const hasMedia = files.some((file) => mediaTypeForName(file.name) !== null);
+
+  if (hasMedia) {
+    const durationError = validateDuration(formData.get("durationSeconds"));
+
+    if (durationError !== null) return failure(durationError);
+  }
+
+  if (mediaEnabled) formData.set("allowMedia", "true");
 
   let response: Response;
 

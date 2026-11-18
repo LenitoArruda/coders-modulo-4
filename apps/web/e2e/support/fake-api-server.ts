@@ -466,8 +466,10 @@ async function handleResetPassword(
   sendJson(response, 200, { message: RESET_PASSWORD_SUCCESS_MESSAGE });
 }
 
-type SourceType = "pdf" | "txt" | "markdown";
+type MediaType = "image" | "audio" | "video";
+type SourceType = "pdf" | "txt" | "markdown" | MediaType;
 type SourceStatus = "queued" | "processing" | "ready" | "failed";
+type ProcessingPhase = "extracting" | "chunking" | "embedding";
 
 type UploadedFile = {
   originalName: string;
@@ -485,6 +487,10 @@ type FakeSourceVersion = {
   chunkCount: number;
   createdAt: string;
   polls: number;
+  processingPhase?: ProcessingPhase | null;
+  mediaType?: MediaType | null;
+  durationSeconds?: number | null;
+  errorMessage?: string | null;
 };
 
 type FakeSource = {
@@ -505,13 +511,21 @@ type FakeSourceSummary = {
   chunkCount: number;
   isStale: boolean;
   createdAt: string;
+  processingPhase?: ProcessingPhase | null;
+  mediaType?: MediaType | null;
+  durationSeconds?: number | null;
+  errorMessage?: string | null;
 };
 
 const MAX_FAKE_SOURCE_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FAKE_MEDIA_FILE_BYTES = 200 * 1024 * 1024;
 const MAX_FAKE_SOURCE_FILES = 5;
 
 const UNSUPPORTED_SOURCE_MESSAGE =
   "Only PDF, TXT or Markdown files are supported.";
+const UNSUPPORTED_ALL_SOURCE_MESSAGE =
+  "Only PDF, TXT, Markdown, JPEG, PNG, MP3 or MP4 files are supported.";
+const NO_SPEECH_MESSAGE = "No speech detected";
 const TOO_MANY_SOURCES_MESSAGE =
   "Too many files. Send up to 5 files at a time.";
 const EMPTY_SOURCE_MESSAGE = "The file has no text we can index.";
@@ -612,8 +626,16 @@ function fakeSourceType(file: UploadedFile): SourceType | null {
   if (name.endsWith(".pdf")) return "pdf";
   if (name.endsWith(".txt")) return "txt";
   if (name.endsWith(".md") || name.endsWith(".markdown")) return "markdown";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image";
+  if (name.endsWith(".png")) return "image";
+  if (name.endsWith(".mp3")) return "audio";
+  if (name.endsWith(".mp4")) return "video";
 
   return null;
+}
+
+function isFakeMediaType(type: SourceType): type is MediaType {
+  return type === "image" || type === "audio" || type === "video";
 }
 
 function normalizeFakeSourceName(name: string): string {
@@ -656,6 +678,10 @@ function toFakeSummary(source: FakeSource): FakeSourceSummary | null {
     chunkCount: version.chunkCount,
     isStale: false,
     createdAt: version.createdAt,
+    processingPhase: version.processingPhase ?? null,
+    mediaType: version.mediaType ?? null,
+    durationSeconds: version.durationSeconds ?? null,
+    errorMessage: version.errorMessage ?? null,
   };
 }
 
@@ -668,7 +694,7 @@ function sourceError(
   sendJson(response, status, { code, message });
 }
 
-/** GET /api/v1/sources — processing versions settle after a second poll. */
+/** GET /api/v1/sources — processing versions settle after a few polls. */
 function handleListSources(
   request: IncomingMessage,
   response: ServerResponse,
@@ -686,6 +712,19 @@ function handleListSources(
     if (version?.status !== "processing") continue;
 
     version.polls += 1;
+
+    if (version.mediaType !== undefined && version.mediaType !== null) {
+      if (version.polls === 1) {
+        version.processingPhase = "chunking";
+      } else if (version.polls === 2) {
+        version.processingPhase = "embedding";
+      } else if (version.polls >= 3) {
+        version.status = "ready";
+        version.processingPhase = null;
+        version.chunkCount = fakeChunkCount(version);
+      }
+      continue;
+    }
 
     if (version.polls >= 2) {
       version.status = "ready";
@@ -732,12 +771,14 @@ async function handleConnectSources(
   }
 
   for (const file of files) {
-    if (fakeSourceType(file) === null) {
+    const type = fakeSourceType(file);
+
+    if (type === null) {
       sourceError(
         response,
         400,
         "UNSUPPORTED_SOURCE_FILE",
-        UNSUPPORTED_SOURCE_MESSAGE,
+        UNSUPPORTED_ALL_SOURCE_MESSAGE,
       );
       return;
     }
@@ -745,7 +786,11 @@ async function handleConnectSources(
       sourceError(response, 400, "EMPTY_SOURCE_FILE", EMPTY_SOURCE_MESSAGE);
       return;
     }
-    if (file.buffer.byteLength > MAX_FAKE_SOURCE_FILE_BYTES) {
+    const limit = isFakeMediaType(type)
+      ? MAX_FAKE_MEDIA_FILE_BYTES
+      : MAX_FAKE_SOURCE_FILE_BYTES;
+
+    if (file.buffer.byteLength > limit) {
       sourceError(
         response,
         400,
@@ -793,7 +838,11 @@ async function handleConnectSources(
       sources.unshift(source);
     }
 
-    const shouldFail = /fail|broken|corrupt/i.test(file.originalName);
+    const mediaType = isFakeMediaType(type) ? type : null;
+    const silentMedia =
+      mediaType !== null && /silent|no-speech/i.test(file.originalName);
+    const shouldFail =
+      /fail|broken|corrupt/i.test(file.originalName) || silentMedia;
     const status: SourceStatus = shouldFail ? "failed" : "processing";
     const version: FakeSourceVersion = {
       id: nextSourceId("ver"),
@@ -805,6 +854,11 @@ async function handleConnectSources(
       chunkCount: 0,
       createdAt: new Date().toISOString(),
       polls: /pending/i.test(file.originalName) ? 0 : 1,
+      processingPhase:
+        mediaType !== null && status === "processing" ? "extracting" : null,
+      mediaType,
+      durationSeconds: null,
+      errorMessage: silentMedia ? NO_SPEECH_MESSAGE : null,
     };
 
     source.versions.push(version);
@@ -818,6 +872,9 @@ async function handleConnectSources(
       versionId: version.id,
       status,
       alreadyConnected: false,
+      processingPhase: version.processingPhase ?? null,
+      mediaType,
+      durationSeconds: null,
     };
   });
 
@@ -874,6 +931,8 @@ function handleRetrySourceVersion(
   }
 
   match.status = "ready";
+  match.processingPhase = null;
+  match.errorMessage = null;
   match.chunkCount = fakeChunkCount(match);
   sendJson(response, 202, { versionId: match.id, status: "processing" });
 }
