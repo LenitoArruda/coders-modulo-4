@@ -63,6 +63,17 @@ export const DEFAULT_RAG_THRESHOLD = 0.35;
 export const DEFAULT_RAG_MAX_CONTEXT_CHARS = 6_000;
 export const DEFAULT_RAG_MAX_HISTORY_MESSAGES = 6;
 
+/** Defaults for the optional multimedia deliverables slice (spec 017). */
+export const DEFAULT_MEDIA_IMAGE_MODEL_ID = "gpt-image-2";
+export const DEFAULT_MEDIA_VIDEO_MODEL_ID = "gemini-omni-1.2-flash";
+export const DEFAULT_MEDIA_IMAGE_QUOTA_PER_HOUR = 10;
+export const DEFAULT_MEDIA_VIDEO_QUOTA_PER_HOUR = 2;
+export const DEFAULT_MEDIA_QUOTA_WINDOW_SECONDS = 3_600;
+export const DEFAULT_MEDIA_MAX_FILE_BYTES = 20 * 1024 * 1024;
+export const DEFAULT_OPENAI_API_BASE_URL = "https://api.openai.com";
+export const DEFAULT_GEMINI_API_BASE_URL =
+  "https://generativelanguage.googleapis.com";
+
 export type Env = {
   /** Effective runtime environment (`NODE_ENV` normalized, defaulting to `dev`). */
   nodeEnv: string;
@@ -113,6 +124,18 @@ export type Env = {
   ragMaxContextChars: number;
   /** Recent messages included in the grounded prompt. */
   ragMaxHistoryMessages: number;
+  /** Enables image/video deliverables; disabled by default (spec 017). */
+  multimediaDeliverablesEnabled: boolean;
+  mediaImageModelId: string;
+  mediaVideoModelId: string;
+  mediaImageQuotaPerHour: number;
+  mediaVideoQuotaPerHour: number;
+  mediaQuotaWindowSeconds: number;
+  mediaMaxFileBytes: number;
+  openaiApiBaseUrl: string;
+  geminiApiBaseUrl: string;
+  /** Gemini API key (secret); empty until configured. */
+  geminiApiKey: string;
 };
 
 export class ConfigurationError extends Error {
@@ -465,6 +488,67 @@ export function loadEnv(source: EnvSource = process.env): Env {
     invalid.push("RAG_MAX_HISTORY_MESSAGES");
   }
 
+  const multimediaDeliverablesEnabled =
+    readBooleanFlag(readString(source.MULTIMEDIA_DELIVERABLES_ENABLED)) ??
+    false;
+  const mediaImageModelId =
+    readString(source.MEDIA_IMAGE_MODEL_ID) || DEFAULT_MEDIA_IMAGE_MODEL_ID;
+  const mediaVideoModelId =
+    readString(source.MEDIA_VIDEO_MODEL_ID) || DEFAULT_MEDIA_VIDEO_MODEL_ID;
+  const mediaImageQuotaPerHour = Number(
+    readString(source.MEDIA_IMAGE_QUOTA_PER_HOUR) ||
+      String(DEFAULT_MEDIA_IMAGE_QUOTA_PER_HOUR),
+  );
+  const mediaVideoQuotaPerHour = Number(
+    readString(source.MEDIA_VIDEO_QUOTA_PER_HOUR) ||
+      String(DEFAULT_MEDIA_VIDEO_QUOTA_PER_HOUR),
+  );
+  const mediaQuotaWindowSeconds = Number(
+    readString(source.MEDIA_QUOTA_WINDOW_SECONDS) ||
+      String(DEFAULT_MEDIA_QUOTA_WINDOW_SECONDS),
+  );
+  const mediaMaxFileBytes =
+    Number(
+      readString(source.MEDIA_MAX_FILE_BYTES) ||
+        String(DEFAULT_MEDIA_MAX_FILE_BYTES),
+    ) || DEFAULT_MEDIA_MAX_FILE_BYTES;
+  const openaiApiBaseUrl =
+    readString(source.OPENAI_API_BASE_URL) || DEFAULT_OPENAI_API_BASE_URL;
+  const geminiApiBaseUrl =
+    readString(source.GEMINI_API_BASE_URL) || DEFAULT_GEMINI_API_BASE_URL;
+  const geminiApiKey = readString(source.GEMINI_API_KEY);
+
+  if (
+    !Number.isInteger(mediaImageQuotaPerHour) ||
+    mediaImageQuotaPerHour < 1 ||
+    mediaImageQuotaPerHour > 10_000
+  ) {
+    invalid.push("MEDIA_IMAGE_QUOTA_PER_HOUR");
+  }
+  if (
+    !Number.isInteger(mediaVideoQuotaPerHour) ||
+    mediaVideoQuotaPerHour < 1 ||
+    mediaVideoQuotaPerHour > 10_000
+  ) {
+    invalid.push("MEDIA_VIDEO_QUOTA_PER_HOUR");
+  }
+  if (
+    !Number.isInteger(mediaQuotaWindowSeconds) ||
+    mediaQuotaWindowSeconds < 60 ||
+    mediaQuotaWindowSeconds > 86_400
+  ) {
+    invalid.push("MEDIA_QUOTA_WINDOW_SECONDS");
+  }
+  if (
+    !Number.isInteger(mediaMaxFileBytes) ||
+    mediaMaxFileBytes < 1_024 ||
+    mediaMaxFileBytes > 104_857_600
+  ) {
+    invalid.push("MEDIA_MAX_FILE_BYTES");
+  }
+  if (!isValidHttpUrl(openaiApiBaseUrl)) invalid.push("OPENAI_API_BASE_URL");
+  if (!isValidHttpUrl(geminiApiBaseUrl)) invalid.push("GEMINI_API_BASE_URL");
+
   if (emailProvider === "resend") {
     if (!resendApiKey) missing.push("RESEND_API_KEY");
   } else if (!mailtrapApiToken) {
@@ -541,5 +625,15 @@ export function loadEnv(source: EnvSource = process.env): Env {
     ragThreshold,
     ragMaxContextChars,
     ragMaxHistoryMessages,
+    multimediaDeliverablesEnabled,
+    mediaImageModelId,
+    mediaVideoModelId,
+    mediaImageQuotaPerHour,
+    mediaVideoQuotaPerHour,
+    mediaQuotaWindowSeconds,
+    mediaMaxFileBytes,
+    openaiApiBaseUrl,
+    geminiApiBaseUrl,
+    geminiApiKey,
   };
 }

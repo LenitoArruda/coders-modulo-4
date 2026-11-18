@@ -101,6 +101,7 @@ export class InMemoryConversationsRepository extends ConversationsRepositoryPort
       ...(exchange.answerStatus === undefined
         ? {}
         : { answerStatus: exchange.answerStatus }),
+      ...(exchange.media === undefined ? {} : { media: exchange.media }),
     };
 
     this.messages.push(userMessage, expertMessage);

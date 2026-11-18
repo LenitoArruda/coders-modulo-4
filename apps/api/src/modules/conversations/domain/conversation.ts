@@ -3,6 +3,7 @@ import type {
   Citation,
   RetrievalMetadata,
 } from "../../citations/domain/citation";
+import type { MediaAttachment } from "../../media/domain/media";
 
 /** One transcript per (authenticated user, Expert). */
 export type Conversation = {
@@ -26,6 +27,8 @@ export type ConversationMessage = {
   citations?: Citation[];
   retrieval?: RetrievalMetadata | null;
   answerStatus?: AnswerStatus;
+  /** Media deliverables attached to this Expert reply (spec 017). */
+  media?: MediaAttachment[];
 };
 
 export type NewExchange = {
@@ -34,6 +37,7 @@ export type NewExchange = {
   citations?: Citation[];
   retrieval?: RetrievalMetadata | null;
   answerStatus?: AnswerStatus;
+  media?: MediaAttachment[];
 };
 
 /** Emitted by the web when a click or submission originates a prompt. */

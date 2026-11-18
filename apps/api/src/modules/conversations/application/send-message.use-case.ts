@@ -13,6 +13,10 @@ import type {
   GroundedAnswer,
   GroundingContext,
 } from "../../citations/domain/citation";
+import { RequestMediaGenerationUseCase } from "../../media/application/request-media-generation.use-case";
+import { MediaGenerationRepositoryPort } from "../../media/application/ports/media-generation-repository.port";
+import type { MediaAttachment } from "../../media/domain/media";
+import { MEDIA_ENABLED } from "../../media/media.tokens";
 import {
   DEFAULT_RAG_MAX_CONTEXT_CHARS,
   DEFAULT_RAG_MAX_HISTORY_MESSAGES,
@@ -77,6 +81,15 @@ export class SendMessageUseCase {
     @Optional()
     @Inject(RAG_MAX_HISTORY_MESSAGES)
     private readonly maxHistoryMessages: number = DEFAULT_RAG_MAX_HISTORY_MESSAGES,
+    @Optional()
+    @Inject(MEDIA_ENABLED)
+    private readonly mediaEnabled: boolean = false,
+    @Optional()
+    @Inject(RequestMediaGenerationUseCase)
+    private readonly requestMedia: RequestMediaGenerationUseCase | null = null,
+    @Optional()
+    @Inject(MediaGenerationRepositoryPort)
+    private readonly mediaRepository: MediaGenerationRepositoryPort | null = null,
   ) {}
 
   async execute(input: SendMessageInput): Promise<SendMessageResult> {
@@ -111,6 +124,32 @@ export class SendMessageUseCase {
       expert.id,
     );
 
+    const needsTranscript =
+      existingConversation !== null && (this.mediaEnabled || this.ragEnabled);
+    const transcript: ConversationMessage[] = needsTranscript
+      ? await this.conversations.listMessages(
+          existingConversation!.id,
+          input.userId,
+        )
+      : [];
+
+    const mediaResult =
+      this.mediaEnabled && this.requestMedia !== null
+        ? await this.requestMedia.execute({
+            userId: input.userId,
+            expertId: expert.id,
+            expertName: expert.name,
+            expertTone: expert.tone,
+            prompt: input.prompt,
+            citations:
+              [...transcript]
+                .reverse()
+                .find((message) => message.role === "expert")?.citations ?? [],
+          })
+        : null;
+    const mediaAttachments: MediaAttachment[] =
+      mediaResult?.outcome === "queued" ? [mediaResult.attachment] : [];
+
     const retriever = this.retrieveContext;
     const canRetrieve = this.ragEnabled && retriever !== null;
     const grounding: GroundingContext | null =
@@ -125,48 +164,58 @@ export class SendMessageUseCase {
         : null;
     const history: ConversationMessage[] =
       grounding !== null && existingConversation !== null
-        ? (
-            await this.conversations.listMessages(
-              existingConversation.id,
-              input.userId,
-            )
-          ).slice(-this.maxHistoryMessages)
+        ? transcript.slice(-this.maxHistoryMessages)
         : [];
 
     let reply: string;
     let groundedAnswer: GroundedAnswer | null = null;
 
-    try {
-      reply = await this.responder.respond(
-        expert,
-        input.prompt,
-        grounding,
-        history,
-      );
-
-      if (grounding !== null) {
-        const composer = this.composeAnswer ?? new ComposeCitedAnswerUseCase();
-
-        groundedAnswer = composer.execute(reply, grounding);
-        reply = groundedAnswer.content;
-      }
-    } catch (error) {
-      log("warn", "expert.chat", {
-        event: "response.failed",
+    if (mediaResult !== null && mediaResult.outcome !== "none") {
+      reply =
+        mediaResult.outcome === "text"
+          ? mediaResult.message
+          : mediaResult.reply;
+      log("info", "expert.chat", {
+        event: "response.completed",
         expertId: expert.id,
         userId: input.userId,
         conversationId: existingConversation?.id,
         durationMs: Date.now() - startedAt,
-        outcome: "model_unavailable",
-        error: error instanceof Error ? error.name : "unknown",
+        outcome: mediaResult.outcome,
       });
+    } else
+      try {
+        reply = await this.responder.respond(
+          expert,
+          input.prompt,
+          grounding,
+          history,
+        );
 
-      if (error instanceof ModelUnavailableError) {
-        throw error;
+        if (grounding !== null) {
+          const composer =
+            this.composeAnswer ?? new ComposeCitedAnswerUseCase();
+
+          groundedAnswer = composer.execute(reply, grounding);
+          reply = groundedAnswer.content;
+        }
+      } catch (error) {
+        log("warn", "expert.chat", {
+          event: "response.failed",
+          expertId: expert.id,
+          userId: input.userId,
+          conversationId: existingConversation?.id,
+          durationMs: Date.now() - startedAt,
+          outcome: "model_unavailable",
+          error: error instanceof Error ? error.name : "unknown",
+        });
+
+        if (error instanceof ModelUnavailableError) {
+          throw error;
+        }
+
+        throw new ModelUnavailableError(error);
       }
-
-      throw new ModelUnavailableError(error);
-    }
 
     const conversation =
       existingConversation ??
@@ -185,8 +234,18 @@ export class SendMessageUseCase {
               retrieval: groundedAnswer.retrieval,
               answerStatus: groundedAnswer.answerStatus,
             }),
+        ...(mediaAttachments.length === 0 ? {} : { media: mediaAttachments }),
       },
     );
+
+    if (mediaResult?.outcome === "queued" && this.mediaRepository !== null) {
+      await this.mediaRepository.linkMessage(
+        mediaResult.attachment.mediaId,
+        exchange.expertMessage.id,
+        conversation.id,
+        input.userId,
+      );
+    }
 
     log("info", "expert.chat", {
       event: "response.completed",
