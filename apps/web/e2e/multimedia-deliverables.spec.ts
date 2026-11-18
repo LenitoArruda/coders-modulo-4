@@ -4,8 +4,8 @@ import {
   E2E_SIGN_IN_DOMAIN,
   E2E_SIGN_IN_PASSWORD,
 } from "./support/fake-session";
+import { FAKE_API_URL, WEB_URL } from "./support/ports";
 
-const FAKE_API_URL = "http://127.0.0.1:3437";
 const FLAG_COOKIE = "multimedia_deliverables_enabled";
 
 /** Each test owns an account so transcripts and deliverables stay isolated. */
@@ -18,9 +18,7 @@ function uniqueEmail(label: string): string {
 async function signIn(page: Page, label = "media"): Promise<void> {
   await page
     .context()
-    .addCookies([
-      { name: FLAG_COOKIE, value: "1", url: "http://127.0.0.1:3017" },
-    ]);
+    .addCookies([{ name: FLAG_COOKIE, value: "1", url: WEB_URL }]);
   await page.goto("/auth/sign-in");
   await page.getByLabel(/^Email/).fill(uniqueEmail(label));
   await page.getByLabel(/^Password/).fill(E2E_SIGN_IN_PASSWORD);
