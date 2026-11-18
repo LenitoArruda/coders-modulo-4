@@ -531,3 +531,50 @@ Limitação registrada:
   aplicação local do schema não foi confirmada.
 - `bun run db:test` não foi autorizado para esta entrega e não foi executado. A validação real com
   PostgreSQL, Weaviate e OpenAI segue como follow-up de integração.
+
+---
+
+## 12. Evidências da spec 015 (2026-11-18)
+
+Executada no worktree `C:\Users\Gamer\Desktop\pos graduacao\PROJETOS\spec-015`, branch `spec/015`,
+sem ler, exibir ou versionar `.env`. O banco de validação ficou isolado em `127.0.0.1:55433`.
+
+| Comando                           | Resultado                                                                           |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `bun run db:migrate`              | ok — 4 migrações aplicadas; rerun final: "nenhuma migração pendente"                |
+| `bun run db:test`                 | ok — 4 arquivos (`001`, `002`, `003`, `004_knowledge_media.test.sql`)               |
+| `bun run lint`                    | ok — todos os pacotes                                                               |
+| `bun run types:check`             | ok — todos os pacotes                                                               |
+| `bun run test`                    | ok — API 67 arquivos / 442 testes; web 12 arquivos / 142 testes                     |
+| `bun run build`                   | ok — `api` + `web`, 10,83 s                                                         |
+| Playwright (146 testes, 1 worker) | ok — 146/146 aprovados em 4,6 min, com portas isoladas 3015 (web) e 3435 (fake API) |
+
+A suíte E2E completa foi executada com o mesmo Playwright, os mesmos 146 cenários e o mesmo código
+do gate `bun run test:e2e`, mas com portas isoladas porque outras worktrees (`spec/014`, `spec/016`)
+usavam simultaneamente as portas padrão 3000/3434. O comando equivalente executado foi:
+
+```text
+bun x playwright test --config=playwright.isolated.config.ts --workers=1
+```
+
+O arquivo de configuração isolado e a cópia temporária dos cenários foram removidos após a execução;
+nenhum arquivo de `playwright.config.ts`, da 014 ou das specs 016–018 foi alterado.
+
+Tentativas anteriores de `bun run test:e2e` nas portas padrão foram invalidadas por
+`reuseExistingServer` ao reaproveitar servidores `next dev`/fake API de outras worktrees em
+execução concorrente, produzindo `ERR_CONNECTION_REFUSED` e timeouts sem relação com a fatia 015.
+A execução isolada acima cobre integralmente os 10 cenários de mídia e a regressão da 013,
+incluindo os seletores e rótulos preservados (`knowledge-source-files`, "Add files", mensagens
+padrão e ordem de tabulação).
+
+Cobertura E2E da fatia 015:
+
+- flag desligada esconde Image/Audio/Video; ligada por cookie expõe os controles;
+- PNG, MP3 e MP4 passam por `processing` até `ready` e são indexados;
+- reenvio idêntico informa "Already connected" sem duplicar;
+- formato não suportado lista todos os formatos aceitos;
+- áudio sem fala falha com "No speech detected" e oferece "Try again";
+- isolamento por usuário autenticado, navegação por teclado e 360/768/1280 px sem rolagem horizontal.
+
+Commit local principal: `3d29102 feat: connect image, audio and video as knowledge sources`
+(sem push, merge ou alterações na branch principal).

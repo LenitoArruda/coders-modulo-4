@@ -87,8 +87,9 @@ Mapear os dez critérios da spec para entregas verificáveis:
 - **Observabilidade:** eventos `media.upload.accepted`, `media.source.reused`,
   `media.extraction.started/completed/failed` e `media.source.deleted` com IDs opacos,
   duração de cada etapa e tipo de mídia; nunca conteúdo, nome de arquivo, hash ou chave.
-- **Flag:** `knowledge_media_enabled` lida no servidor do web; padrão `false`, ligada apenas
-  no ambiente de E2E pela config do Playwright, conforme o rollout da spec.
+- **Flag:** `knowledge_media_enabled` lida no servidor do web (env ou cookie); padrão `false`.
+  Os cenários E2E de mídia ligam a flag com cookie no contexto do navegador, sem alterar a config
+  global do Playwright, para preservar as expectativas da suíte da 013.
 
 ## 5. Arquivos e áreas afetadas
 
@@ -98,7 +99,7 @@ Mapear os dez critérios da spec para entregas verificáveis:
 - `db/migrations/0004_knowledge_media.sql`, `db/tests/004_knowledge_media.test.sql`.
 - `apps/web/lib/knowledge/types.ts`, `apps/web/app/app/source-actions.ts`,
   `apps/web/app/app/_components/knowledge-sources.tsx`, `apps/web/app/app/page.tsx`,
-  `apps/web/next.config.js`, `apps/web/playwright.config.ts`.
+  `apps/web/next.config.js` (`bodySizeLimit`), sem alterar `playwright.config.ts`.
 - `apps/web/e2e/support/fake-api-server.ts`, `apps/web/e2e/knowledge-media.spec.ts`.
 - `.docs/ARCHITECTURE.md`, `.docs/QA.md`, `.docs/BUSINESS.md`, `.specs/015-knowledge-media.md`,
   este plano.
@@ -164,7 +165,22 @@ Cada critério de aceite é coberto por ao menos um teste listado no plano de te
 
 ## 11. Evidências e pendências
 
-- Preenchido ao final com resultados de `db:migrate`, `db:test`, `lint`, `types:check`, `test`,
-  `build` e `test:e2e`, além de hashes de commit.
-- Seguem como decisões abertas do solicitante: modelos locais, OCR de frames de vídeo, limites
-  definitivos, idioma da transcrição e retenção de arquivos volumosos.
+Executado em `spec/015` (worktree `C:\Users\Gamer\Desktop\pos graduacao\PROJETOS\spec-015`),
+sem ler, exibir ou versionar `.env`. Banco isolado em `127.0.0.1:55433` somente para validação.
+
+| Comando               | Resultado                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| `bun run db:migrate`  | ok — 4 migrações aplicadas; rerun final: "nenhuma migração pendente"                      |
+| `bun run db:test`     | ok — 4 arquivos (`001`, `002`, `003`, `004_knowledge_media.test.sql`)                     |
+| `bun run lint`        | ok — todos os pacotes                                                                     |
+| `bun run types:check` | ok — todos os pacotes                                                                     |
+| `bun run test`        | ok — API 67 arquivos / 442 testes; web 12 arquivos / 142 testes                           |
+| `bun run build`       | ok — `api` + `web`, 10,83 s                                                               |
+| `bun run test:e2e`    | ok — 146/146 testes em execução isolada (portas 3015/3435); detalhes em `.docs/QA.md` §12 |
+
+Commit local: `3d29102 feat: connect image, audio and video as knowledge sources` (sem push/merge).
+Evidência detalhada, incluindo o resultado final do E2E, está em `.docs/QA.md` §12.
+
+Seguem como decisões abertas do solicitante: modelos locais de OCR/transcrição, OCR de frames de
+vídeo, limites definitivos, idioma da transcrição, mídia por URL e retenção de arquivos volumosos.
+O adaptador local é configurável por comando; sem comando configurado a falha é explícita em en-US.
