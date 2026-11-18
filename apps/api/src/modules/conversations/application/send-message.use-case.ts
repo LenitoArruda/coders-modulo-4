@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Inject, Injectable, Optional } from "@nestjs/common";
 
 import { ComposeCitedAnswerUseCase } from "../../citations/application/compose-cited-answer.use-case";
@@ -20,6 +21,15 @@ import {
   DEFAULT_RAG_TOP_K,
 } from "../../shared/config/env";
 import { getExpertById } from "../../experts/domain/expert-catalog";
+import { TraceEmitter } from "../../observability/application/trace-emitter";
+import type {
+  TraceCorrelation,
+  TraceStatus,
+} from "../../observability/domain/trace-span";
+import {
+  EXPERT_MODEL_NAME,
+  EXPERT_PROMPT_VERSION,
+} from "../domain/expert-model";
 import {
   ModelUnavailableError,
   UnknownExpertError,
@@ -77,7 +87,47 @@ export class SendMessageUseCase {
     @Optional()
     @Inject(RAG_MAX_HISTORY_MESSAGES)
     private readonly maxHistoryMessages: number = DEFAULT_RAG_MAX_HISTORY_MESSAGES,
+    @Optional()
+    @Inject(TraceEmitter)
+    private readonly traceEmitter: TraceEmitter | null = null,
   ) {}
+
+  private emitTrace(input: {
+    spanId: string;
+    traceId: string;
+    startedAt: number;
+    userId: string;
+    expertId: string;
+    source: PromptSource;
+    conversationId?: string;
+    messageId?: string;
+    status: TraceStatus;
+    groundedAnswer: GroundedAnswer | null;
+    errorName?: string;
+  }): void {
+    this.traceEmitter?.emit({
+      id: input.spanId,
+      traceId: input.traceId,
+      name: "expert.chat",
+      kind: "chat",
+      startedAt: input.startedAt,
+      endedAt: Date.now(),
+      status: input.status,
+      userId: input.userId,
+      conversationId: input.conversationId,
+      messageId: input.messageId,
+      expertId: input.expertId,
+      modelId: EXPERT_MODEL_NAME,
+      metadata: {
+        source: input.source,
+        promptVersion: EXPERT_PROMPT_VERSION,
+        grounded: input.groundedAnswer !== null,
+        answerStatus: input.groundedAnswer?.answerStatus ?? "plain",
+        citationCount: input.groundedAnswer?.citations.length ?? 0,
+        ...(input.errorName === undefined ? {} : { error: input.errorName }),
+      },
+    });
+  }
 
   async execute(input: SendMessageInput): Promise<SendMessageResult> {
     const startedAt = Date.now();
@@ -86,6 +136,15 @@ export class SendMessageUseCase {
     if (expert === null) {
       throw new UnknownExpertError(input.expertId);
     }
+
+    const traceId = randomUUID();
+    const rootSpanId = randomUUID();
+    const trace: TraceCorrelation = {
+      traceId,
+      parentSpanId: rootSpanId,
+      userId: input.userId,
+      expertId: expert.id,
+    };
 
     log("info", "expert.chat", {
       event: "prompt.submitted",
@@ -121,6 +180,7 @@ export class SendMessageUseCase {
             topK: this.topK,
             threshold: this.threshold,
             maxContextChars: this.maxContextChars,
+            trace,
           })
         : null;
     const history: ConversationMessage[] =
@@ -142,6 +202,7 @@ export class SendMessageUseCase {
         input.prompt,
         grounding,
         history,
+        trace,
       );
 
       if (grounding !== null) {
@@ -151,6 +212,21 @@ export class SendMessageUseCase {
         reply = groundedAnswer.content;
       }
     } catch (error) {
+      const errorName = error instanceof Error ? error.name : "unknown";
+
+      this.emitTrace({
+        spanId: rootSpanId,
+        traceId,
+        startedAt,
+        userId: input.userId,
+        expertId: expert.id,
+        source: input.source,
+        conversationId: existingConversation?.id,
+        status: "error",
+        groundedAnswer,
+        errorName,
+      });
+
       log("warn", "expert.chat", {
         event: "response.failed",
         expertId: expert.id,
@@ -196,6 +272,28 @@ export class SendMessageUseCase {
       messageId: exchange.expertMessage.id,
       durationMs: Date.now() - startedAt,
       outcome: groundedAnswer === null ? "ok" : groundedAnswer.answerStatus,
+    });
+
+    const traceStatus: TraceStatus =
+      groundedAnswer === null
+        ? "ok"
+        : groundedAnswer.answerStatus === "no_match"
+          ? "no_match"
+          : groundedAnswer.answerStatus === "retrieval_unavailable"
+            ? "degraded"
+            : "ok";
+
+    this.emitTrace({
+      spanId: rootSpanId,
+      traceId,
+      startedAt,
+      userId: input.userId,
+      expertId: expert.id,
+      source: input.source,
+      conversationId: conversation.id,
+      messageId: exchange.expertMessage.id,
+      status: traceStatus,
+      groundedAnswer,
     });
 
     return {

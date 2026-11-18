@@ -4,6 +4,7 @@ import {
   E2E_SIGN_IN_DOMAIN,
   E2E_SIGN_IN_PASSWORD,
 } from "./support/fake-session";
+import { WEB_URL } from "./support/ports";
 
 const SIGN_IN_PATH = "/auth/sign-in";
 const EMPTY_MESSAGE =
@@ -30,9 +31,7 @@ function uniqueEmail(label: string): string {
 async function signIn(page: Page, label = "media"): Promise<void> {
   await page
     .context()
-    .addCookies([
-      { name: FLAG_COOKIE, value: "1", url: "http://127.0.0.1:3000" },
-    ]);
+    .addCookies([{ name: FLAG_COOKIE, value: "1", url: WEB_URL }]);
   await page.goto(SIGN_IN_PATH);
   await page.getByLabel(/^Email/).fill(uniqueEmail(label));
   await page.getByLabel(/^Password/).fill(E2E_SIGN_IN_PASSWORD);
@@ -128,9 +127,7 @@ test.describe("knowledge media", () => {
     await signIn(page, "media-off");
     await page
       .context()
-      .addCookies([
-        { name: FLAG_COOKIE, value: "0", url: "http://127.0.0.1:3000" },
-      ]);
+      .addCookies([{ name: FLAG_COOKIE, value: "0", url: WEB_URL }]);
     await page.reload();
 
     await openPanel(page);

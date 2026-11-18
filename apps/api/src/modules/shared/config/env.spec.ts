@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { ConfigurationError, loadEnv, type EnvSource } from "./env";
+import {
+  ConfigurationError,
+  isLocalTraceEndpoint,
+  loadEnv,
+  type EnvSource,
+} from "./env";
 
 const validEnv: EnvSource = {
   PORT: "3333",
@@ -32,6 +37,12 @@ describe("loadEnv", () => {
       mailtrapApiToken: "test-mailtrap-token",
       mailFromEmail: "hello@demomailtrap.co",
       mailFromName: "Experts",
+      obsTracingEnabled: false,
+      obsEndpoint: "http://127.0.0.1:1980",
+      obsApiKey: "",
+      obsUserPseudonymSalt: "",
+      obsTraceBatchSize: 32,
+      obsTraceFlushIntervalMs: 1_000,
     });
   });
 
@@ -460,5 +471,158 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ ...validEnv, WEB_ORIGIN: "not-a-url" })).toThrow(
       /WEB_ORIGIN/,
     );
+  });
+});
+
+describe("configuração de observabilidade (spec 018)", () => {
+  const enabledEnv: EnvSource = {
+    ...validEnv,
+    LANGSMITH_TRACING_ENABLED: "true",
+    LANGSMITH_ENDPOINT: "http://langsmith:1980",
+    LANGSMITH_API_KEY: "test-local-langsmith-key",
+    OBS_USER_PSEUDONYM_SALT: "test-local-pseudonym-salt",
+  };
+
+  it("deve manter a instrumentação desligada e sem credenciais por padrão", () => {
+    expect(
+      loadEnv({
+        ...validEnv,
+        LANGSMITH_ENDPOINT: "https://cloud.langsmith.com",
+        LANGSMITH_API_KEY: undefined,
+        OBS_USER_PSEUDONYM_SALT: undefined,
+      }),
+    ).toMatchObject({
+      obsTracingEnabled: false,
+      obsEndpoint: "https://cloud.langsmith.com",
+      obsApiKey: "",
+      obsUserPseudonymSalt: "",
+    });
+  });
+
+  it.each([
+    ["true", true],
+    ["1", true],
+    ["YES", true],
+    ["false", false],
+    ["0", false],
+    ["no", false],
+  ])("deve interpretar a flag %s", (value, expected) => {
+    expect(
+      loadEnv({ ...enabledEnv, LANGSMITH_TRACING_ENABLED: value })
+        .obsTracingEnabled,
+    ).toBe(expected);
+  });
+
+  it("deve falhar quando a flag é ambígua", () => {
+    expect(() =>
+      loadEnv({ ...validEnv, LANGSMITH_TRACING_ENABLED: "maybe" }),
+    ).toThrow(/LANGSMITH_TRACING_ENABLED/);
+  });
+
+  it("deve carregar configuração local quando a instrumentação está ligada", () => {
+    expect(loadEnv(enabledEnv)).toMatchObject({
+      obsTracingEnabled: true,
+      obsEndpoint: "http://langsmith:1980",
+      obsApiKey: "test-local-langsmith-key",
+      obsUserPseudonymSalt: "test-local-pseudonym-salt",
+      obsTraceBatchSize: 32,
+      obsTraceFlushIntervalMs: 1_000,
+    });
+  });
+
+  it("deve rejeitar endpoint cloud quando a instrumentação está ligada", () => {
+    expect(() =>
+      loadEnv({
+        ...enabledEnv,
+        LANGSMITH_ENDPOINT: "https://eu.api.langsmith.com",
+      }),
+    ).toThrow(/LANGSMITH_ENDPOINT/);
+
+    expect(() =>
+      loadEnv({ ...enabledEnv, LANGSMITH_ENDPOINT: "not-a-url" }),
+    ).toThrow(/LANGSMITH_ENDPOINT/);
+  });
+
+  it("deve exigir chave local e sal quando a instrumentação está ligada", () => {
+    try {
+      loadEnv({
+        ...enabledEnv,
+        LANGSMITH_API_KEY: undefined,
+        OBS_USER_PSEUDONYM_SALT: undefined,
+      });
+      expect.unreachable("loadEnv deveria lançar ConfigurationError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigurationError);
+      expect((error as ConfigurationError).missing).toEqual(
+        expect.arrayContaining([
+          "LANGSMITH_API_KEY",
+          "OBS_USER_PSEUDONYM_SALT",
+        ]),
+      );
+      expect((error as ConfigurationError).message).not.toContain(
+        "test-local-langsmith-key",
+      );
+    }
+  });
+
+  it("deve aplicar limites de lote e flush quando informados", () => {
+    expect(
+      loadEnv({
+        ...enabledEnv,
+        OBS_TRACE_BATCH_SIZE: "128",
+        OBS_TRACE_FLUSH_INTERVAL_MS: "2500",
+      }),
+    ).toMatchObject({
+      obsTraceBatchSize: 128,
+      obsTraceFlushIntervalMs: 2_500,
+    });
+  });
+
+  it.each([
+    ["OBS_TRACE_BATCH_SIZE", "0"],
+    ["OBS_TRACE_BATCH_SIZE", "513"],
+    ["OBS_TRACE_BATCH_SIZE", "abc"],
+    ["OBS_TRACE_FLUSH_INTERVAL_MS", "0"],
+    ["OBS_TRACE_FLUSH_INTERVAL_MS", "60001"],
+    ["OBS_TRACE_FLUSH_INTERVAL_MS", "abc"],
+  ])("deve rejeitar %s=%s", (key, value) => {
+    expect(() => loadEnv({ ...validEnv, [key]: value })).toThrow(
+      new RegExp(key),
+    );
+  });
+
+  it("deve remover apenas barras finais do endpoint local", () => {
+    expect(
+      loadEnv({ ...enabledEnv, LANGSMITH_ENDPOINT: "http://langsmith:1980/" })
+        .obsEndpoint,
+    ).toBe("http://langsmith:1980");
+  });
+});
+
+describe("isLocalTraceEndpoint", () => {
+  it.each([
+    "http://127.0.0.1:1980",
+    "http://localhost:1980",
+    "http://[::1]:1980",
+    "http://langsmith:1980",
+    "https://obs.internal",
+    "http://api.local",
+    "http://10.0.0.5:1980",
+    "http://172.20.0.4:1980",
+    "http://192.168.1.10:1980",
+  ])("deve aceitar o endpoint local %s", (endpoint) => {
+    expect(isLocalTraceEndpoint(endpoint)).toBe(true);
+  });
+
+  it.each([
+    "https://api.langsmith.com",
+    "https://cloud.langsmith.com/api/v1",
+    "ftp://127.0.0.1:1980",
+    "http://user:pass@127.0.0.1:1980",
+    "not-a-url",
+    "http://8.8.8.8:1980",
+    "http://172.32.0.1:1980",
+  ])("deve rejeitar o endpoint externo %s", (endpoint) => {
+    expect(isLocalTraceEndpoint(endpoint)).toBe(false);
   });
 });

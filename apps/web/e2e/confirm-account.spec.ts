@@ -7,6 +7,7 @@ import {
   E2E_CONFIRM_USED_TOKEN,
   E2E_VALID_SESSION_TOKEN,
 } from "./support/fake-session";
+import { WEB_URL } from "./support/ports";
 
 const CONFIRM_PATH = "/auth/confirm";
 
@@ -26,7 +27,7 @@ async function setSessionCookie(page: Page, token: string): Promise<void> {
     {
       name: "session_token",
       value: token,
-      url: "http://127.0.0.1:3000",
+      url: WEB_URL,
     },
   ]);
 }

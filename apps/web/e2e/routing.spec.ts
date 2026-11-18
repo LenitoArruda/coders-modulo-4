@@ -4,6 +4,7 @@ import {
   E2E_INVALID_SESSION_TOKEN,
   E2E_VALID_SESSION_TOKEN,
 } from "./support/fake-session";
+import { WEB_URL } from "./support/ports";
 
 const AUTH_PLACEHOLDERS = [
   ["/auth/sign-up", "Create your account"],
@@ -28,7 +29,7 @@ async function setSessionCookie(page: Page, token: string): Promise<void> {
     {
       name: "session_token",
       value: token,
-      url: "http://127.0.0.1:3000",
+      url: WEB_URL,
     },
   ]);
 }

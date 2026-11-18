@@ -1,0 +1,32 @@
+# Override OPCIONAL para LangSmith self-hosted.
+#
+# IMPORTANTE: este arquivo NAO foi validado nesta fatia. O daemon Docker da maquina de
+# desenvolvimento nao responde e a imagem self-hosted do LangSmith e Enterprise/licenciada.
+# Nenhuma imagem "fake" ou tag inventada e usada como default: a imagem e a chave devem ser
+# fornecidas explicitamente por quem possui a licenca.
+#
+# Uso (somente com a distribuicao licenciada disponivel):
+#   docker compose -f docker-compose.yml -f docker-compose.langsmith.yml --profile langsmith up -d
+#
+# O profile "langsmith" mantem o servico FORA do `bun run infra:up` padrao. A porta publicada
+# fica apenas em 127.0.0.1, nunca em 0.0.0.0. A distribuicao licenciada pode exigir servicos
+# proprios (fila, Redis, ClickHouse, etc.); consulte o Compose oficial dessa distribuicao e
+# mescle-o com este arquivo antes de usar em desenvolvimento ou teste.
+
+name: coders-modulo-4
+
+services:
+  langsmith:
+    profiles: ["langsmith"]
+    image: ${LANGSMITH_IMAGE:?Defina LANGSMITH_IMAGE com a imagem self-hosted licenciada}
+    container_name: coders-modulo-4-langsmith
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LANGSMITH_PORT:-1980}:1980"
+    environment:
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:?Defina LANGSMITH_API_KEY no ambiente local}
+    volumes:
+      - langsmith-data:/var/lib/langsmith
+
+volumes:
+  langsmith-data:

@@ -754,3 +754,41 @@ As migrações `0001`–`0005` e seus testes SQL foram validados nos worktrees d
 bancos isolados (§13 e §15). A validação real na principal segue como follow-up quando o Docker
 estiver disponível. Nenhuma chave, token, URL sensível, prompt, trecho, hash ou conteúdo de arquivo
 foi registrado em logs ou documentação.
+
+---
+
+## 17. Evidências da fatia 018 — observabilidade local (worktree `spec/018`)
+
+Executado em 2026-11-18 na worktree isolada, com PATH explícito para Bun/Node. Nenhuma migration
+foi adicionada: traces não são persistidos em PostgreSQL.
+
+| Comando                                                                                                                            | Resultado                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `bun run lint`                                                                                                                     | ok — 3 tarefas                                                                |
+| `bun run types:check`                                                                                                              | ok — 3 tarefas                                                                |
+| `bun run test`                                                                                                                     | ok — API 87 arquivos / 593 testes; web em cache                               |
+| `bunx vitest run src/modules/observability/domain/evaluation.spec.ts src/modules/observability/application/evaluation-cli.spec.ts` | ok — 2 arquivos / 29 testes                                                   |
+| `bun run build`                                                                                                                    | ok — `api` + `web`                                                            |
+| `bun run obs:eval`                                                                                                                 | ok — 4/4 datasets aprovados, exit code 0                                      |
+| `bun run test:e2e` (web, portas isoladas 3018/3438)                                                                                | ok — 163/163 testes em 4,8 min                                                |
+| `bun run db:migrate`                                                                                                               | bloqueado — `connect ECONNREFUSED 127.0.0.1:5433` (sem Postgres local)        |
+| `bun run db:test`                                                                                                                  | bloqueado — `connect ECONNREFUSED 127.0.0.1:5433`                             |
+| Stack LangSmith self-hosted / Studio / evaluation ao vivo                                                                          | bloqueado — daemon Docker indisponível e imagem Enterprise licenciada ausente |
+
+Detalhes do bloqueio externo:
+
+- `docker info` e `docker version` não responderam; o caminho alternativo `.exe` não foi
+  reconhecido como comando. Sem daemon não há como subir o self-hosted, o Studio nem validar a
+  ingestão de spans pelo coletor real.
+- A imagem self-hosted do LangSmith é Enterprise/licenciada. `docker-compose.langsmith.yml` foi
+  entregue como template opcional (profile `langsmith`) que exige `LANGSMITH_IMAGE` e
+  `LANGSMITH_API_KEY` fornecidos externamente; nenhuma tag inventada foi usada como default.
+- Em vez de configuração "validada" fictícia, a fatia entrega sinks e evaluation testados contra
+  coletor local fake, com degradação graciosa e erro explícito para endpoints cloud.
+
+Para permitir E2E isolado por worktree, as portas do Playwright passaram a ser configuráveis por
+`E2E_WEB_PORT`/`E2E_FAKE_API_PORT` (defaults 3000/3434). Nesta execução foram usadas 3018/3438;
+os defaults e os fluxos 012–016 permanecem intactos.
+
+Nenhum valor de `.env`, chave, token, URL sensível, hash, prompt, resposta ou conteúdo de arquivo
+foi registrado em logs, relatórios ou documentação.

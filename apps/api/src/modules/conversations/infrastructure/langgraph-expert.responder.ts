@@ -1,4 +1,5 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import {
   AIMessage,
   HumanMessage,
@@ -13,12 +14,22 @@ import type { Expert } from "../../experts/domain/expert";
 import type { ConversationMessage } from "../domain/conversation";
 import type { GroundingContext } from "../../citations/domain/citation";
 import { formatContextBlock } from "../../citations/domain/citation-policy";
+import { TraceEmitter } from "../../observability/application/trace-emitter";
+import { estimateCost } from "../../observability/domain/cost-estimator";
+import { createGenerationSpanMetadata } from "../../observability/domain/span-metadata";
+import type {
+  TraceCorrelation,
+  TraceStatus,
+} from "../../observability/domain/trace-span";
 import { OPENAI_API_KEY } from "../conversations.tokens";
 import { ExpertResponderPort } from "../application/ports/expert-responder.port";
+import {
+  EXPERT_MODEL_NAME,
+  EXPERT_PROMPT_VERSION,
+} from "../domain/expert-model";
 import { ModelUnavailableError } from "../domain/conversation.errors";
 import { log } from "../../shared/observability/app-logger";
 
-const MODEL_NAME = "gpt-4o-mini";
 const TEMPERATURE = 0.4;
 const MAX_TOKENS = 700;
 
@@ -72,6 +83,27 @@ function historyMessages(history: ConversationMessage[]): BaseMessage[] {
   );
 }
 
+type GenerationUsage = {
+  tokensIn: number;
+  tokensOut: number;
+  finishReason: string;
+};
+
+function generationUsage(message: BaseMessage | undefined): GenerationUsage {
+  const record = message as unknown as
+    | {
+        usage_metadata?: { input_tokens?: number; output_tokens?: number };
+        response_metadata?: { finish_reason?: string };
+      }
+    | undefined;
+
+  return {
+    tokensIn: record?.usage_metadata?.input_tokens ?? 0,
+    tokensOut: record?.usage_metadata?.output_tokens ?? 0,
+    finishReason: record?.response_metadata?.finish_reason ?? "stop",
+  };
+}
+
 /**
  * Adapter that turns an Expert catalog entry into a grounded system prompt and
  * runs one LangGraph node backed by ChatOpenAI. Nothing else in the API knows
@@ -79,8 +111,55 @@ function historyMessages(history: ConversationMessage[]): BaseMessage[] {
  */
 @Injectable()
 export class LangGraphExpertResponder extends ExpertResponderPort {
-  constructor(@Inject(OPENAI_API_KEY) private readonly apiKey: string) {
+  constructor(
+    @Inject(OPENAI_API_KEY) private readonly apiKey: string,
+    @Optional()
+    @Inject(TraceEmitter)
+    private readonly traceEmitter: TraceEmitter | null = null,
+  ) {
     super();
+  }
+
+  private emitTrace(input: {
+    expert: Expert;
+    trace: TraceCorrelation | null | undefined;
+    startedAt: number;
+    status: TraceStatus;
+    usage: GenerationUsage;
+    errorName?: string;
+  }): void {
+    const cost = estimateCost(
+      EXPERT_MODEL_NAME,
+      input.usage.tokensIn,
+      input.usage.tokensOut,
+    );
+
+    this.traceEmitter?.emit({
+      id: randomUUID(),
+      traceId: input.trace?.traceId ?? randomUUID(),
+      parentSpanId: input.trace?.parentSpanId ?? null,
+      name: "expert.generation",
+      kind: "generation",
+      startedAt: input.startedAt,
+      endedAt: Date.now(),
+      status: input.status,
+      userId: input.trace?.userId ?? "",
+      conversationId: input.trace?.conversationId,
+      messageId: input.trace?.messageId,
+      expertId: input.expert.id,
+      modelId: EXPERT_MODEL_NAME,
+      metadata: {
+        ...createGenerationSpanMetadata({
+          promptVersion: EXPERT_PROMPT_VERSION,
+          tokensIn: input.usage.tokensIn,
+          tokensOut: input.usage.tokensOut,
+          estimatedCostUsd: cost.estimatedCostUsd,
+          finishReason: input.usage.finishReason,
+        }),
+        costRateKnown: cost.rateKnown,
+        ...(input.errorName === undefined ? {} : { error: input.errorName }),
+      },
+    });
   }
 
   async respond(
@@ -88,6 +167,7 @@ export class LangGraphExpertResponder extends ExpertResponderPort {
     prompt: string,
     grounding: GroundingContext | null = null,
     history: ConversationMessage[] = [],
+    trace: TraceCorrelation | null = null,
   ): Promise<string> {
     if (this.apiKey === "") {
       throw new ModelUnavailableError(
@@ -107,7 +187,7 @@ export class LangGraphExpertResponder extends ExpertResponderPort {
     });
 
     const model = new ChatOpenAI({
-      model: MODEL_NAME,
+      model: EXPERT_MODEL_NAME,
       apiKey: this.apiKey,
       temperature: TEMPERATURE,
       maxTokens: MAX_TOKENS,
@@ -139,6 +219,14 @@ export class LangGraphExpertResponder extends ExpertResponderPort {
         throw new Error("model returned an empty response");
       }
 
+      this.emitTrace({
+        expert,
+        trace,
+        startedAt,
+        status: "ok",
+        usage: generationUsage(last),
+      });
+
       log("info", "rag", {
         event: "rag.generation.completed",
         expertId: expert.id,
@@ -149,10 +237,21 @@ export class LangGraphExpertResponder extends ExpertResponderPort {
 
       return content;
     } catch (error) {
+      const errorName = error instanceof Error ? error.name : "unknown";
+
+      this.emitTrace({
+        expert,
+        trace,
+        startedAt,
+        status: "error",
+        usage: { tokensIn: 0, tokensOut: 0, finishReason: "error" },
+        errorName,
+      });
+
       log("warn", "expert.chat", {
         event: "model.error",
         expertId: expert.id,
-        error: error instanceof Error ? error.name : "unknown",
+        error: errorName,
       });
 
       throw new ModelUnavailableError(error);

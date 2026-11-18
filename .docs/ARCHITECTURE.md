@@ -925,7 +925,37 @@ tomadas.
 
 ---
 
-## 8. Como manter este documento
+## 8. Observabilidade local-first (spec 018)
+
+A fatia 018 adiciona a slice `apps/api/src/modules/observability` seguindo as camadas do
+projeto: contrato de span no domínio, `TraceEmitter` na aplicação e adaptadores HTTP/no-op na
+infraestrutura. A direção de dependência permanece `interface → application → domain`, com a
+infraestrutura implementando a porta `TraceSinkPort`.
+
+- **Instrumentação por injeção opcional** (`@Optional()`) em `SendMessageUseCase`,
+  `RetrieveContextUseCase` e `LangGraphExpertResponder`: assinaturas existentes preservadas e flag
+  desligada por padrão. Nenhuma rota, controller ou contrato de API foi alterado.
+- **Correlação:** um `traceId` por requisição liga os spans raiz, de recuperação e de geração.
+  `conversationId`/`messageId` entram quando disponíveis, senão recebem `missing`.
+- **Privacidade:** `userPseudonym` é HMAC-SHA256 com sal server-side; sanitização recursiva remove
+  chaves proibidas antes do sink. Prompt, resposta e PII nunca entram no payload.
+- **Resiliência:** emissão assíncrona em fila; falha do coletor gera `obs.trace.dropped` em log e
+  nunca propaga para o fluxo do usuário.
+- **Configuração local-only:** endpoint cloud, protocolo não HTTP(S) e URL com credenciais são
+  rejeitados no boot quando `LANGSMITH_TRACING_ENABLED=true`.
+- **Evaluation:** scorer puro e determinístico em `domain/evaluation.ts`, CLI em
+  `scripts/obs-eval.ts` e datasets sintéticos versionados em `eval/datasets/`. Não há chamada a
+  modelo externo nem persistência em banco.
+- **Infraestrutura:** `docker-compose.langsmith.yml` é um override opcional, protegido pelo profile
+  `langsmith`, que exige imagem Enterprise licenciada. Não é usado por `bun run infra:up`.
+  Stack real, Studio e validação ao vivo permanecem bloqueados nesta fatia (Docker daemon
+  indisponível e imagem licenciada ausente).
+
+Detalhes operacionais em [OBSERVABILITY.md](./OBSERVABILITY.md).
+
+---
+
+## 9. Como manter este documento
 
 Atualize `ARCHITECTURE.md` na mesma mudança que:
 

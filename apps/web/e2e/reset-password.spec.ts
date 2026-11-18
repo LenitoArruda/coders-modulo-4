@@ -6,10 +6,11 @@ import {
   E2E_SIGN_IN_PASSWORD,
   e2eResetToken,
 } from "./support/fake-session";
+import { WEB_URL } from "./support/ports";
 
 const RESET_PATH = "/auth/reset-password";
 const SIGN_IN_PATH = "/auth/sign-in";
-const BASE_URL = "http://127.0.0.1:3000";
+const BASE_URL = WEB_URL;
 
 const NEW_PASSWORD = "brand new password 123";
 const INVALID_LINK_MESSAGE =

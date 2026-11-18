@@ -1,0 +1,74 @@
+{
+  "name": "citation-fidelity",
+  "revision": "1",
+  "description": "Synthetic cases for deterministic citation fidelity scoring. Source ids are fictional.",
+  "metrics": ["citation_fidelity"],
+  "thresholds": { "citation_fidelity": 0.8 },
+  "cases": [
+    {
+      "id": "cf-001",
+      "input": "O cache usa TTL?",
+      "candidate": {
+        "answer": "Sim, TTL por usuario.",
+        "answerStatus": "with_source",
+        "sources": ["policy-cache.md#ttl"],
+        "citations": ["policy-cache.md#ttl"]
+      },
+      "expected": {
+        "sourceIds": ["policy-cache.md#ttl"]
+      }
+    },
+    {
+      "id": "cf-002",
+      "input": "Quem aprova reencaminhamento?",
+      "candidate": {
+        "answer": "O gestor.",
+        "answerStatus": "with_source",
+        "sources": ["policy-routing.md#approval"],
+        "citations": ["policy-routing.md#approval"]
+      },
+      "expected": {
+        "sourceIds": ["policy-routing.md#approval"]
+      }
+    },
+    {
+      "id": "cf-003",
+      "input": "Qual e o limite de diarias?",
+      "candidate": {
+        "answer": "Trinta dias.",
+        "answerStatus": "with_source",
+        "sources": ["policy-travel.md#limits"],
+        "citations": ["policy-travel.md#limits"]
+      },
+      "expected": {
+        "sourceIds": ["policy-travel.md#limits"]
+      }
+    },
+    {
+      "id": "cf-004",
+      "input": "Como solicitar auxilio?",
+      "candidate": {
+        "answer": "Pelo portal interno.",
+        "answerStatus": "with_source",
+        "sources": ["policy-auxilio.md#portal"],
+        "citations": ["policy-auxilio.md#portal"]
+      },
+      "expected": {
+        "sourceIds": ["policy-auxilio.md#portal"]
+      }
+    },
+    {
+      "id": "cf-005",
+      "input": "Qual e a regra de cache?",
+      "candidate": {
+        "answer": "A regra antiga era diferente.",
+        "answerStatus": "with_source",
+        "sources": ["policy-cache.md#ttl"],
+        "citations": ["policy-cache.md#outdated"]
+      },
+      "expected": {
+        "sourceIds": ["policy-cache.md#ttl"]
+      }
+    }
+  ]
+}

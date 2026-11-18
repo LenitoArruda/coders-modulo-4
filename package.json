@@ -24,6 +24,7 @@
     "load:spike": "node scripts/k6.mjs api spike",
     "load:soak": "node scripts/k6.mjs api soak",
     "load:rate-limit": "node scripts/k6.mjs rate-limit",
+    "obs:eval": "bun scripts/obs-eval.ts",
     "prepare": "lefthook install",
     "env:setup": "cp .env.example .env",
     "local:setup": "bun i && bun env:setup && bun infra:up && bun db:migrate"

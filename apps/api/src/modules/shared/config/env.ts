@@ -63,6 +63,13 @@ export const DEFAULT_RAG_THRESHOLD = 0.35;
 export const DEFAULT_RAG_MAX_CONTEXT_CHARS = 6_000;
 export const DEFAULT_RAG_MAX_HISTORY_MESSAGES = 6;
 
+/** Default local-only LangSmith endpoint (spec 018). */
+export const DEFAULT_LANGSMITH_ENDPOINT = "http://127.0.0.1:1980";
+export const DEFAULT_OBS_TRACE_BATCH_SIZE = 32;
+export const DEFAULT_OBS_TRACE_FLUSH_INTERVAL_MS = 1_000;
+export const MAX_OBS_TRACE_BATCH_SIZE = 512;
+export const MAX_OBS_TRACE_FLUSH_INTERVAL_MS = 60_000;
+
 export type Env = {
   /** Effective runtime environment (`NODE_ENV` normalized, defaulting to `dev`). */
   nodeEnv: string;
@@ -113,6 +120,18 @@ export type Env = {
   ragMaxContextChars: number;
   /** Recent messages included in the grounded prompt. */
   ragMaxHistoryMessages: number;
+  /** Enables LangSmith trace emission; disabled by default (spec 018). */
+  obsTracingEnabled: boolean;
+  /** Local-only LangSmith endpoint; cloud endpoints are rejected when enabled. */
+  obsEndpoint: string;
+  /** Local LangSmith API key (secret); never logged or returned to clients. */
+  obsApiKey: string;
+  /** Server-side salt used to pseudonymize user ids (secret); never logged. */
+  obsUserPseudonymSalt: string;
+  /** Maximum number of queued spans flushed in one batch. */
+  obsTraceBatchSize: number;
+  /** Maximum interval, in milliseconds, between buffer flushes. */
+  obsTraceFlushIntervalMs: number;
 };
 
 export class ConfigurationError extends Error {
@@ -195,6 +214,63 @@ function isValidPostgresUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Trace endpoints must stay inside the local/private network. Loopback,
+ * single-label Docker DNS names, `*.localhost`, `*.local`, `*.internal` and
+ * RFC 1918 addresses are accepted; any public host (notably LangSmith Cloud)
+ * is rejected. Used only when tracing is enabled, so a disabled setup never
+ * needs a LangSmith credential to boot.
+ */
+export function isLocalTraceEndpoint(value: string): boolean {
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return false;
+  }
+
+  if (url.username !== "" || url.password !== "") {
+    return false;
+  }
+
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal")
+  ) {
+    return true;
+  }
+
+  if (!host.includes(".")) {
+    return true;
+  }
+
+  const octets = host.split(".").map(Number);
+
+  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part))) {
+    return false;
+  }
+
+  const first = octets[0] ?? -1;
+  const second = octets[1] ?? -1;
+
+  if (first === 10) return true;
+  if (first === 172 && second >= 16 && second <= 31) return true;
+  if (first === 192 && second === 168) return true;
+
+  return false;
 }
 
 export function loadEnv(source: EnvSource = process.env): Env {
@@ -443,6 +519,22 @@ export function loadEnv(source: EnvSource = process.env): Env {
     readString(source.RAG_MAX_HISTORY_MESSAGES) ||
     String(DEFAULT_RAG_MAX_HISTORY_MESSAGES);
   const ragMaxHistoryMessages = Number(ragMaxHistoryMessagesValue);
+  const tracingFlag = readBooleanFlag(
+    readString(source.LANGSMITH_TRACING_ENABLED),
+  );
+  const obsTracingEnabled = tracingFlag ?? false;
+  const obsEndpoint =
+    readString(source.LANGSMITH_ENDPOINT) || DEFAULT_LANGSMITH_ENDPOINT;
+  const obsApiKey = readString(source.LANGSMITH_API_KEY);
+  const obsUserPseudonymSalt = readString(source.OBS_USER_PSEUDONYM_SALT);
+  const obsTraceBatchSizeValue =
+    readString(source.OBS_TRACE_BATCH_SIZE) ||
+    String(DEFAULT_OBS_TRACE_BATCH_SIZE);
+  const obsTraceBatchSize = Number(obsTraceBatchSizeValue);
+  const obsTraceFlushIntervalMsValue =
+    readString(source.OBS_TRACE_FLUSH_INTERVAL_MS) ||
+    String(DEFAULT_OBS_TRACE_FLUSH_INTERVAL_MS);
+  const obsTraceFlushIntervalMs = Number(obsTraceFlushIntervalMsValue);
 
   if (!Number.isInteger(ragTopK) || ragTopK < 1 || ragTopK > 20) {
     invalid.push("RAG_TOP_K");
@@ -463,6 +555,28 @@ export function loadEnv(source: EnvSource = process.env): Env {
     ragMaxHistoryMessages > 50
   ) {
     invalid.push("RAG_MAX_HISTORY_MESSAGES");
+  }
+  if (tracingFlag === null) invalid.push("LANGSMITH_TRACING_ENABLED");
+  if (
+    !Number.isInteger(obsTraceBatchSize) ||
+    obsTraceBatchSize < 1 ||
+    obsTraceBatchSize > MAX_OBS_TRACE_BATCH_SIZE
+  ) {
+    invalid.push("OBS_TRACE_BATCH_SIZE");
+  }
+  if (
+    !Number.isInteger(obsTraceFlushIntervalMs) ||
+    obsTraceFlushIntervalMs < 1 ||
+    obsTraceFlushIntervalMs > MAX_OBS_TRACE_FLUSH_INTERVAL_MS
+  ) {
+    invalid.push("OBS_TRACE_FLUSH_INTERVAL_MS");
+  }
+  if (obsTracingEnabled) {
+    if (!isLocalTraceEndpoint(obsEndpoint)) {
+      invalid.push("LANGSMITH_ENDPOINT");
+    }
+    if (!obsApiKey) missing.push("LANGSMITH_API_KEY");
+    if (!obsUserPseudonymSalt) missing.push("OBS_USER_PSEUDONYM_SALT");
   }
 
   if (emailProvider === "resend") {
@@ -541,5 +655,11 @@ export function loadEnv(source: EnvSource = process.env): Env {
     ragThreshold,
     ragMaxContextChars,
     ragMaxHistoryMessages,
+    obsTracingEnabled,
+    obsEndpoint: obsEndpoint.replace(/\/+$/, ""),
+    obsApiKey,
+    obsUserPseudonymSalt,
+    obsTraceBatchSize,
+    obsTraceFlushIntervalMs,
   };
 }
