@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { fetchApiWithSession } from "../../lib/auth/api-client";
 import { requireSessionUser } from "../../lib/auth/guards";
 import { isKnowledgeMediaEnabled } from "../../lib/knowledge/flags";
+import { isMultimediaEnabled } from "../../lib/media/flags";
 import {
   LOAD_FAILED_MESSAGE,
   type ChatMessage,
@@ -39,6 +40,7 @@ async function readJson<T>(response: Response): Promise<T | null> {
 export default async function AppHomePage() {
   const user = await requireSessionUser();
   const mediaEnabled = await isKnowledgeMediaEnabled();
+  const multimediaEnabled = await isMultimediaEnabled();
 
   let experts: Expert[] = [];
   let initialMessages: ChatMessage[] = [];
@@ -121,6 +123,7 @@ export default async function AppHomePage() {
         initialExpertId={experts[0]?.id ?? ""}
         initialMessages={initialMessages}
         initialError={loadError}
+        mediaDeliverablesEnabled={multimediaEnabled}
       />
 
       <KnowledgeSources

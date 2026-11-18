@@ -142,6 +142,57 @@ type ChatMessage = {
     status: "matched" | "no_match" | "unavailable";
   };
   answerStatus?: "plain" | "with_source" | "no_match" | "retrieval_unavailable";
+  media?: FakeMediaAttachment[];
+};
+
+type FakeMediaKind = "image" | "video";
+type FakeMediaStatus =
+  "queued" | "generating" | "ready" | "failed" | "cancelled";
+type FakeMediaSize = "1024x1024" | "1024x1536" | "1536x1024";
+type FakeMediaDuration = 4 | 6 | 8;
+
+type FakeMediaParameters = {
+  kind: FakeMediaKind;
+  size?: FakeMediaSize;
+  durationSeconds?: FakeMediaDuration;
+  resolution?: "720p";
+  style?: string;
+  citationNumber?: number;
+};
+
+type FakeMediaCitation = {
+  citationNumber: number;
+  sourceName: string;
+  locationLabel: string;
+};
+
+/** Mirrors the API's public media contract without exposing bytes in JSON. */
+type FakeMediaAttachment = {
+  mediaId: string;
+  kind: FakeMediaKind;
+  status: FakeMediaStatus;
+  uri: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
+  modelId: string;
+  modelVersion: string | null;
+  parameters: FakeMediaParameters;
+  createdAt: string;
+  citation?: FakeMediaCitation;
+  errorCode?: string;
+  errorMessage?: string;
+  attempts?: number;
+};
+
+type FakeMediaRecord = {
+  attachment: FakeMediaAttachment;
+  ownerToken: string;
+  fileName: string;
+  bytes: Buffer;
+  polls: number;
 };
 
 const RAG_NO_MATCH_ANSWER =
@@ -161,6 +212,10 @@ type StoredConversation = {
  */
 const storedConversations = new Map<string, StoredConversation>();
 let chatSequence = 0;
+
+/** Deliverables are keyed by session token so every E2E account stays isolated. */
+const mediaByToken = new Map<string, FakeMediaRecord[]>();
+let mediaSequence = 0;
 
 function bearerToken(request: IncomingMessage): string {
   return (request.headers.authorization ?? "").replace(/^Bearer /, "");
@@ -187,6 +242,371 @@ function unauthorized(response: ServerResponse): void {
 
 function conversationKey(token: string, expertId: string): string {
   return `${token}|${expertId}`;
+}
+
+// A 1x1 PNG is enough for the inline <img> preview; no provider is contacted.
+const FAKE_IMAGE_BYTES = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+  "base64",
+);
+// The video preview only needs a downloadable payload in this fake API.
+const FAKE_VIDEO_BYTES = Buffer.from("fake-mp4-payload-for-e2e", "utf8");
+
+const MEDIA_GENERATE_WORDS =
+  /\b(create|generate|make|draw|produce|design|render|build)\b/i;
+const MEDIA_IMAGE_WORDS =
+  /\b(image|picture|photo|poster|thumbnail|illustration|banner|graphic|cover art|social media post)\b/i;
+const MEDIA_VIDEO_WORDS = /\b(video|clip|animation|reel|story|motion|movie)\b/i;
+
+type FakeMediaPromptPlan =
+  | {
+      outcome: "media";
+      kind: FakeMediaKind;
+      parameters: FakeMediaParameters;
+      reply: string;
+      fail?: boolean;
+    }
+  | { outcome: "text"; reply: string }
+  | { outcome: "none" };
+
+function mediaDetail(parameters: FakeMediaParameters): string {
+  return parameters.kind === "video"
+    ? `${parameters.durationSeconds ?? 6}-second 720p video`
+    : `${parameters.size ?? "1024x1024"} image`;
+}
+
+function mediaIntroduction(
+  expertName: string,
+  parameters: FakeMediaParameters,
+): string {
+  return `As the ${expertName}, I started your ${mediaDetail(parameters)}. The preview and download link appear below as soon as it is ready.`;
+}
+
+/** Deterministic en-US media replies mirroring the real intent rules for E2E. */
+function mediaPromptPlan(
+  prompt: string,
+  expertName: string,
+): FakeMediaPromptPlan {
+  const text = prompt.trim();
+  const normalized = text.toLowerCase();
+
+  if (normalized.startsWith("fail-media:")) {
+    return {
+      outcome: "media",
+      kind: "image",
+      parameters: { kind: "image", size: "1024x1024" },
+      reply: mediaIntroduction(expertName, {
+        kind: "image",
+        size: "1024x1024",
+      }),
+      fail: true,
+    };
+  }
+
+  if (!MEDIA_GENERATE_WORDS.test(text)) return { outcome: "none" };
+
+  const isImage = MEDIA_IMAGE_WORDS.test(text);
+  const isVideo = MEDIA_VIDEO_WORDS.test(text);
+
+  if (isImage === isVideo) {
+    return {
+      outcome: "text",
+      reply: "What should I create — an image or a short video?",
+    };
+  }
+
+  if (text.length > 2_000) {
+    return {
+      outcome: "text",
+      reply:
+        "Keep the briefing under 2,000 characters so I can create a focused deliverable.",
+    };
+  }
+
+  const topic = text
+    .replace(MEDIA_GENERATE_WORDS, " ")
+    .replace(MEDIA_IMAGE_WORDS, " ")
+    .replace(MEDIA_VIDEO_WORDS, " ")
+    .replace(/\b(a|an|the|me|please|short|new|some)\b/gi, " ")
+    .replace(/\b\d+\s*(?:s|sec|secs|second|seconds)\b/gi, " ")
+    .replace(
+      /\b(720p|4k|8k|square|portrait|vertical|landscape|horizontal)\b/gi,
+      " ",
+    )
+    .replace(/\[\d+\]/g, " ")
+    .replace(/[,.;:!?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (topic.length === 0) {
+    return {
+      outcome: "text",
+      reply: "What should it show? Send me a short topic or briefing.",
+    };
+  }
+
+  const kind: FakeMediaKind = isImage ? "image" : "video";
+  const parameters: FakeMediaParameters = { kind };
+  const citationNumber = /\[(\d+)\]/.exec(text)?.[1];
+  const style = text.match(
+    /\b(minimalist|minimalistic|bold|vintage|modern|abstract|flat|cinematic|colorful|simple|retro)\b/i,
+  )?.[0];
+  const size: FakeMediaSize | undefined = /\b(portrait|vertical)\b/i.test(text)
+    ? "1024x1536"
+    : /\b(landscape|horizontal|banner|wide)\b/i.test(text)
+      ? "1536x1024"
+      : /\b(square|post)\b/i.test(text)
+        ? "1024x1024"
+        : undefined;
+
+  if (style !== undefined) parameters.style = style.toLowerCase();
+  if (citationNumber !== undefined)
+    parameters.citationNumber = Number(citationNumber);
+
+  if (kind === "image") {
+    if (/\b(4k|8k|ultra hd|3840|4096)\b/i.test(text)) {
+      return {
+        outcome: "text",
+        reply:
+          "Images are available in square, portrait or landscape sizes. Which one should I use?",
+      };
+    }
+    if (size !== undefined) parameters.size = size;
+  } else {
+    const durationMatch = /(\d+)\s*(?:s|sec|secs|second|seconds)\b/i.exec(text);
+    const duration =
+      durationMatch?.[1] === undefined ? null : Number(durationMatch[1]);
+
+    if (duration !== null && ![4, 6, 8].includes(duration)) {
+      return {
+        outcome: "text",
+        reply:
+          "Short videos can be 4, 6 or 8 seconds long. Which duration should I use?",
+      };
+    }
+
+    parameters.durationSeconds = (duration ?? 6) as FakeMediaDuration;
+    parameters.resolution = "720p";
+  }
+
+  return {
+    outcome: "media",
+    kind,
+    parameters,
+    reply: mediaIntroduction(expertName, parameters),
+  };
+}
+
+function tokenMedia(token: string): FakeMediaRecord[] {
+  let records = mediaByToken.get(token);
+
+  if (records === undefined) {
+    records = [];
+    mediaByToken.set(token, records);
+  }
+
+  return records;
+}
+
+function nextMediaId(): string {
+  mediaSequence += 1;
+
+  return `media-${mediaSequence}`;
+}
+
+function publicMedia(record: FakeMediaRecord): FakeMediaAttachment {
+  return { ...record.attachment };
+}
+
+function findOwnedMedia(
+  token: string,
+  mediaId: string,
+): FakeMediaRecord | null {
+  return (
+    tokenMedia(token).find((record) => record.attachment.mediaId === mediaId) ??
+    null
+  );
+}
+
+function createFakeMedia(
+  token: string,
+  plan: Extract<FakeMediaPromptPlan, { outcome: "media" }>,
+): FakeMediaRecord {
+  const mediaId = nextMediaId();
+  const mimeType = plan.kind === "image" ? "image/png" : "video/mp4";
+  const bytes = plan.kind === "image" ? FAKE_IMAGE_BYTES : FAKE_VIDEO_BYTES;
+  const citation =
+    plan.parameters.citationNumber === undefined
+      ? {}
+      : {
+          citation: {
+            citationNumber: plan.parameters.citationNumber,
+            sourceName: "engineering-handbook.txt",
+            locationLabel: "Chunk 1",
+          },
+        };
+  const attachment: FakeMediaAttachment = {
+    mediaId,
+    kind: plan.kind,
+    status: plan.fail === true ? "failed" : "queued",
+    uri: `/api/v1/media/${mediaId}/content`,
+    mimeType: plan.fail === true ? null : mimeType,
+    sizeBytes: plan.fail === true ? null : bytes.byteLength,
+    width: plan.kind === "image" ? 1 : null,
+    height: plan.kind === "image" ? 1 : null,
+    durationSeconds:
+      plan.kind === "video" ? (plan.parameters.durationSeconds ?? 6) : null,
+    modelId: plan.kind === "image" ? "gpt-image-2" : "gemini-omni-1.2-flash",
+    modelVersion: null,
+    parameters: { ...plan.parameters },
+    createdAt: new Date().toISOString(),
+    ...citation,
+    ...(plan.fail === true
+      ? {
+          errorCode: "PROVIDER_UNAVAILABLE",
+          errorMessage: "We couldn't create this file. Try again.",
+        }
+      : {}),
+    attempts: 1,
+  };
+  const record: FakeMediaRecord = {
+    attachment,
+    ownerToken: token,
+    fileName: plan.kind === "image" ? "deliverable.png" : "deliverable.mp4",
+    bytes,
+    polls: 0,
+  };
+
+  tokenMedia(token).unshift(record);
+
+  return record;
+}
+
+/** Two status polls settle a job: queued → generating → ready. */
+function advanceFakeMedia(record: FakeMediaRecord): void {
+  if (record.attachment.status === "queued") {
+    record.attachment.status = "generating";
+    return;
+  }
+
+  if (record.attachment.status === "generating") {
+    record.polls += 1;
+    if (record.polls >= 1) record.attachment.status = "ready";
+  }
+}
+
+function mediaNotFound(response: ServerResponse): void {
+  sendJson(response, 404, {
+    code: "MEDIA_NOT_FOUND",
+    message: "That file is no longer available.",
+  });
+}
+
+function handleGetMediaStatus(
+  request: IncomingMessage,
+  response: ServerResponse,
+  mediaId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const record = findOwnedMedia(bearerToken(request), mediaId);
+
+  if (record === null) {
+    mediaNotFound(response);
+    return;
+  }
+
+  advanceFakeMedia(record);
+  sendJson(response, 200, publicMedia(record));
+}
+
+function handleCancelMedia(
+  request: IncomingMessage,
+  response: ServerResponse,
+  mediaId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const record = findOwnedMedia(bearerToken(request), mediaId);
+
+  if (record === null) {
+    mediaNotFound(response);
+    return;
+  }
+
+  if (record.attachment.status !== "ready") {
+    record.attachment.status = "cancelled";
+    record.attachment.errorCode = "CANCELLED";
+    record.attachment.errorMessage = "Generation cancelled. No file was kept.";
+  }
+
+  sendJson(response, 200, publicMedia(record));
+}
+
+function handleRetryMedia(
+  request: IncomingMessage,
+  response: ServerResponse,
+  mediaId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const record = findOwnedMedia(bearerToken(request), mediaId);
+
+  if (record === null) {
+    mediaNotFound(response);
+    return;
+  }
+
+  record.attachment.status = "queued";
+  record.attachment.attempts = (record.attachment.attempts ?? 1) + 1;
+  delete record.attachment.errorCode;
+  delete record.attachment.errorMessage;
+  record.polls = 0;
+  sendJson(response, 200, publicMedia(record));
+}
+
+function handleGetMediaContent(
+  request: IncomingMessage,
+  response: ServerResponse,
+  mediaId: string,
+): void {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const record = findOwnedMedia(bearerToken(request), mediaId);
+
+  if (record === null) {
+    mediaNotFound(response);
+    return;
+  }
+
+  if (record.attachment.status !== "ready") {
+    sendJson(response, 409, {
+      code: "MEDIA_NOT_READY",
+      message: "This file is not ready yet.",
+    });
+    return;
+  }
+
+  response.writeHead(200, {
+    "Content-Type": record.attachment.mimeType ?? "application/octet-stream",
+    "Content-Length": String(record.bytes.byteLength),
+    "Content-Disposition": `attachment; filename="${record.fileName}"`,
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  response.end(record.bytes);
 }
 
 function nextChatId(prefix: string): string {
@@ -1436,7 +1856,9 @@ async function handleSendMessage(
     return;
   }
 
-  if (prompt.toLowerCase().includes("fail")) {
+  const mediaPlan = mediaPromptPlan(prompt, expert.name);
+
+  if (mediaPlan.outcome === "none" && prompt.toLowerCase().includes("fail")) {
     sendJson(response, 503, {
       code: "MODEL_UNAVAILABLE",
       message: "The Expert could not respond right now. Try again in a moment.",
@@ -1465,11 +1887,28 @@ async function handleSendMessage(
     content: prompt,
     createdAt: new Date().toISOString(),
   };
-  const expertMessage = groundedExpertMessage(
-    expert,
-    prompt,
-    nextChatId("msg"),
-  );
+  let expertMessage: ChatMessage;
+
+  if (mediaPlan.outcome === "media") {
+    const record = createFakeMedia(bearerToken(request), mediaPlan);
+
+    expertMessage = {
+      id: nextChatId("msg"),
+      role: "expert",
+      content: mediaPlan.reply,
+      createdAt: new Date().toISOString(),
+      media: [publicMedia(record)],
+    };
+  } else if (mediaPlan.outcome === "text") {
+    expertMessage = {
+      id: nextChatId("msg"),
+      role: "expert",
+      content: mediaPlan.reply,
+      createdAt: new Date().toISOString(),
+    };
+  } else {
+    expertMessage = groundedExpertMessage(expert, prompt, nextChatId("msg"));
+  }
 
   stored.messages.push(userMessage, expertMessage);
   sendJson(response, 201, {
@@ -1578,6 +2017,52 @@ const server = createServer(async (request, response) => {
     request.method === "POST"
   ) {
     await handleSendMessage(request, response);
+    return;
+  }
+
+  const mediaStatusMatch = /^\/api\/v1\/media\/([^/]+)\/status$/.exec(pathname);
+
+  if (mediaStatusMatch !== null && request.method === "GET") {
+    handleGetMediaStatus(
+      request,
+      response,
+      decodeURIComponent(mediaStatusMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  const mediaCancelMatch = /^\/api\/v1\/media\/([^/]+)\/cancel$/.exec(pathname);
+
+  if (mediaCancelMatch !== null && request.method === "POST") {
+    handleCancelMedia(
+      request,
+      response,
+      decodeURIComponent(mediaCancelMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  const mediaRetryMatch = /^\/api\/v1\/media\/([^/]+)\/retry$/.exec(pathname);
+
+  if (mediaRetryMatch !== null && request.method === "POST") {
+    handleRetryMedia(
+      request,
+      response,
+      decodeURIComponent(mediaRetryMatch[1] ?? ""),
+    );
+    return;
+  }
+
+  const mediaContentMatch = /^\/api\/v1\/media\/([^/]+)\/content$/.exec(
+    pathname,
+  );
+
+  if (mediaContentMatch !== null && request.method === "GET") {
+    handleGetMediaContent(
+      request,
+      response,
+      decodeURIComponent(mediaContentMatch[1] ?? ""),
+    );
     return;
   }
 

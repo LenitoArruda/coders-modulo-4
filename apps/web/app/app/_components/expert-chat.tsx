@@ -1,7 +1,13 @@
 "use client";
 
 import { Button } from "@repo/ui/components/ui/button";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 import {
   EMPTY_PROMPT_MESSAGE,
@@ -10,6 +16,7 @@ import {
   type ChatMessage,
   type Citation,
   type Expert,
+  type MediaAttachment,
   type PromptSource,
 } from "../../../lib/expert-chat/types";
 import { FieldError, FormAlert } from "../../_components/form-parts";
@@ -17,12 +24,15 @@ import { labelClassName } from "../../_components/shared-styles";
 import { loadConversationAction, sendPromptAction } from "../chat-actions";
 import { CitedContent } from "./cited-content";
 import { CitationPanel } from "./citation-panel";
+import { MediaAttachmentView } from "./media-attachment";
 
 type ExpertChatProps = {
   experts: Expert[];
   initialExpertId: string;
   initialMessages: ChatMessage[];
   initialError?: string | null;
+  /** Multimedia deliverables are hidden entirely while the rollout flag is off. */
+  mediaDeliverablesEnabled?: boolean;
 };
 
 /**
@@ -36,6 +46,7 @@ export function ExpertChat({
   initialExpertId,
   initialMessages,
   initialError = null,
+  mediaDeliverablesEnabled = false,
 }: ExpertChatProps) {
   const [selectedExpertId, setSelectedExpertId] = useState(initialExpertId);
   const [transcripts, setTranscripts] = useState<Record<string, ChatMessage[]>>(
@@ -52,6 +63,25 @@ export function ExpertChat({
   >({});
   const errorRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  const updateMedia = useCallback(
+    (messageId: string, next: MediaAttachment) => {
+      setTranscripts((current) => ({
+        ...current,
+        [selectedExpertId]: (current[selectedExpertId] ?? []).map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                media: (message.media ?? []).map((item) =>
+                  item.mediaId === next.mediaId ? next : item,
+                ),
+              }
+            : message,
+        ),
+      }));
+    },
+    [selectedExpertId],
+  );
 
   const selectedExpert = experts.find(
     (expert) => expert.id === selectedExpertId,
@@ -221,6 +251,15 @@ export function ExpertChat({
                     {message.content}
                   </p>
                 )}
+                {message.role === "expert" &&
+                  mediaDeliverablesEnabled &&
+                  message.media?.map((item) => (
+                    <MediaAttachmentView
+                      key={item.mediaId}
+                      initial={item}
+                      onUpdate={(next) => updateMedia(message.id, next)}
+                    />
+                  ))}
                 {message.role === "expert" &&
                 message.answerStatus === "retrieval_unavailable" &&
                 promptByMessage[message.id] !== undefined ? (
