@@ -7,15 +7,15 @@
 
 ## 1. Specs do range
 
-| Spec | Título                             | Status   | Worktree      | Branch     | Estado     | Observações                                                  |
-| ---- | ---------------------------------- | -------- | ------------- | ---------- | ---------- | ------------------------------------------------------------ |
-| 012  | Catálogo de Experts e chat         | done     | —             | —          | pulada     | entregue manualmente antes da orquestração; commit `1412ae6` |
-| 013  | Fontes de conhecimento por arquivo | done     | `../spec-013` | `spec/013` | mesclada   | commit `92e4a5c`; merge `b8c99d8`; QA verde                  |
-| 014  | Fontes de conhecimento por URL     | done     | `../spec-014` | `spec/014` | mesclada   | commit `2516a7c`; merge `b16f183`; gates verdes              |
-| 015  | Fontes de conhecimento por mídia   | done     | `../spec-015` | `spec/015` | mesclada   | commit `3d29102`; merge `b9b4d89`; QA verde                  |
-| 016  | Respostas com RAG e citações       | done     | `../spec-016` | `spec/016` | mesclada   | commit `c84aa5f`; merge `eee1cd5`; QA verde                  |
-| 017  | Entregáveis multimídia             | approved | `../spec-017` | `spec/017` | executando | onda 3; HEAD `dd33577`; risco Gemini/Veo billing             |
-| 018  | LangSmith local                    | done     | —             | —          | mesclada   | commit `5e2ad77`; merge `ae91965`; push `b591fd9`; QA verde  |
+| Spec | Título                             | Status | Worktree      | Branch     | Estado   | Observações                                                  |
+| ---- | ---------------------------------- | ------ | ------------- | ---------- | -------- | ------------------------------------------------------------ |
+| 012  | Catálogo de Experts e chat         | done   | —             | —          | pulada   | entregue manualmente antes da orquestração; commit `1412ae6` |
+| 013  | Fontes de conhecimento por arquivo | done   | `../spec-013` | `spec/013` | mesclada | commit `92e4a5c`; merge `b8c99d8`; QA verde                  |
+| 014  | Fontes de conhecimento por URL     | done   | `../spec-014` | `spec/014` | mesclada | commit `2516a7c`; merge `b16f183`; gates verdes              |
+| 015  | Fontes de conhecimento por mídia   | done   | `../spec-015` | `spec/015` | mesclada | commit `3d29102`; merge `b9b4d89`; QA verde                  |
+| 016  | Respostas com RAG e citações       | done   | `../spec-016` | `spec/016` | mesclada | commit `c84aa5f`; merge `eee1cd5`; QA verde                  |
+| 017  | Entregáveis multimídia             | done   | —             | —          | mesclada | commit `25c7ff4`; merge `4f74265`; QA verde                  |
+| 018  | LangSmith local                    | done   | —             | —          | mesclada | commit `5e2ad77`; merge `ae91965`; push `b591fd9`; QA verde  |
 
 Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 
@@ -25,7 +25,7 @@ Estados: `pendente | executando | mesclada | bloqueada | falhou | pulada`.
 | ---- | ------------- | ---------- | ------------ | ------------------------------------------------------ |
 | 1    | 013           | 21:32      | 2026-11-18   | merge `b8c99d8`; push `b1d10c7`                        |
 | 2    | 014, 015, 016 | 2026-11-18 | 2026-11-18   | merges `b16f183`, `b9b4d89`, `eee1cd5`; push `dd33577` |
-| 3    | 017, 018      | 2026-11-18 | —            | 018: push `b591fd9`; 017 pendente                      |
+| 3    | 017, 018      | 2026-11-18 | 2026-11-18   | merges `ae91965`, `4f74265`; push de fechamento        |
 
 Ondas confirmadas pelo usuário em 2026-11-17. A onda 1 foi concluída e publicada com QA verde.
 A onda 2 foi lançada em paralelo com worktrees independentes; a onda 3 segue após sua integração.
@@ -36,9 +36,9 @@ A onda 2 foi lançada em paralelo com worktrees independentes; a onda 3 segue ap
 012 (done)
 ├── 013 (mesclada)
 │   ├── 014 (mesclada)
-│   ├── 015 (mesclada) ──► 017 (executando)
+│   ├── 015 (mesclada) ──► 017 (mesclada/publicada)
 │   └── 016 (mesclada) ──► 018 (mesclada/publicada)
-└── 017 (executando)
+└── 017 (mesclada/publicada)
 ```
 
 Detalhamento:
@@ -118,22 +118,36 @@ Detalhamento:
   12/156, `build` 2/2, `obs:eval` 4/4, `test:e2e` 163/163. Studio/traces ao vivo não validados:
   imagem LangSmith self-hosted é Enterprise/licenciada e o Docker não está disponível.
 - 2026-11-18 — [018] publicada em `b591fd9`; worktree `../spec-018` e branch `spec/018` removidos.
+- 2026-11-18 — [017] `RESULTADO: ok`; commits `9dc494e`, `2cd905f`, `25c7ff4`. Nova slice `media`
+  aditiva: `MULTIMEDIA_DELIVERABLES_ENABLED` default off, migration `0006`, cota em memória por
+  usuário, adapters OpenAI/Gemini e download autenticado.
+- 2026-11-18 — [017] merge `4f74265` após quatro conflitos aditivos com a 018 em
+  `send-message.use-case.ts` (trace + geração), `conversations.module.ts` (importa ambos os módulos),
+  `env.ts` (ambos os blocos de config) e `.docs/QA.md` (seções renumeradas).
+- 2026-11-18 — correção pós-merge: o E2E da 017 usava portas fixas 3017/3437; passou a usar
+  `WEB_URL`/`FAKE_API_URL` de `apps/web/e2e/support/ports.ts`, respeitando `E2E_WEB_PORT` e
+  `E2E_FAKE_API_PORT`. E2E consolidado passou de 167/168 para 168/168.
+- 2026-11-18 — QA final 012–018 na principal: `lint` 3/3, `types:check` 3/3, `test` API 91/627 +
+  web 13/156, `build` 2/2, `obs:eval` 4/4, `test:e2e` 168/168. `db:migrate`/`db:test` seguem
+  bloqueados na principal (Docker fora; 5432 recusou credenciais); migrações validadas nos
+  worktrees com bancos isolados. Billing/API Google e chamada real de vídeo seguem como follow-up.
 
 ## 5. Resultado consolidado
 
-| Spec | Resultado  | Commit da spec | Merge     | QA    | Bloqueios          |
-| ---- | ---------- | -------------- | --------- | ----- | ------------------ |
-| 012  | pulada     | `1412ae6`      | —         | verde | —                  |
-| 013  | ok         | `92e4a5c`      | `b8c99d8` | verde | —                  |
-| 014  | ok         | `2516a7c`      | `b16f183` | verde | —                  |
-| 015  | ok         | `3d29102`      | `b9b4d89` | verde | —                  |
-| 016  | ok         | `c84aa5f`      | `eee1cd5` | verde | —                  |
-| 017  | executando | —              | —         | —     | onda 3; Gemini/Veo |
-| 018  | ok         | `5e2ad77`      | `ae91965` | verde | —                  |
+| Spec | Resultado | Commit da spec | Merge     | QA    | Bloqueios                                     |
+| ---- | --------- | -------------- | --------- | ----- | --------------------------------------------- |
+| 012  | pulada    | `1412ae6`      | —         | verde | —                                             |
+| 013  | ok        | `92e4a5c`      | `b8c99d8` | verde | —                                             |
+| 014  | ok        | `2516a7c`      | `b16f183` | verde | —                                             |
+| 015  | ok        | `3d29102`      | `b9b4d89` | verde | —                                             |
+| 016  | ok        | `c84aa5f`      | `eee1cd5` | verde | —                                             |
+| 017  | ok        | `25c7ff4`      | `4f74265` | verde | billing/API Google e vídeo real não validados |
+| 018  | ok        | `5e2ad77`      | `ae91965` | verde | —                                             |
 
 ## 6. Retomada
 
-018 integrada com QA verde; falta 017. Para retomar: aguardar o `RESULTADO` de 017, integrá-la com
-`merge --no-ff`, rodar QA completo na principal, publicar a onda e remover os worktrees `spec-017`
-e `spec-018`. Riscos: geração de vídeo da 017 via Gemini/Veo pode exigir billing ativado; o
-`db:migrate` da principal depende de Docker, indisponível no momento.
+Range 012–018 concluído, integrado e publicado. Follow-ups fora do range: validar billing/API Google
+e a chamada real de vídeo da 017; validar Studio/traces ao vivo da 018 com LangSmith licenciado e
+Docker disponível; executar `db:migrate`/`db:test` na principal quando o Postgres local estiver
+acessível; avaliar precisão das citações e p95 com OpenAI/Weaviate reais antes de habilitar
+`RAG_CITATIONS_ENABLED` em produção.

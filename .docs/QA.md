@@ -847,3 +847,28 @@ Cobertura adicional da fatia 017:
 - Billing/API Google e a chamada real de vídeo não foram validados; são follow-up de rollout.
   Nenhuma chave, token, URL sensível, prompt, trecho, hash, bytes ou valor de `.env` foi lido,
   exibido ou registrado.
+
+---
+
+## 20. Evidências finais do range 012–018 (2026-11-18)
+
+Merge de fechamento `4f74265` na principal, combinando 017 e 018. Conflitos resolvidos sem
+descartar funcionalidade: emissão de traces e geração de mídia coexistem no `SendMessageUseCase`;
+`ConversationsModule` importa `MediaModule` e `ObservabilityModule`; `env.ts` mantém os dois
+blocos de configuração; as seções de evidências foram renumeradas. A suíte E2E da 017 passou a
+usar `WEB_URL`/`FAKE_API_URL` de `apps/web/e2e/support/ports.ts` em vez das portas fixas
+3017/3437 do worktree.
+
+| Comando               | Resultado                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| `bun run lint`        | ok — 3 tarefas                                                  |
+| `bun run types:check` | ok — 3 tarefas                                                  |
+| `bun run test`        | ok — API 91 arquivos / 627 testes; web 13 arquivos / 156 testes |
+| `bun run build`       | ok — `api` + `web`                                              |
+| `bun run obs:eval`    | ok — 4/4 datasets                                               |
+| `bun run test:e2e`    | ok — 168/168 testes em 5,0 min, portas padrão 3000/3434         |
+| `bun run db:migrate`  | bloqueado — Docker fora; 5432 recusou as credenciais do `.env`  |
+
+As migrações `0001`–`0006` e seus testes SQL foram validados nos worktrees com bancos isolados.
+Não foram registrados chaves, tokens, URLs sensíveis, prompts, respostas, hashes, trechos ou bytes
+de arquivo em logs, relatórios ou documentação.
