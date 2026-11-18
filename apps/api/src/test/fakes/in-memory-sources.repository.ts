@@ -9,6 +9,7 @@ import type {
   SourceSummary,
   SourceVersion,
 } from "../../modules/sources/domain/source";
+import { URL_SOURCE_MIME_TYPE } from "../../modules/sources/domain/source-url-policy";
 
 type StoredFile = { userId: string; versionId: string; content: Buffer };
 type StoredVersion = SourceVersion & { createdOrder: number };
@@ -108,7 +109,7 @@ export class InMemorySourcesRepository extends SourcesRepositoryPort {
       ...input,
       id: randomUUID(),
       chunkCount: 0,
-      errorMessage: null,
+      errorMessage: input.errorMessage ?? null,
       createdAt: now,
       updatedAt: now,
       createdOrder: this.order,
@@ -152,6 +153,21 @@ export class InMemorySourcesRepository extends SourcesRepositoryPort {
         (file) => file.userId === userId && file.versionId === versionId,
       )?.content ?? null
     );
+  }
+
+  async updateVersionContentHash(
+    userId: string,
+    versionId: string,
+    contentHash: string,
+    byteSize: number,
+  ): Promise<void> {
+    const version = await this.findVersion(userId, versionId);
+
+    if (version === null) return;
+
+    version.contentHash = contentHash;
+    version.byteSize = byteSize;
+    version.updatedAt = new Date();
   }
 
   async saveChunks(chunks: Chunk[]): Promise<void> {
@@ -219,6 +235,10 @@ export class InMemorySourcesRepository extends SourcesRepositoryPort {
         return {
           id: source.id,
           name: source.name,
+          url:
+            version.mimeType === URL_SOURCE_MIME_TYPE
+              ? version.originalName
+              : undefined,
           type: source.type,
           byteSize: version.byteSize,
           status: version.status,

@@ -44,6 +44,14 @@ export abstract class SourcesRepositoryPort {
 
   abstract findFile(userId: string, versionId: string): Promise<Buffer | null>;
 
+  /** Replaces the placeholder hash of a failed URL version before a retry. */
+  abstract updateVersionContentHash(
+    userId: string,
+    versionId: string,
+    contentHash: string,
+    byteSize: number,
+  ): Promise<void>;
+
   abstract saveChunks(chunks: Chunk[]): Promise<void>;
 
   abstract updateVersionStatus(

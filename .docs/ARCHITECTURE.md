@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Arquitetura
 
-> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha + catálogo de Experts, chat e fontes de conhecimento por arquivo implementados · **Atualizado em:** 2026-11-18
+> **Status:** fundação + sessão + rotas + sign-up + confirmação + recuperação de senha + catálogo de Experts, chat, fontes de conhecimento por arquivo e por URL implementados · **Atualizado em:** 2026-11-18
 > **Legenda:** ✅ implementado · 🧭 planejado · 🔍 decisão em aberto
 
 Este documento descreve a estrutura do monorepo, a stack e a arquitetura alvo. Para regras de
@@ -13,10 +13,10 @@ engenharia, consulte [DEVELOPMENT.md](./DEVELOPMENT.md).
 Monorepo **Turborepo** com **Bun**, contendo aplicações Next.js, uma API NestJS e pacotes
 compartilhados. A fundação entrega web, API e PostgreSQL local; a primeira feature de produto —
 o catálogo de Experts e o chat em persona (spec 012) — e a ingestão de fontes de conhecimento por
-arquivo (spec 013) já estão implementadas. O produto é uma plataforma de Experts
+arquivo (spec 013) e por URL pública (spec 014) já estão implementadas. O produto é uma plataforma de Experts
 (ver [BUSINESS.md](./BUSINESS.md)), com:
 
-- **Web app** para interação com Experts, conexão de arquivos locais e gestão de conectores.
+- **Web app** para interação com Experts, conexão de arquivos locais e URLs públicas, e gestão de conectores.
 - **API** dedicada para regras de negócio, ingestão e orquestração de agents.
 - **PostgreSQL 18** como banco relacional; a **autenticação é própria da API** (JWT emitido pela
   API, sem provedor externo).
@@ -52,14 +52,14 @@ arquivo (spec 013) já estão implementadas. O produto é uma plataforma de Expe
 └── bun.lock
 ```
 
-| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                                                                                                                                |
-| ---------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação, troca de senha, chat com Experts e painel de fontes de arquivo na porta 3000                                                    |
-| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, catálogo de Experts, conversas com LangGraph, fontes de arquivo com dedup/chunks/embeddings/Weaviate, contrato de erro, env, CORS, logs e OTel na porta 3333 |
-| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                                                                                                                          |
-| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                                                                                                                        |
-| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                                                                                                                  |
-| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                                                                                                                  |
+| App/Pacote                   | Responsabilidade                        | Estado                                                                                                                                                                                                                                                      |
+| ---------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                   | Interface principal do produto          | ✅ grupos `/auth/*` (público) e `/app/*` (privado), shell, guard, ponte de sessão, sign-up, confirmação, recuperação, troca de senha, chat com Experts e painel de fontes de arquivo e URL na porta 3000                                                    |
+| `apps/api`                   | API NestJS                              | ✅ hello em `/api/v1`, sessão JWT + cookie, sign-up, confirmação, forgot/reset-password, catálogo de Experts, conversas com LangGraph, fontes de arquivo e URL com dedup/chunks/embeddings/Weaviate, contrato de erro, env, CORS, logs e OTel na porta 3333 |
+| `packages/ui`                | Componentes compartilhados              | ✅ Tailwind, shadcn, tokens, `cn` e `Button`                                                                                                                                                                                                                |
+| `packages/eslint-config`     | Lint compartilhado                      | ✅ `base`, `next-js`, `react-internal`; preset Babel resolvido                                                                                                                                                                                              |
+| `packages/typescript-config` | Tipagem compartilhada                   | ✅ `base`, `nextjs`, `react-library`                                                                                                                                                                                                                        |
+| `packages/shared`            | Contratos, tipos e utilidades cross-app | 🧭 não existe; aguarda contrato real                                                                                                                                                                                                                        |
 
 ---
 
@@ -161,10 +161,10 @@ apps/api/src/
 │   │   ├── infrastructure/      # repositório `pg`, adapter LangGraph/ChatOpenAI
 │   │   └── interface/           # GET /conversations, POST /conversations/messages + integração
 │   ├── sources/
-│   │   ├── domain/              # Source, SourceVersion, Chunk, Document, política de arquivo e hash
-│   │   ├── application/         # conectar, listar, processar, excluir e retry; portas de extrator/embedding/vetor/repositório
-│   │   ├── infrastructure/      # repositório `pg`, `pdf-parse`, OpenAIEmbeddings e Weaviate REST
-│   │   └── interface/           # GET/POST /sources, DELETE /sources/:id, POST /sources/:versionId/retry
+│   │   ├── domain/              # Source, SourceVersion, Chunk, Document, políticas de arquivo/URL e hash
+│   │   ├── application/         # conectar arquivo/URL, listar, processar, excluir e retry; portas de extrator/embedding/vetor/repositório/fetch
+│   │   ├── infrastructure/      # repositório `pg`, `pdf-parse`, fetch HTTP seguro, OpenAIEmbeddings e Weaviate REST
+│   │   └── interface/           # GET/POST /sources, POST /sources/urls, DELETE /sources/:id, POST /sources/:versionId/retry
 │   ├── hello/
 │   │   ├── domain/
 │   │   ├── application/
@@ -176,7 +176,7 @@ apps/api/src/
 └── main.ts
 ```
 
-Os domínios `experts` e `conversations` (spec 012) e `sources` (spec 013) seguem o mesmo formato;
+Os domínios `experts` e `conversations` (spec 012) e `sources` (specs 013 e 014) seguem o mesmo formato;
 novos domínios (`connectors`, `documents`, `knowledge`) devem segui-lo, criando `infrastructure/`
 quando houver implementação concreta. `auth`, `conversations` e `sources` são as referências de
 slices completos com as quatro camadas.
@@ -653,6 +653,53 @@ Regras:
 - As suítes usam fakes (`InMemorySourcesRepository`, extrator/embedding/vetor em memória) e um
   servidor HTTP local para o adaptador Weaviate. A chave real não é usada nos testes.
 
+### 4.13 Fontes de conhecimento por URL (fatia 014)
+
+O mesmo painel passa a aceitar uma URL pública. A fatia reaproveita integralmente o contrato e o
+pipeline da fatia 013: a página buscada vira um `SourceVersion` do tipo `txt`, com marcador MIME
+privado `text/plain+url`, e segue para chunks, embeddings e vetores sem tipo paralelo de fonte.
+
+```text
+/app (web, server) ── Server Action (JSON) ──► POST /api/v1/sources/urls
+        │                                       │ ConnectSourceUrlUseCase
+        │                                       ├─ normalizeSourceUrl + SSRF policy
+        │                                       ├─ HttpWebPageFetcherAdapter (DNS + redirects)
+        │                                       └─ ConnectSourcesUseCase (SHA-256 do texto extraído)
+        ▼
+KnowledgeSources (client) ◄── Server Actions ◄── GET/DELETE/POST retry /api/v1/sources
+```
+
+| Peça                        | Responsabilidade                                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `source-url-policy.ts`      | Normalização (http/https, hosts, fragmentos, parâmetros de rastreamento, 255 caracteres), bloqueio SSRF e extração de título/texto |
+| `WebPageFetcherPort`        | Porta de busca com `allowPrivateHosts` apenas em testes; timeout, limite de bytes, redirecionamentos e retries configuráveis       |
+| `HttpWebPageFetcherAdapter` | `fetch` com validação de DNS e de cada hop, 8 s, 2 MB, 3 redirecionamentos e 1 retry; nunca registra URL, página ou hash           |
+| `ConnectSourceUrlUseCase`   | Busca, dedup/versionamento pelo pipeline 013 e persistência de versão `failed` com mensagem acionável quando a busca não termina   |
+| `RetrySourceVersionUseCase` | Para versões de URL, refaz a busca antes de reprocessar; falha de busca permanece `failed`                                         |
+| `source-actions.ts`         | `connectSourceUrlAction`: JSON com token apenas no servidor; expõe apenas códigos públicos e mensagens en-US                       |
+| `KnowledgeSources`          | Campo “Add a URL”, estados `processing`/`ready`/`failed`, “Already connected”, retry, remoção e linha com URL normalizada e título |
+
+Endpoint adicional autenticado:
+
+| Rota                        | Resposta                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `POST /api/v1/sources/urls` | `202 { results: ConnectedSourceResult[] }`; JSON `{ url }`; falhas de busca viram versão `failed` |
+
+Regras:
+
+- `sources.normalized_name` é a URL normalizada em minúsculas; `source_versions.original_name`
+  guarda a URL para retry; `source_files.content` guarda o texto extraído. Nenhuma nova migração.
+- Deduplicação continua sendo SHA-256 do conteúdo extraído no escopo de `user_id`. O hash de uma
+  busca falha usa placeholder e é excluído da dedup.
+- SSRF: apenas http/https sem credenciais; bloqueio de loopback, privados, link-local, metadados,
+  special-use e hostnames internos; DNS e cada redirecionamento são validados antes da conexão.
+- `SOURCE_OPENAI_API_KEY` permanece no servidor. Logs e telemetria `knowledge.sources` registram
+  apenas `userId`, IDs opacos, código de erro, desfecho, duração e `chunkCount` — nunca URL,
+  conteúdo da página, hash ou chave.
+- O texto externo é tratado como não confiável e nunca altera regras de Expert/chat/plataforma.
+- E2E usa um fake API com catálogo de páginas controlável por teste; nenhuma rede externa é
+  necessária e os limites de timeout/redirecionamento seguem decisão aberta com Engenharia.
+
 ---
 
 ## 5. Fluxo de dados alvo
@@ -697,7 +744,9 @@ Fluxo resumido:
 > LangGraph/`gpt-4o-mini` (`GET /api/v1/conversations` e `POST /api/v1/conversations/messages`) e
 > o histórico isolado por usuário. A fatia 013 acrescenta o FAB/painel de fontes, o upload
 > multipart de PDF/TXT/Markdown, deduplicação por hash, chunks, embeddings e gravação no Weaviate
-> local (`KnowledgeChunk`), com listagem, retry e exclusão isolados por usuário. O schema de auth
+> local (`KnowledgeChunk`), com listagem, retry e exclusão isolados por usuário. A fatia 014
+> acrescenta a conexão de URLs públicas ao mesmo painel, com validação SSRF e o mesmo pipeline de
+> indexação. O schema de auth
 > veio na fatia 001, o de conversas na fatia 012 e o de fontes na fatia 013; os vetores ainda não
 > são consultados pelo chat (fatia 5 do épico).
 
@@ -742,21 +791,25 @@ tomadas.
 | Weaviate local com vectorizer `none`         | Vetores vêm do `text-embedding-3-small`; distância cosine e IDs determinísticos         | ✅                                           |
 | Adaptador Weaviate por REST/GraphQL          | Compose expõe apenas a porta HTTP 8080; cliente v3 exigiria gRPC 50051                  | ✅                                           |
 | Limites provisórios 10 MB / 5 arquivos       | Validação centralizada no domínio e ecoada no web; definição final segue em aberto      | ✅ (follow-up)                               |
+| URL como fonte `txt` com marcador MIME       | Reusa o contrato 013 sem migração; hash do texto extraído e retry refaz a busca         | ✅                                           |
+| Política SSRF centralizada no domínio        | Validação antes do fetch, no DNS e em cada redirecionamento; host privado nunca buscado | ✅                                           |
 
 ---
 
 ## 7. Decisões em aberto
 
-| Tema                  | Pergunta                                                                                       |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| Deploy da API         | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render). |
-| OXLint/OXFmt          | Migrar do ESLint/Prettier atual ou manter?                                                     |
-| Multi-tenancy         | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                     |
-| `packages/shared`     | Quais contratos realmente serão compartilhados entre web e api?                                |
-| PostgreSQL gerenciado | Qual provedor (Neon, RDS, Cloud SQL) será usado em produção?                                   |
-| Limites de upload     | Tamanho máximo por arquivo e quantidade por envio definitivos (hoje 10 MB / 5, provisórios).   |
-| Retenção de fontes    | Por quanto tempo manter arquivo original, versões antigas, chunks e embeddings após a conexão. |
-| Metas de ingestão     | Latência e custo máximos aceitáveis por arquivo processado.                                    |
+| Tema                  | Pergunta                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| Deploy da API         | NestJS na Vercel atende limites de execução e filas? Avaliar alternativa (Railway/Fly/Render).   |
+| OXLint/OXFmt          | Migrar do ESLint/Prettier atual ou manter?                                                       |
+| Multi-tenancy         | Workspace/organização é obrigatório no MVP? Impacta RLS e modelo de dados.                       |
+| `packages/shared`     | Quais contratos realmente serão compartilhados entre web e api?                                  |
+| PostgreSQL gerenciado | Qual provedor (Neon, RDS, Cloud SQL) será usado em produção?                                     |
+| Limites de upload     | Tamanho máximo por arquivo e quantidade por envio definitivos (hoje 10 MB / 5, provisórios).     |
+| Retenção de fontes    | Por quanto tempo manter arquivo original, versões antigas, chunks e embeddings após a conexão.   |
+| Metas de ingestão     | Latência e custo máximos aceitáveis por arquivo e por página processados.                        |
+| Limites de URL        | Timeout, tamanho máximo de resposta e redirecionamentos definitivos (hoje 8 s / 2 MB / 3).       |
+| Robots e termos       | Verificar `robots.txt` antes de buscar páginas externas? Hoje apenas conteúdo público é buscado. |
 
 ---
 

@@ -5,6 +5,7 @@ import { SourcesRepositoryPort } from "./ports/sources-repository.port";
 import { ProcessSourceVersionUseCase } from "./process-source-version.use-case";
 import type { SourceStatus, SourceType } from "../domain/source";
 import type { ValidatedSourceFile } from "../domain/source-file-policy";
+import { URL_SOURCE_MIME_TYPE } from "../domain/source-url-policy";
 import { SourceProcessingError } from "../domain/source.errors";
 
 export type ConnectSourcesInput = {
@@ -14,6 +15,8 @@ export type ConnectSourcesInput = {
 
 export type ConnectedSourceResult = {
   name: string;
+  /** Present only for URL sources; `name` then holds the page title. */
+  url?: string;
   type: SourceType;
   byteSize: number;
   sourceId: string;
@@ -55,7 +58,11 @@ export class ConnectSourcesUseCase {
         });
 
         results.push({
-          name: file.originalName,
+          name: file.displayName ?? file.originalName,
+          url:
+            file.mimeType === URL_SOURCE_MIME_TYPE
+              ? file.originalName
+              : undefined,
           type: file.type,
           byteSize: file.byteSize,
           sourceId: existing.sourceId,
@@ -74,7 +81,7 @@ export class ConnectSourcesUseCase {
         existingSource ??
         (await this.sources.createSource(
           input.userId,
-          file.originalName,
+          file.displayName ?? file.originalName,
           file.normalizedName,
           file.type,
         ));
@@ -98,7 +105,11 @@ export class ConnectSourcesUseCase {
         if (concurrent === null) throw new SourceProcessingError();
 
         results.push({
-          name: file.originalName,
+          name: file.displayName ?? file.originalName,
+          url:
+            file.mimeType === URL_SOURCE_MIME_TYPE
+              ? file.originalName
+              : undefined,
           type: file.type,
           byteSize: file.byteSize,
           sourceId: concurrent.sourceId,
@@ -125,7 +136,11 @@ export class ConnectSourcesUseCase {
       });
 
       results.push({
-        name: file.originalName,
+        name: file.displayName ?? file.originalName,
+        url:
+          file.mimeType === URL_SOURCE_MIME_TYPE
+            ? file.originalName
+            : undefined,
         type: file.type,
         byteSize: file.byteSize,
         sourceId: source.id,

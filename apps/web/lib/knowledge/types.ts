@@ -9,6 +9,8 @@ export type SourceType = "pdf" | "txt" | "markdown";
 export type SourceSummary = {
   id: string;
   name: string;
+  /** Present only for URL sources; `name` then holds the extracted page title. */
+  url?: string;
   type: SourceType;
   byteSize: number;
   status: SourceStatus;
@@ -21,6 +23,7 @@ export type SourceSummary = {
 
 export type ConnectedSourceResult = {
   name: string;
+  url?: string;
   type: SourceType;
   byteSize: number;
   sourceId: string;
@@ -36,6 +39,7 @@ export type SourceActionResult<T> =
   { ok: true; data: T; message?: string } | { ok: false; message: string };
 
 export const CONNECT_SOURCES_PATH = "/api/v1/sources";
+export const CONNECT_SOURCE_URL_PATH = "/api/v1/sources/urls";
 
 /** Mirrors the API domain limits; the API validates again on every request. */
 export const MAX_SOURCE_FILE_BYTES = 10 * 1024 * 1024;
@@ -46,6 +50,9 @@ export const SOURCE_EMPTY_MESSAGE =
   "No sources connected yet. Use the add button to connect a document.";
 export const SOURCE_CONNECT_FAILED_MESSAGE =
   "We could not connect these files. Try again.";
+export const SOURCE_URL_REQUIRED_MESSAGE = "Enter a public HTTP or HTTPS URL.";
+export const SOURCE_URL_CONNECT_FAILED_MESSAGE =
+  "We could not connect this URL. Try again.";
 export const SOURCE_LOAD_FAILED_MESSAGE =
   "We could not load your sources. Try again.";
 export const SOURCE_DELETE_FAILED_MESSAGE =

@@ -4,6 +4,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
+import { isIP } from "node:net";
 
 import {
   E2E_CONFIRM_RATE_LIMITED_TOKEN,
@@ -485,6 +486,8 @@ type FakeSourceVersion = {
   chunkCount: number;
   createdAt: string;
   polls: number;
+  url?: string;
+  errorMessage?: string;
 };
 
 type FakeSource = {
@@ -505,6 +508,16 @@ type FakeSourceSummary = {
   chunkCount: number;
   isStale: boolean;
   createdAt: string;
+  url?: string;
+  errorMessage?: string;
+};
+
+type FakePageKind = "text" | "no-text" | "unavailable";
+
+type FakePage = {
+  title: string;
+  text: string;
+  kind: FakePageKind;
 };
 
 const MAX_FAKE_SOURCE_FILE_BYTES = 10 * 1024 * 1024;
@@ -519,9 +532,19 @@ const SOURCE_TOO_LARGE_MESSAGE =
   "One of the files is too large. Try a smaller file.";
 const SOURCE_NOT_FOUND_MESSAGE = "That source is no longer available.";
 const SOURCE_VERSION_NOT_FOUND_MESSAGE = "That version is no longer available.";
+const INVALID_URL_MESSAGE =
+  "Enter a valid public HTTP or HTTPS URL (255 characters or fewer).";
+const BLOCKED_URL_MESSAGE =
+  "That address is not allowed. Use a public HTTP or HTTPS link.";
+const NO_TEXT_URL_MESSAGE =
+  "That page has no text we can index. Try another URL or upload a file.";
+const UNAVAILABLE_URL_MESSAGE =
+  "We could not load that page. Check the address and try again.";
 
 /** Source state is keyed by session token so parallel E2E tests stay isolated. */
 const sourcesByToken = new Map<string, FakeSource[]>();
+/** Fake page contents, keyed by normalized URL; tests may update them. */
+const fakePages = new Map<string, FakePage>();
 let sourceSequence = 0;
 
 function nextSourceId(prefix: string): string {
@@ -539,6 +562,130 @@ function tokenSources(token: string): FakeSource[] {
   }
 
   return sources;
+}
+
+const FAKE_TRACKING_PARAMS = new Set([
+  "fbclid",
+  "gclid",
+  "igshid",
+  "mc_cid",
+  "mc_eid",
+  "msclkid",
+  "ref",
+  "ref_src",
+  "source",
+]);
+
+/** Mirrors the API's public-URL normalization closely enough for E2E. */
+function normalizeFakeSourceUrl(input: string): string | null {
+  const trimmed = input.trim();
+
+  if (trimmed.length === 0 || trimmed.length > 255 || /\s/.test(trimmed)) {
+    return null;
+  }
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (
+    (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+    parsed.hostname === "" ||
+    parsed.username !== "" ||
+    parsed.password !== ""
+  ) {
+    return null;
+  }
+
+  for (const key of Array.from(parsed.searchParams.keys())) {
+    const lower = key.toLowerCase();
+
+    if (lower.startsWith("utm_") || FAKE_TRACKING_PARAMS.has(lower)) {
+      parsed.searchParams.delete(key);
+    }
+  }
+
+  parsed.host = parsed.host.toLowerCase();
+  parsed.hash = "";
+
+  let normalized = parsed.toString();
+
+  if (normalized.endsWith("/") && parsed.pathname === "/") {
+    normalized = normalized.slice(0, -1);
+  }
+
+  return normalized.length > 0 && normalized.length <= 255 ? normalized : null;
+}
+
+function isBlockedFakeHost(hostname: string): boolean {
+  const normalized = hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+
+  if (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized.endsWith(".local") ||
+    normalized.endsWith(".cluster.local") ||
+    normalized.endsWith(".svc") ||
+    normalized === "metadata" ||
+    normalized === "metadata.google.internal" ||
+    normalized === "metadata.goog" ||
+    normalized === "instance-data" ||
+    normalized === "kubernetes.default.svc"
+  ) {
+    return true;
+  }
+
+  if (isIP(normalized) === 0) return false;
+
+  if (
+    normalized === "::" ||
+    normalized === "::1" ||
+    normalized.startsWith("0.") ||
+    normalized.startsWith("10.") ||
+    normalized.startsWith("127.") ||
+    normalized.startsWith("169.254.") ||
+    normalized.startsWith("192.168.") ||
+    normalized.startsWith("192.0.")
+  ) {
+    return true;
+  }
+
+  const parts = normalized.split(".");
+  const second = parts.length > 1 ? Number(parts[1]) : 0;
+
+  return normalized.startsWith("172.") && second >= 16 && second <= 31;
+}
+
+function fakePageTitle(url: string): string {
+  const parsed = new URL(url);
+  const segment =
+    decodeURIComponent(parsed.pathname).split("/").filter(Boolean).pop() ??
+    parsed.hostname;
+  const titled = segment
+    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  return titled === "" ? parsed.hostname : titled;
+}
+
+function fakePageFor(url: string): FakePage {
+  const configured = fakePages.get(url);
+
+  if (configured !== undefined) return configured;
+
+  const title = fakePageTitle(url);
+
+  return { title, text: `${title}: public knowledge page.`, kind: "text" };
 }
 
 function readRawBody(request: IncomingMessage): Promise<Buffer> {
@@ -656,6 +803,10 @@ function toFakeSummary(source: FakeSource): FakeSourceSummary | null {
     chunkCount: version.chunkCount,
     isStale: false,
     createdAt: version.createdAt,
+    ...(version.url === undefined ? {} : { url: version.url }),
+    ...(version.errorMessage === undefined
+      ? {}
+      : { errorMessage: version.errorMessage }),
   };
 }
 
@@ -824,6 +975,146 @@ async function handleConnectSources(
   sendJson(response, 202, { results });
 }
 
+/** POST /api/v1/sources/urls — one public page, same source contract as files. */
+async function handleConnectSourceUrl(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  if (!isAuthenticated(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  const body = asRecord(await readJsonBody(request));
+  const url = normalizeFakeSourceUrl(readString(body, "url"));
+
+  if (url === null) {
+    sourceError(response, 400, "INVALID_SOURCE_URL", INVALID_URL_MESSAGE);
+    return;
+  }
+
+  const hostname = new URL(url).hostname;
+
+  if (isBlockedFakeHost(hostname)) {
+    sourceError(response, 400, "BLOCKED_SOURCE_URL", BLOCKED_URL_MESSAGE);
+    return;
+  }
+
+  const page = fakePageFor(url);
+  const failed = page.kind !== "text";
+  const contentHash = createHash("sha256")
+    .update(failed ? `failed:${url}` : page.text)
+    .digest("hex");
+  const sources = tokenSources(bearerToken(request));
+  const existing = sources
+    .flatMap((source) =>
+      source.versions.map((version) => ({ source, version })),
+    )
+    .find(
+      (candidate) =>
+        candidate.version.contentHash === contentHash &&
+        candidate.version.status !== "failed",
+    );
+
+  if (existing !== undefined) {
+    sendJson(response, 202, {
+      results: [
+        {
+          name: page.title,
+          type: "txt",
+          byteSize: Buffer.byteLength(page.text, "utf8"),
+          sourceId: existing.source.id,
+          versionId: existing.version.id,
+          status: existing.version.status,
+          alreadyConnected: true,
+          url,
+        },
+      ],
+    });
+    return;
+  }
+
+  let source = sources.find(
+    (candidate) => candidate.normalizedName === url.toLowerCase(),
+  );
+
+  if (source === undefined) {
+    source = {
+      id: nextSourceId("src"),
+      normalizedName: url.toLowerCase(),
+      currentVersionId: "",
+      versions: [],
+    };
+    sources.unshift(source);
+  }
+
+  const errorMessage = failed
+    ? page.kind === "no-text"
+      ? NO_TEXT_URL_MESSAGE
+      : UNAVAILABLE_URL_MESSAGE
+    : undefined;
+  const version: FakeSourceVersion = {
+    id: nextSourceId("ver"),
+    contentHash,
+    name: page.title,
+    type: "txt",
+    byteSize: failed ? 1 : Buffer.byteLength(page.text, "utf8"),
+    status: failed ? "failed" : "processing",
+    chunkCount: 0,
+    createdAt: new Date().toISOString(),
+    polls: 1,
+    url,
+    ...(errorMessage === undefined ? {} : { errorMessage }),
+  };
+
+  source.versions.push(version);
+  source.currentVersionId = version.id;
+
+  sendJson(response, 202, {
+    results: [
+      {
+        name: page.title,
+        type: "txt",
+        byteSize: version.byteSize,
+        sourceId: source.id,
+        versionId: version.id,
+        status: version.status,
+        alreadyConnected: false,
+        url,
+      },
+    ],
+  });
+}
+
+/** Test-only control for simulated page changes and fetch failures. */
+async function handleSetFakePage(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const body = asRecord(await readJsonBody(request));
+  const url = normalizeFakeSourceUrl(readString(body, "url"));
+
+  if (url === null) {
+    sendJson(response, 400, {
+      code: "INVALID_SOURCE_URL",
+      message: INVALID_URL_MESSAGE,
+    });
+    return;
+  }
+
+  const previous = fakePageFor(url);
+  const requestedKind = readString(body, "kind");
+  const kind: FakePageKind =
+    requestedKind === "no-text" || requestedKind === "unavailable"
+      ? requestedKind
+      : "text";
+  const title = readString(body, "title").trim() || previous.title;
+  const text = typeof body.text === "string" ? body.text : previous.text;
+
+  fakePages.set(url, { title, text, kind });
+  sendJson(response, 200, { url, title, kind });
+}
+
 /** DELETE /api/v1/sources/:sourceId */
 function handleDeleteSource(
   request: IncomingMessage,
@@ -871,6 +1162,28 @@ function handleRetrySourceVersion(
       SOURCE_VERSION_NOT_FOUND_MESSAGE,
     );
     return;
+  }
+
+  if (match.url !== undefined) {
+    // A failed URL version is re-fetched on retry, just like the real use case.
+    const page = fakePageFor(match.url);
+
+    if (page.kind !== "text") {
+      sourceError(
+        response,
+        422,
+        page.kind === "no-text"
+          ? "SOURCE_URL_NO_TEXT"
+          : "SOURCE_URL_UNAVAILABLE",
+        page.kind === "no-text" ? NO_TEXT_URL_MESSAGE : UNAVAILABLE_URL_MESSAGE,
+      );
+      return;
+    }
+
+    match.name = page.title;
+    match.byteSize = Buffer.byteLength(page.text, "utf8");
+    match.contentHash = createHash("sha256").update(page.text).digest("hex");
+    delete match.errorMessage;
   }
 
   match.status = "ready";
@@ -1106,6 +1419,16 @@ const server = createServer(async (request, response) => {
 
   if (pathname === "/api/v1/sources" && request.method === "POST") {
     await handleConnectSources(request, response);
+    return;
+  }
+
+  if (pathname === "/api/v1/sources/urls" && request.method === "POST") {
+    await handleConnectSourceUrl(request, response);
+    return;
+  }
+
+  if (pathname === "/__fake/pages" && request.method === "POST") {
+    await handleSetFakePage(request, response);
     return;
   }
 
